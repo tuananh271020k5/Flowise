@@ -1,0 +1,15 @@
+# Codex project config (loaded only because this project is trusted in ~/.codex/config.toml).
+# Docs: https://learn.chatgpt.com/docs/config-file/config-advanced
+#
+# Where Codex reads things in this project:
+#   AGENTS.md             -> instructions (repo root, not inside .codex/)
+#   .agents/skills/       -> skills (shared with Antigravity)
+#   .codex/agents/*.toml  -> subagents, generated from .claude/agents/ by scripts/sync-ai-config.py
+#   .codex/config.toml    -> this file: project overrides (model, MCP servers, hooks)
+#   .codex/hooks.json     -> optional lifecycle hooks
+#
+# Credential/provider keys (model_provider, openai_base_url, profiles, notify, otel...) are ignored here;
+# set those in ~/.codex/config.toml.
+#
+# Open Codex at the trello-clone root. Inside a sub-repo (e.g. Trello-Clone-Backend/) the .git there
+# becomes the project root and this file, AGENTS.md and .agents/skills/ at the root are not loaded.

@@ -1,0 +1,12 @@
+{
+    "currentTask": "TASK-001",
+    "status": "in_progress",
+    "productStage": "baseline_in_progress",
+    "summary": "Ví dụ cấu trúc bàn giao; thay bằng kết quả thật trước khi dùng.",
+    "decisions": [],
+    "changedFiles": [],
+    "checks": [],
+    "blockers": [],
+    "nextActions": ["Thực hiện bước tiếp theo đã được giao"],
+    "nextTask": "TASK-001"
+}

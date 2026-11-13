@@ -1,0 +1,69 @@
+{
+    "schemaVersion": 1,
+    "revision": 6,
+    "updatedAt": "2026-11-13T19:18:05.502Z",
+    "authorization": "planning_and_local_harness_only; product implementation requires a later user request",
+    "baselineGitHead": "9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb",
+    "currentTask": "PLAN-000",
+    "status": "completed",
+    "productStage": "not_started",
+    "summary": "Theo yêu cầu commit/push: baseline code/dependency đã lưu ở 8f3e3946 và push thành công. Bộ plan 7 phase/68 task + 8 harness, instructions, handoff, MCP task và shared state được đóng gói trong commit PLAN-000 chứa checkpoint này. Builder chưa triển khai.",
+    "decisions": [
+        "Tách baseline patches và PLAN-000 thành commit riêng; người dùng đã cho phép commit/push công việc hiện có.",
+        "origin là fork tuananh271020k5/Flowise; push baseline đã xác minh quyền ghi; tra Git history để lấy SHA commit chứa state này.",
+        "Cache CodeGraph, .local, node_modules và .DS_Store không đưa lên Git; không tự đánh dấu task sản phẩm hoàn tất."
+    ],
+    "changedFiles": [
+        ".gitignore",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        "PLAN_TONG_HOP.md",
+        "FLOWISE_AGENT_BUILDER_HARNESS_V2.md",
+        "AI-Agent/"
+    ],
+    "checks": [
+        "node --test AI-Agent/harness/harness.test.mjs: PASS 15/15, 0 skipped, chạy lại trong phiên commit/push.",
+        "Docs local links/source pointers/state refs và phase/task counts: PASS; git diff --check PASS.",
+        "Baseline git commit: pretty-quick và lint-staged/eslint hooks PASS; git push origin main PASS cho 8f3e3946.",
+        "Chưa chạy Flowise build/runtime hoặc benchmark token; không coi commit baseline là xác minh chức năng."
+    ],
+    "blockers": [
+        "TASK-001 vẫn cần chuẩn hóa Node/pnpm và kiểm chứng runtime/auth/fixture/prediction.",
+        "Antigravity/Claude/Gemini cold start, interrupted handoff và token A/B chưa xác minh."
+    ],
+    "nextActions": [
+        "Khi bắt đầu triển khai: TASK-001 / PH0-T01–T06; tiếp nhận state và Git history hiện tại.",
+        "SHA của commit chứa checkpoint và trạng thái đã push xem git log/branch tracking; checkpoint được ghi trước commit nên HEAD snapshot là parent."
+    ],
+    "nextTask": "TASK-001",
+    "references": [
+        "AI-Agent/harness/GIT_WORKFLOW.md",
+        "AI-Agent/harness/HANDOFF.md",
+        "AI-Agent/tasks/PH6-T12.md",
+        "PLAN_TONG_HOP.md",
+        "AI-Agent/context/PROJECT_MAP.md",
+        "AI-Agent/context/BASELINE.md",
+        "AI-Agent/plans/MASTER_PLAN.md",
+        "AI-Agent/tasks/TASK-001.md"
+    ],
+    "measurement": {
+        "actualInputTokens": null,
+        "actualOutputTokens": null,
+        "verifiedSavings": false
+    },
+    "repository": {
+        "origin": "https://github.com/tuananh271020k5/Flowise.git",
+        "upstream": "https://github.com/FlowiseAI/Flowise",
+        "trackingBranch": "origin/main",
+        "fetchVerified": true,
+        "pushVerified": true,
+        "baselinePatchCommit": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
+        "newCommitCreatedDuringSetup": false
+    },
+    "snapshot": {
+        "head": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
+        "branch": "main",
+        "sourceFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "schemaVersion": 1,
+    "maxPackChars": 12000,
+    "maxSectionChars": 4200,
+    "maxSourceBytes": 131072,
+    "maxLogBytes": 2097152,
+    "maxLogLines": 80,
+    "defaultTask": "AI-Agent/tasks/TASK-001.md",
+    "baseFiles": ["AI-Agent/state/project.json", "AI-Agent/context/PROJECT_MAP.md"],
+    "allowedContextFiles": [
+        "PLAN_TONG_HOP.md",
+        "AI-Agent/state/project.json",
+        "AI-Agent/context/PROJECT_MAP.md",
+        "AI-Agent/context/BASELINE.md",
+        "AI-Agent/tasks/TASK-000.md",
+        "AI-Agent/tasks/TASK-001.md",
+        "AI-Agent/tasks/PH6-T12.md",
+        "AI-Agent/harness/HANDOFF.md",
+        "AI-Agent/harness/GIT_WORKFLOW.md",
+        "AI-Agent/plans/MASTER_PLAN.md",
+        "AI-Agent/plans/CONTRACTS.md",
+        "AI-Agent/plans/DOCUMENT_REVIEW.md",
+        "AI-Agent/plans/BACKLOG.md",
+        "AI-Agent/decisions/ADR-001.md"
+    ]
+}
