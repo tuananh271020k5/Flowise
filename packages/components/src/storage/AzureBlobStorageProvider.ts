@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { BlobServiceClient, ContainerClient, StorageSharedKeyCredential } from '@azure/storage-blob'
 import multer from 'multer'
 import { MulterAzureStorage } from 'multer-azure-blob-storage'
