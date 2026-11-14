@@ -1,5 +1,11 @@
 # Nhật ký bàn giao ngắn
 
+## 14/11/2026 — TASK-001 / PH0-T01–T06
+
+Người dùng giao làm task đầu tiên và tự commit/push. Git `main` sạch tại `c31ae010` trước khi sửa. Tải Node 24.15.0/pnpm 10.26.0 portable vào thư mục local ignored, xác minh hash. Frozen install ban đầu lỗi mismatch giữa root `resolutions` và lockfile `overrides`; đồng bộ lockfile với pnpm 10 rồi frozen install exit 0. `pnpm build` exit 0, Turbo 6/6. Server SQLite local ở `127.0.0.1:3037` khởi tạo đầy đủ; Couchbase native node không load trên Windows nên integration đó chưa kiểm tra.
+
+Tạo Start node 1.4 qua UI, fixture Start → Direct Reply sanitized; API create/read/update và prediction trả HTTP 200. Edge headless mở lại canvas với 2 node, flowData trùng fixture, không page error. **Private draft vẫn cho phép prediction ẩn danh HTTP 200** dù `deployed=false`/`isPublic=false`; GET private flow ẩn danh HTTP 401. Chưa có model credential nên LLM path và cách ly chéo workspace/org chưa kiểm tra. Đã dừng instance local sau kiểm tra. Harness tests 15/15 pass; doctor pass và nay ghi rõ nó không tự probe runtime. Tạo task handoff B-002, đổi default/allowlist context sang task đó; pack 9.148/12.000 ký tự, chưa đo token thật. Bằng chứng: [TASK-001_RUNTIME.md](../context/TASK-001_RUNTIME.md). Checkpoint hoàn thành trỏ B-002/PH0-T07–T08; không commit/push trong phiên này.
+
 ## 14/11/2026 — Commit và push theo yêu cầu
 
 Người dùng yêu cầu thực hiện commit/push các thay đổi hiện có. Đã tách 9 file code/dependency có từ trước vào commit `8f3e3946` (chore baseline) và push thành công lên origin/main. Commit hook pretty-quick/lint-staged chạy thành công. Chạy lại harness tests: 15/15 pass, 0 skip; kiểm tra docs/phase task counts và git diff --check đạt. Bộ plan/harness/instructions/shared state/blueprint được đóng gói trong commit PLAN-000 chứa entry này. Không đưa .codegraph, AI-Agent/.local, node_modules hoặc .DS_Store vào commit. Không chạy build/runtime Flowise; chưa đo tiết kiệm token thật.

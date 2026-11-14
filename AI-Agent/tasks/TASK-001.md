@@ -1,6 +1,6 @@
 # TASK-001 — Chuẩn hóa môi trường và xác minh runtime baseline
 
-**Status:** not_started. **Loại:** task triển khai tương lai; chưa được thực hiện trong phiên lập plan.
+**Status:** completed ngày 14/11/2026 cho baseline deterministic V2. **Bằng chứng:** [TASK-001_RUNTIME.md](../context/TASK-001_RUNTIME.md).
 **Phụ thuộc:** PLAN-000. **Ước lượng:** 2–4 ngày tập trung, điều chỉnh theo lỗi môi trường.
 
 ## Mục tiêu
@@ -11,7 +11,7 @@ Chứng minh Flowise tại fork này build/start được và một Agentflow V2
 
 Root `AGENTS.md`, `AI-Agent/state/project.json`, `AI-Agent/context/PROJECT_MAP.md`, phần environment + unknown trong `AI-Agent/context/BASELINE.md`. Chỉ mở master plan mục có liên quan.
 
-## Hiện trạng cần nhớ
+## Snapshot trước khi thực hiện (lịch sử)
 
 -   Pinned HEAD `9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb`; có 9 tracked files đã sửa từ trước.
 -   Local Node 22.19.0/pnpm.cmd 12.18.0 lệch engines ^24/^10.26.0.
@@ -35,12 +35,16 @@ Baseline docs/fixtures/logs local; environment project-local; kiểm tra hẹp c
 
 ## Definition of done
 
--   [ ] Node/pnpm phù hợp engine; install/build thực sự thành công hoặc lỗi đã được xác định, không báo pass giả.
--   [ ] Instance local start thành công; auth/DB/config không lộ secrets.
--   [ ] Có một fixture flow V2 sanitized từ fork thật, mở lại canvas được.
--   [ ] Controlled prediction trả lời được, hoặc trạng thái ghi rõ blocked dependency/credential và chưa đạt DoD toàn phần.
--   [ ] Contract behavior draft/private/auth được ghi với bằng chứng; không gọi cờ deployed là sandbox.
--   [ ] Baseline cập nhật và phạm vi demo D1/B-002 sẵn để bắt đầu.
+-   [x] Node/pnpm phù hợp engine; frozen install và build thực sự thành công.
+-   [x] Instance local start thành công; auth/DB/config không lộ secrets.
+-   [x] Có một fixture flow V2 sanitized từ fork thật, mở lại canvas được.
+-   [x] Controlled prediction Direct Reply trả lời được; LLM provider chưa được cấp credential nên đường model chưa xác minh.
+-   [x] Contract behavior draft/private/auth được ghi với bằng chứng; cờ deployed không chặn prediction ẩn danh.
+-   [x] Baseline cập nhật và phạm vi demo D1/B-002 sẵn để chốt ở task tiếp theo.
+
+## Kết quả và giới hạn
+
+Node 24.15.0/pnpm 10.26.0 portable, frozen install, build 6/6 và server SQLite local đều đạt. Fixture Start → Direct Reply mở lại qua UI và prediction trả lời. `deployed=false`/`isPublic=false` vẫn cho phép prediction ẩn danh: xem [runtime evidence](../context/TASK-001_RUNTIME.md) trước khi thiết kế draft/preview. Chưa thử LLM provider hoặc cách ly chéo workspace/org; PH0-T07–T08 (B-002) phải chốt model profile, demo, license và owner xử lý rủi ro. Người dùng tự commit/push thay đổi của task này.
 
 ## Prompt bàn giao ngắn
 

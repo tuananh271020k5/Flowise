@@ -1,7 +1,7 @@
 # Project map — chỉ dẫn truy xuất ngắn
 
 -   Mục tiêu: Chat → yêu cầu có cấu trúc → Agentflow V2 draft → test → chỉnh bằng chat.
--   Nền đã khảo sát: Flowise 3.1.4, HEAD `9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb`; working tree có thay đổi sẵn. Builder chưa được triển khai.
+-   Nền đã khảo sát: Flowise 3.1.4; TASK-001 chạy trên `main` tại `c31ae010ad0da23b823abbc31c16a9e732025dad`. Builder chưa được triển khai.
 -   React UI: `packages/ui`; Express/API + TypeORM + runtime: `packages/server`; node/tool/model: `packages/components`.
 -   `packages/agentflow` là editor/generator client, manifest `0.0.0-dev.14`; không phải execution engine độc lập.
 -   `packages/observe` tồn tại; ngoài đường găng MVP. CodeGraph `.codegraph/` và MCP đã dùng được trong phiên khảo sát.
@@ -21,6 +21,6 @@
 
 Đã xác minh từ source: API prefix `/api/v1`; tạo/sửa qua `/chatflows`; generator `/agentflowv2-generator/generate` nhận `question` + `selectedChatModel`; `flowData` lưu dạng JSON string; Agentflow V2 dùng type `AGENTFLOW`. Canvas `/v2/agentcanvas/:id`.
 
-Controller tạo flow lấy organization/workspace từ `req.user`; không được thay bằng trường do LLM/user body tự gửi. Không coi cờ `deployed=false` hay `isPublic=false` là sandbox hoặc lớp chặn prediction đã được chứng minh.
+Controller tạo flow lấy organization/workspace từ `req.user`; không được thay bằng trường do LLM/user body tự gửi. Runtime TASK-001 chứng minh `deployed=false` và `isPublic=false` **vẫn cho phép prediction ẩn danh**; xem [bằng chứng](TASK-001_RUNTIME.md) trước khi thiết kế draft/preview.
 
-Chưa xác minh bằng runtime: build/start Flowise, auth end-to-end, export fixtures, tạo/chạy draft, policy cách ly, tiết kiệm token thật. Xem `BASELINE.md` khi task đụng những phần này.
+Đã xác minh build/start, auth local, CRUD flow, canvas V2 và Direct Reply prediction. Chưa xác minh provider LLM, cách ly chéo workspace/org hoặc tiết kiệm token thật. Xem [TASK-001_RUNTIME.md](TASK-001_RUNTIME.md); bước kế tiếp [B-002](../tasks/B-002.md)/PH0-T07–T08.

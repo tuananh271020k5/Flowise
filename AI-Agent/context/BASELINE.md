@@ -85,3 +85,9 @@ Không gán tác giả hoặc mục đích cho các patch trên. Không reset/st
 -   [Gemini CLI context](https://geminicli.com/docs/cli/gemini-md/): root `GEMINI.md`; kiểm tra nạp file bằng `/memory show`.
 
 Về giấy phép: `LICENSE.md` local ghi ngoại lệ commercial cho enterprise directory và file có notice riêng như IdentityManager. Ghi nhận phạm vi này trong kế hoạch; việc xác định quyền sử dụng cụ thể cần người phụ trách kiểm tra, chưa được kết luận ở đây.
+
+## Cập nhật sau TASK-001 — 14/11/2026
+
+Phần trên là snapshot khảo sát ban đầu. Sau khi người dùng giao TASK-001, Node 24.15.0/pnpm 10.26.0 portable, frozen install, build 6/6, server SQLite local, CRUD flow, canvas V2 và Direct Reply prediction đều đã được chạy thật. Lockfile phải đồng bộ vì root `resolutions` được pnpm gộp vào `overrides`; diff lớn cần review trước commit. [Bằng chứng, lệnh, kết quả và giới hạn](TASK-001_RUNTIME.md).
+
+Phát hiện quan trọng: flow `deployed=false`/`isPublic=false` vẫn trả lời prediction ẩn danh. Đây là hành vi hiện tại cần xử lý trước khi Builder tạo draft chứa dữ liệu nhạy cảm. Chưa thử LLM provider, cross-workspace và tích hợp Couchbase native trên Windows. B-002/PH0-T07–T08 cần chốt demo/model profile, owner fork, license/advisory và hướng bảo vệ preview.

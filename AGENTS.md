@@ -24,7 +24,7 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 -   Keep retrieval bounded: start with one focused query and 2–4 files. Expand when evidence is missing. Do not re-read source already returned as current; read flagged stale files or uncovered details directly.
 -   Docs, config, runtime behavior, and tests may require direct inspection. CodeGraph is not a compiler or a runtime verification tool.
 -   Root instructions are the only shared rules source. `CLAUDE.md` and `GEMINI.md` are thin adapters. Detailed docs load on demand.
--   Optional startup pack: `node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/TASK-001.md`. It contains state/map/task, so do not also attach those same files in full.
+-   Optional startup pack: `node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/B-002.md`. It contains state/map/task, so do not also attach those same files in full.
 -   Test the actual change with the narrowest meaningful checks. Report commands run, outcomes, and what remains unverified. Never invent build results, token counts, or completion percentages.
 -   Write a checkpoint before a long operation, after each completed subtask or meaningful test result, and when handing off. Include the phase/subtask ID in summary, completed vs partial work, changed paths, actual checks, blockers and the exact next action. Use the current revision to avoid overwriting a newer handoff. This is a workflow rule, not an automatic quota-exhaustion hook.
 -   After an interrupted session, follow `AI-Agent/harness/HANDOFF.md`: reconcile shared state with live Git diff and relevant logs/processes before resuming; do not assume uncheckpointed edits were tested or finished.

@@ -247,7 +247,7 @@ Git đã kết nối fork `tuananh271020k5/Flowise`: xem [GIT_WORKFLOW.md](AI-Ag
 
 Với Antigravity hoặc khi Codex hết quota đột ngột, dùng [quy trình HANDOFF](AI-Agent/harness/HANDOFF.md). Ghi checkpoint sau mỗi subtask/kết quả kiểm tra quan trọng và trước thao tác dài; nếu code mới hơn checkpoint phải khôi phục tiến độ từ diff/log. Không chờ cuối phiên mới ghi.
 
-**Task kế tiếp khi được giao triển khai: [TASK-001](AI-Agent/tasks/TASK-001.md), tương ứng nhóm PH0-T01–T06. Phiên hiện tại vẫn chỉ chỉnh kế hoạch/tài liệu.**
+**Tiến độ 14/11/2026:** [TASK-001](AI-Agent/tasks/TASK-001.md) / PH0-T01–T06 đã có baseline runtime; xem [bằng chứng](AI-Agent/context/TASK-001_RUNTIME.md). Chưa triển khai Builder. Nhóm kế tiếp [B-002](AI-Agent/tasks/B-002.md) / PH0-T07–T08 cần chốt model profile, demo, license và cách xử lý prediction công khai của draft.
 
 ## 13. Tài liệu chi tiết khi cần
 

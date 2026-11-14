@@ -190,7 +190,7 @@ Unit/mock pass không thay thế contract/runtime pass. Không gọi môi trư�
 | “API readonly” vẫn có tác động | HTTP GET không bảo đảm hành vi endpoint              | Connector do server đăng ký, allowlist operation đã review                  |
 | SQL read-only bị vượt          | Regex không kiểm soát quyền DB                       | Account readonly + query executor/limits; thiết kế khi mở rộng              |
 
-Câu hỏi để chốt trong TASK-001: demo assistant hay Knowledge trước theo dữ liệu sẵn? Đội đã có provider/model profile nào? Quy mô user/workspace của bản nội bộ? Deadline demo? Ai giữ credential và owner patch fork? Khi chưa có câu trả lời, mặc định assistant cơ bản → Knowledge kiểm soát, một workspace thử nghiệm, chưa production.
+Câu hỏi để chốt trong B-002/PH0-T07–T08: demo assistant hay Knowledge trước theo dữ liệu sẵn? Đội đã có provider/model profile nào? Quy mô user/workspace của bản nội bộ? Deadline demo? Ai giữ credential và owner patch fork? Khi chưa có câu trả lời, mặc định assistant cơ bản → Knowledge kiểm soát, một workspace thử nghiệm, chưa production.
 
 ## 13. Quy trình giao việc cho ba AI
 
@@ -198,4 +198,4 @@ Một task có một người/AI giữ quyền ghi tại một thời điểm. C
 
 Trước làm: đọc checkpoint, kiểm tra revision/SHA/Git status, xác định acceptance và source cần mở. Sau làm: test phù hợp, review diff, ghi kết quả thực tế, cập nhật status/next task và bàn giao dưới khoảng 250 từ. Chi tiết lịch sử nằm trong worklog/PR, không nạp tất cả ở cold start.
 
-Phiên kế tiếp chỉ bắt đầu TASK-001 khi người dùng yêu cầu triển khai/baseline runtime. Khi đó phải phân biệt việc đã khảo sát với việc còn cần thực thi.
+TASK-001/PH0-T01–T06 đã chạy baseline runtime ngày 14/11/2026; xem [bằng chứng](../context/TASK-001_RUNTIME.md). B-002/PH0-T07–T08 là nhóm kế tiếp. Builder chưa được triển khai.

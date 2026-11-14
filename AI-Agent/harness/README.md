@@ -22,7 +22,7 @@ Chạy từ root repo:
 
 ```powershell
 node AI-Agent/harness/harness.mjs doctor
-node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/TASK-001.md
+node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/B-002.md
 node --test AI-Agent/harness/harness.test.mjs
 ```
 
@@ -31,7 +31,7 @@ Context ghi vào `AI-Agent/.local/context-pack.md`. Pack có source hash, Git HE
 Nếu task thực sự cần contract:
 
 ```powershell
-node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/TASK-001.md --extra AI-Agent/plans/CONTRACTS.md
+node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/B-002.md --extra AI-Agent/plans/CONTRACTS.md
 ```
 
 Nếu pack đã bị cắt, mở đúng section còn thiếu; không coi nội dung cuối pack chắc chắn đã được nạp. State/map/task được ưu tiên trước extra. Không thêm toàn blueprint vào allowlist chỉ để tiện.
@@ -89,7 +89,7 @@ Có thể đặt mục tiêu giảm 20–30% sau baseline như giả thuyết th
 | Gemini CLI  | `GEMINI.md` import `@AGENTS.md`                    | `/memory show`, `/memory reload`; xác nhận nội dung và đường dẫn                              |
 | Antigravity | Root `AGENTS.md`/`GEMINI.md` theo client discovery | Mở cùng repo, dùng prompt trong HANDOFF và xác nhận currentTask/subtask/nextAction            |
 
-Các client phải trả lời đúng: đã làm plan/harness, Builder chưa triển khai, TASK-001 là bước kế tiếp khi được giao. Đây là checklist cần thực hiện trên từng app; chưa chứng minh Claude/Gemini/Antigravity đã nạp file tại máy này. Antigravity có discovery root rules theo [tài liệu Google](https://antigravity.google/docs/rules/); `@filename` của nó là reference, không mặc định inline giống Gemini CLI.
+Các client phải trả lời đúng trạng thái theo `state/project.json`: plan/harness đã có; TASK-001 baseline đã chạy; Builder chưa triển khai; B-002/PH0-T07–T08 là nhóm kế tiếp. `doctor` chỉ báo trạng thái được ghi và không tự kiểm tra lại runtime. Đây là checklist cần thực hiện trên từng app; chưa chứng minh Claude/Gemini/Antigravity đã nạp file tại máy này. Antigravity có discovery root rules theo [tài liệu Google](https://antigravity.google/docs/rules/); `@filename` của nó là reference, không mặc định inline giống Gemini CLI.
 
 Tài liệu chính thức: [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Claude memory/imports](https://code.claude.com/docs/en/memory), [Gemini CLI GEMINI.md](https://geminicli.com/docs/cli/gemini-md/).
 

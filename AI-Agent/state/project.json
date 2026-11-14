@@ -1,42 +1,51 @@
 {
     "schemaVersion": 1,
-    "revision": 6,
-    "updatedAt": "2026-11-13T19:18:05.502Z",
-    "authorization": "planning_and_local_harness_only; product implementation requires a later user request",
-    "baselineGitHead": "9291856d1ea4a4ceea9f8fef8ce14f4f6c81e8eb",
-    "currentTask": "PLAN-000",
+    "revision": 14,
+    "updatedAt": "2026-11-14T10:38:33.811Z",
+    "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
+    "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
+    "currentTask": "TASK-001",
     "status": "completed",
-    "productStage": "not_started",
-    "summary": "Theo yêu cầu commit/push: baseline code/dependency đã lưu ở 8f3e3946 và push thành công. Bộ plan 7 phase/68 task + 8 harness, instructions, handoff, MCP task và shared state được đóng gói trong commit PLAN-000 chứa checkpoint này. Builder chưa triển khai.",
+    "productStage": "baseline_verified",
+    "summary": "TASK-001/PH0-T01–T06 hoàn thành: Node 24/pnpm 10, frozen install, build 6/6, SQLite local, UI Start 1.4 và Direct Reply V2, canvas/prediction đạt. Private draft prediction ẩn danh HTTP 200; instance đã dừng. B-002 handoff và context pack đã sẵn; chưa commit/push.",
     "decisions": [
-        "Tách baseline patches và PLAN-000 thành commit riêng; người dùng đã cho phép commit/push công việc hiện có.",
-        "origin là fork tuananh271020k5/Flowise; push baseline đã xác minh quyền ghi; tra Git history để lấy SHA commit chứa state này.",
-        "Cache CodeGraph, .local, node_modules và .DS_Store không đưa lên Git; không tự đánh dấu task sản phẩm hoàn tất."
+        "Người dùng tự commit/push; AI không chạy git commit/push trong task này.",
+        "Đồng bộ pnpm-lock.yaml với root resolutions/overrides bằng pnpm 10; review diff lớn trước commit.",
+        "Dùng fixture chatInput gọn, không credential; không gọi Direct Reply là kiểm chứng LLM provider."
     ],
     "changedFiles": [
-        ".gitignore",
-        "AGENTS.md",
-        "CLAUDE.md",
-        "GEMINI.md",
+        "pnpm-lock.yaml",
         "PLAN_TONG_HOP.md",
-        "FLOWISE_AGENT_BUILDER_HARNESS_V2.md",
-        "AI-Agent/"
+        "AI-Agent/tasks/TASK-001.md",
+        "AI-Agent/context/BASELINE.md",
+        "AI-Agent/context/PROJECT_MAP.md",
+        "AI-Agent/context/TASK-001_RUNTIME.md",
+        "AI-Agent/fixtures/TASK-001-direct-reply.agentflow.json",
+        "AI-Agent/plans/MASTER_PLAN.md",
+        "AI-Agent/harness/README.md",
+        "AI-Agent/state/WORKLOG.md",
+        "AI-Agent/state/project.json",
+        "AI-Agent/tasks/B-002.md",
+        "AI-Agent/harness/harness.mjs",
+        "AGENTS.md",
+        "AI-Agent/harness/config.json"
     ],
     "checks": [
-        "node --test AI-Agent/harness/harness.test.mjs: PASS 15/15, 0 skipped, chạy lại trong phiên commit/push.",
-        "Docs local links/source pointers/state refs và phase/task counts: PASS; git diff --check PASS.",
-        "Baseline git commit: pretty-quick và lint-staged/eslint hooks PASS; git push origin main PASS cho 8f3e3946.",
-        "Chưa chạy Flowise build/runtime hoặc benchmark token; không coi commit baseline là xác minh chức năng."
+        "Node 24.15.0 và pnpm 10.26.0 hash nguồn phát hành khớp.",
+        "pnpm install --frozen-lockfile: exit 0 sau lockfile reconcile; pnpm build: exit 0, 6/6 tasks.",
+        "Server 127.0.0.1:3037: init complete, ping/root HTTP 200; dừng sau kiểm tra.",
+        "POST/GET/PUT chatflow private draft với session: HTTP 200; GET anonymous: 401.",
+        "Prediction private draft session và anonymous: HTTP 200, đúng Direct Reply text.",
+        "Edge headless: canvas 2 nodes, sameFlowData=true, pageErrors=[]; fixture không credential.",
+        "node --test AI-Agent/harness/harness.test.mjs: 15/15 pass; harness doctor: pass, Node engine satisfied, runtime probe not run.",
+        "Context pack B-002: 9148/12000 chars; git diff --check exit 0; state/config/fixture JSON pass."
     ],
-    "blockers": [
-        "TASK-001 vẫn cần chuẩn hóa Node/pnpm và kiểm chứng runtime/auth/fixture/prediction.",
-        "Antigravity/Claude/Gemini cold start, interrupted handoff và token A/B chưa xác minh."
-    ],
+    "blockers": ["Chưa có provider profile/credential cho LLM; cross-workspace/org và Couchbase native Windows chưa xác minh."],
     "nextActions": [
-        "Khi bắt đầu triển khai: TASK-001 / PH0-T01–T06; tiếp nhận state và Git history hiện tại.",
-        "SHA của commit chứa checkpoint và trạng thái đã push xem git log/branch tracking; checkpoint được ghi trước commit nên HEAD snapshot là parent."
+        "Người dùng review diff lockfile/tài liệu và tự commit/push TASK-001 theo GIT_WORKFLOW.md.",
+        "Khi được giao B-002/PH0-T07–T08, đọc AI-Agent/tasks/B-002.md để chốt model profile, demo, owner fork/license và hướng bảo vệ draft prediction."
     ],
-    "nextTask": "TASK-001",
+    "nextTask": "B-002",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -45,7 +54,9 @@
         "AI-Agent/context/PROJECT_MAP.md",
         "AI-Agent/context/BASELINE.md",
         "AI-Agent/plans/MASTER_PLAN.md",
-        "AI-Agent/tasks/TASK-001.md"
+        "AI-Agent/tasks/TASK-001.md",
+        "AI-Agent/tasks/B-002.md",
+        "AI-Agent/context/TASK-001_RUNTIME.md"
     ],
     "measurement": {
         "actualInputTokens": null,
@@ -62,8 +73,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
+        "head": "c31ae010ad0da23b823abbc31c16a9e732025dad",
         "branch": "main",
-        "sourceFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "sourceFingerprint": "01cca70b7d52944edf97d88548ad2322c474e15b82e9a746ed3012099afe1d66"
     }
 }
