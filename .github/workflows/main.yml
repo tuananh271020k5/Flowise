@@ -38,16 +38,16 @@ jobs:
             - name: Cypress install
               run: pnpm cypress install
             - name: Install dependencies (Cypress Action)
-              uses: cypress-io/github-action@v7.1.5
+              uses: cypress-io/github-action@v7
               with:
                   working-directory: ./
                   runTests: false
             - name: Cypress test
-              uses: cypress-io/github-action@v7.1.5
+              uses: cypress-io/github-action@v7
               with:
                   install: false
                   working-directory: packages/server
                   start: pnpm start
-                  wait-on: 'http://localhost:3000'
+                  wait-on: 'http://127.0.0.1:3000'
                   wait-on-timeout: 120
                   browser: chrome
