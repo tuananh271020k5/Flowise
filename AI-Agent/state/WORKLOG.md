@@ -1,5 +1,20 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-009 / PH2-T05–T06
+
+Hoàn thành B-009 (PH2-T05 Server Validation cho Flow và PH2-T06 Flowise CRUD Adapter):
+
+-   **Server Flow Validator (PH2-T05):** Xây dựng `flowValidator.ts` thẩm định toàn diện cấu trúc graph Flowise Agentflow V2: kiểm tra graph connectivity, đảm bảo có đúng 1 Start node (1.4), ít nhất 1 Agent node (3.2), chặn Start mồ côi (disconnected), kiểm tra tính toàn vẹn của edges, và kiểm tra metadata registry whitelist chống chèn node lạ.
+-   **Flowise Draft Adapter (PH2-T06):** Xây dựng `flowiseDraftAdapter.ts` thực hiện CRUD an toàn cho bản draft `ChatFlow`: serialize `flowData` đúng 1 lần duy nhất thành chuỗi JSON chống double stringify; gán policy an toàn `type: EnumChatflowType.AGENTFLOW`, `deployed: false`, `isPublic: false`; đảm bảo cách ly chéo workspace (Negative Auth: 403 Forbidden khi workspace không khớp).
+-   **Kiểm thử nghiệm thu:**
+    -   Viết 7 unit tests cho `flowValidator.test.ts` (100% pass).
+    -   Viết 10 unit tests cho `flowiseDraftAdapter.test.ts` (100% pass).
+    -   Toàn bộ backend test suite `agent-builder` đạt 9/9 test suites pass, 95/95 tests pass.
+    -   TypeScript type check (`tsc --noEmit`) đạt exit 0.
+    -   UI test `agentBuilder.test.js` 4/4 pass.
+    -   Harness tests 14 pass, 1 skipped (symlink host policy).
+    -   Lập task tiếp theo `B-010.md` (PH2-T07 và PH2-T08).
+
 ## 15/11/2026 — B-008 / PH2-T03–T04
 
 Hoàn thành B-008 (PH2-T03 và PH2-T04): Định nghĩa AgentPlan và Viết Compiler Deterministic.
@@ -15,17 +30,20 @@ Hoàn thành B-008 (PH2-T03 và PH2-T04): Định nghĩa AgentPlan và Viết Co
     -   Kiểm chứng tính tất định: Chạy 10 lần liên tiếp cùng input cho ra kết quả trùng khớp 100% không dựa vào LLM sinh raw graph.
 -   Kiểm thử và biên dịch: Toàn bộ 75/75 unit tests module Agent Builder backend pass 100% (7 tests agentPlan, 3 tests compiler, 11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-008.md` hoàn thành, lập `B-009.md` (PH2-T05–T06) và cập nhật allowlist harness.
 
-## 14/11/2026 — B-007 / PH2-T01–T02
+## 15/11/2026 — B-008 / PH2-T03–T04
 
-Bắt đầu Phase 2: Từ spec đến Flowise draft thật. Hoàn thành B-007 (PH2-T01 và PH2-T02): Assistant Flow Template có Version và Node Metadata Registry.
+Hoàn thành B-008 (PH2-T03 và PH2-T04): Định nghĩa AgentPlan và Viết Compiler Deterministic.
 
--   Xây dựng `Node Metadata Registry` (`generator/nodeRegistry.ts`):
-    -   Định nghĩa whitelist metadata cho các node được phép dùng trong Agentflow V2: `startAgentflow` (pinned version 1.4 chuẩn theo runtime TASK-001, chặn version cũ 1.1), `agentAgentflow` (version 3.2), `directReplyAgentflow` (version 1.0), Chat Models (`chatOpenAI` 5.0, `chatGoogleGenerativeAI` 2.0, `chatAnthropic` 4.0, `chatOllama` 3.0), Tools (`calculator`, `webSearch`).
-    -   Hàm `validateNodeMetadata`: Kiểm tra chặt chẽ tên node, version, type, required inputs và từ chối mọi trường lạ hoặc node ngoài allowlist (ngăn chặn chèn mã độc/code runner không an toàn).
--   Xây dựng `Assistant Flow Template v1.0` (`generator/templates/assistantTemplate.v1.ts`):
-    -   Kế thừa từ flow fixture đã được kiểm chứng ở TASK-001: Start node 1.4, Chat Model node, Agent node 3.2 với system prompt, kết nối Tool nodes.
-    -   Hàm `instantiateAssistantTemplate(spec)` chuyển đổi từ `AgentSpec v1` sang Agentflow V2 graph `{ nodes, edges }` hoàn chỉnh với các tọa độ trực quan và handles kết nối chính xác.
--   Kiểm thử và biên dịch: Toàn bộ 65/65 unit tests module Agent Builder backend pass 100% (11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-007.md` hoàn thành, lập `B-008.md` (PH2-T03–T04) và cập nhật allowlist harness.
+-   Xây dựng tầng trung gian `AgentPlan` (`generator/agentPlan.ts`):
+    -   Định nghĩa interface `AgentPlan`, `CapabilityBinding` ánh xạ mô hình, công cụ từ allowlist registry, loại bỏ mọi code injection.
+    -   Hàm `createAgentPlan`: Chuyển từ `AgentSpec v1` sang `AgentPlan`, tính toán `plan.id` bằng sha256 hash ổn định.
+    -   Hàm `validateAgentPlan`: Thẩm định template compatibility, spec readiness (`buildReady: true`), capabilities allowlist và phát hiện script/eval injection trong config.
+-   Xây dựng bộ biên dịch tất định `AgentflowCompiler` (`generator/compiler.ts`):
+    -   Biên dịch deterministic từ `AgentPlan` sang graph Flowise Agentflow V2 `{ nodes, edges, viewport, flowConfig }`.
+    -   Quy tắc tạo ID ổn định (`startAgentflow_0`, `agentAgentflow_0`, `tool_calculator_0`), tọa độ trực quan bố trí chuẩn, liên kết handles chính xác.
+    -   Tự động thẩm định 100% nodes qua `validateNodeMetadata` từ B-007.
+    -   Kiểm chứng tính tất định: Chạy 10 lần liên tiếp cùng input cho ra kết quả trùng khớp 100% không dựa vào LLM sinh raw graph.
+-   Kiểm thử và biên dịch: Toàn bộ 75/75 unit tests module Agent Builder backend pass 100% (7 tests agentPlan, 3 tests compiler, 11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-008.md` hoàn thành, lập `B-009.md` (PH2-T05–T06) và cập nhật allowlist harness.
 
 ## 14/11/2026 — B-004 / PH1-T03–T04
 
