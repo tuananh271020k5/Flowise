@@ -59,6 +59,7 @@ import verifyRouter from './verify'
 import versionRouter from './versions'
 import webhookRouter from './webhook'
 import webhookListenerRouter from './webhook-listener'
+import agentBuilderRouter from './agent-builder'
 
 import accountRouter from '../enterprise/routes/account.route'
 import auditRouter from '../enterprise/routes/audit'
@@ -129,6 +130,7 @@ router.use('/nvidia-nim', nvidiaNimRouter)
 router.use('/executions', executionsRouter)
 router.use('/validation', validationRouter)
 router.use('/agentflowv2-generator', agentflowv2GeneratorRouter)
+router.use('/agent-builder', agentBuilderRouter)
 router.use('/text-to-speech', textToSpeechRouter)
 router.use('/custom-mcp-servers', customMcpServersRouter)
 router.use('/mcp-server', mcpServerRouter)

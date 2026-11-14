@@ -29,6 +29,9 @@ import { LoginMethod } from '../../enterprise/database/entities/login-method.ent
 import { LoginSession } from '../../enterprise/database/entities/login-session.entity'
 import { ScheduleRecord } from './ScheduleRecord'
 import { ScheduleTriggerLog } from './ScheduleTriggerLog'
+import { BuilderSession } from './BuilderSession'
+import { BuilderMessage } from './BuilderMessage'
+import { AgentSpecRevision } from './AgentSpecRevision'
 
 export const entities = {
     ChatFlow,
@@ -63,5 +66,8 @@ export const entities = {
     LoginMethod,
     LoginSession,
     ScheduleRecord,
-    ScheduleTriggerLog
+    ScheduleTriggerLog,
+    BuilderSession,
+    BuilderMessage,
+    AgentSpecRevision
 }

@@ -1,41 +1,49 @@
 {
     "schemaVersion": 1,
-    "revision": 16,
-    "updatedAt": "2026-11-14T14:48:02.367Z",
+    "revision": 17,
+    "updatedAt": "2026-11-14T15:16:29.162Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-003",
+    "currentTask": "B-004",
     "status": "completed",
-    "productStage": "agent_spec_defined",
-    "summary": "B-003/PH1-T01–T02 hoàn thành: Định nghĩa AgentSpec v1 bằng Zod/TypeScript và hàm computeReadiness() tại packages/server/src/services/agent-builder/. Schema bảo vệ strict, phát hiện secret/script injection; computeReadiness tính toán deterministic specReady, buildReady, testReady, missingFields, assumptions và reasonCodes. Unit tests 21/21 pass; tsc typecheck 0 error. Lập task B-004.",
+    "productStage": "session_persistence_and_api_ready",
+    "summary": "B-004/PH1-T03–T04 hoàn thành: Thiết kế Entities BuilderSession, BuilderMessage, AgentSpecRevision; migration SQLite 1781000000000; BuilderSessionService, controller và routes tại /api/v1/agent-builder. Hoạt động idempotent với clientMessageId, chặn xung đột revision (409 Conflict), chặn chéo workspace (403 Forbidden). Tests sessionService 16/16 pass, toàn module 37/37 pass, tsc typecheck 0 error. Lập task B-005.",
     "decisions": [
-        "Đặt module Builder mới tại packages/server/src/services/agent-builder/ độc lập với runtime cũ.",
-        "Dùng Zod với .strict() và regex detection để cấm đưa API key hoặc script độc hại vào spec.",
-        "computeReadiness tách biệt tính sẵn sàng kinh doanh (buildReady) với tính sẵn sàng kiểm thử (testReady)."
+        "Tạo 3 entities BuilderSession, BuilderMessage, AgentSpecRevision theo chuẩn TypeORM trong database/entities.",
+        "Dùng unique index [sessionId, clientMessageId] để đảm bảo idempotency chống gửi trùng tin nhắn.",
+        "Xác thực expectedRevision và trả về 409 Conflict khi có xung đột phiên bản spec.",
+        "Scope truy vấn dữ liệu theo activeWorkspaceId từ req.user, từ chối 403 Forbidden khi workspace không khớp."
     ],
     "changedFiles": [
-        "packages/server/src/services/agent-builder/types.ts",
-        "packages/server/src/services/agent-builder/schema.ts",
-        "packages/server/src/services/agent-builder/readiness.ts",
-        "packages/server/src/services/agent-builder/index.ts",
-        "packages/server/src/services/agent-builder/agentSpec.test.ts",
-        "AI-Agent/tasks/B-003.md",
+        "packages/server/src/database/entities/BuilderSession.ts",
+        "packages/server/src/database/entities/BuilderMessage.ts",
+        "packages/server/src/database/entities/AgentSpecRevision.ts",
+        "packages/server/src/database/entities/index.ts",
+        "packages/server/src/database/migrations/sqlite/1781000000000-AddAgentBuilderEntities.ts",
+        "packages/server/src/database/migrations/sqlite/index.ts",
+        "packages/server/src/services/agent-builder/sessionService.ts",
+        "packages/server/src/services/agent-builder/sessionService.test.ts",
+        "packages/server/src/controllers/agent-builder/index.ts",
+        "packages/server/src/routes/agent-builder/index.ts",
+        "packages/server/src/routes/index.ts",
         "AI-Agent/tasks/B-004.md",
+        "AI-Agent/tasks/B-005.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "21/21 tests pass trong packages/server/src/services/agent-builder/agentSpec.test.ts (Jest).",
-        "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0, không có lỗi kiểu.",
+        "16/16 tests pass trong sessionService.test.ts (Jest).",
+        "Tổng 37/37 tests pass cho toàn module Agent Builder.",
+        "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0.",
         "node --test AI-Agent/harness/harness.test.mjs: 15/15 pass (1 skip host symlink).",
-        "Harness context sinh pack B-004: 9379/12000 chars đạt ngân sách context."
+        "Harness context sinh pack B-005: 9521/12000 chars đạt ngân sách context."
     ],
     "blockers": [],
     "nextActions": [
-        "Người dùng review diff B-003 và commit/push theo GIT_WORKFLOW.md.",
-        "Triển khai B-004 (PH1-T03 và PH1-T04): Thiết kế lưu trữ Session/Message/SpecRevision và API hội thoại Builder."
+        "Người dùng review diff B-004 và commit/push theo GIT_WORKFLOW.md.",
+        "Triển khai B-005 (PH1-T07 và PH1-T08): Tạo giao diện Chat Builder và thẻ tóm tắt Spec / Missing Fields trên packages/ui."
     ],
-    "nextTask": "B-004",
+    "nextTask": "B-005",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -63,8 +71,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "8f231bee7760e8d383b4ddcd6bba60e4884e03fd",
+        "head": "fced6c46e513add405ef8584b193dd0517954f4c",
         "branch": "main",
-        "sourceFingerprint": "b80c0a7b69e1845df53316fae2724db34891546537e31bc85b6d5c992750e9fc"
+        "sourceFingerprint": "696a61f63b49eded4ce314fb0710167e92bb46252838853725515bcc22ad9ad3"
     }
 }
