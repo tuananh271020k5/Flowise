@@ -1,48 +1,41 @@
 {
     "schemaVersion": 1,
-    "revision": 24,
-    "updatedAt": "2026-11-14T18:26:21.783Z",
+    "revision": 25,
+    "updatedAt": "2026-11-14T18:39:56.542Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-011",
+    "currentTask": "B-012",
     "status": "completed",
-    "productStage": "phase2_gate_completed_flowise_runtime_verified",
-    "summary": "B-011/PH2-T09–T10 hoàn thành: Build Job Lifecycle và Contract Test với Flowise Runtime. Khép lại 100% Phase 2. BuildJob entity và BuildJobManager quản lý trạng thái, timeout, retry attempts và hủy bỏ (superseded) khi có revision mới. agentflowContract.test.ts kiểm chứng end-to-end từ Vietnamese Spec -> Plan -> Compiler -> Flowise Draft -> Canvas Validation đạt 100% tiêu chí Flowise V2 runtime. 129/129 tests pass (13/13 suites), tsc 0 error, 4/4 UI tests pass, harness 14/14 pass. Lập task B-012 mở đầu Phase 3.",
+    "productStage": "phase3_test_chat_panel_and_progress_ready",
+    "summary": "B-012/PH3-T01–T02 hoàn thành: Panel Chat Thử Nghiệm với Agent Draft và Hiển Thị Tiến Trình. Mở đầu Phase 3. TestChatPane.jsx cung cấp giao diện chat thử nghiệm độc lập với phiên thiết kế, gửi prediction tới draft flowId, tự động đối soát assertions kiểm thử và cho phép gửi câu hỏi mẫu nhanh. Tabs trên UI cho phép chuyển đổi giữa cấu hình và chạy thử. SSE lắng nghe và cập nhật tiến trình build realtime. 84/84 UI tests pass (4/4 suites), vite build exit 0 (21,181 modules), harness 14/14 pass. Lập task B-013.",
     "decisions": [
-        "Xây dựng BuildJobManager để quản lý toàn diện vòng đời tác vụ build và tự động hủy (supersede) job cũ khi có revision mới.",
-        "Bảo đảm bản draft ChatFlow tuân thủ 100% cấu trúc Flowise Agentflow V2 và policy an toàn deployed=false, isPublic=false.",
-        "Khép lại Phase 2 và sẵn sàng bước vào Phase 3 (Chat thử nghiệm với draft và hoàn thiện Demo D1)."
+        "Tách biệt hoàn toàn trạng thái đàm thoại thiết kế (ChatPane) và đàm thoại chạy thử (TestChatPane).",
+        "Tự động chuyển tab sang Chat Thử Nghiệm khi người dùng kích hoạt lệnh Tạo Agentflow V2 để người dùng theo dõi tiến trình build.",
+        "Hỗ trợ kiểm tra tự động các chuỗi assertion trong câu trả lời của Agent để người dùng đánh giá chất lượng ngay tại panel thử nghiệm."
     ],
     "changedFiles": [
-        "packages/server/src/database/entities/BuildJob.ts",
-        "packages/server/src/database/entities/index.ts",
-        "packages/server/src/database/migrations/sqlite/1783000000000-AddBuildJobEntity.ts",
-        "packages/server/src/database/migrations/sqlite/index.ts",
-        "packages/server/src/services/agent-builder/pipeline/buildJobManager.ts",
-        "packages/server/src/services/agent-builder/pipeline/buildJobManager.test.ts",
-        "packages/server/src/services/agent-builder/pipeline/buildPipelineService.ts",
-        "packages/server/src/services/agent-builder/pipeline/buildPipelineService.test.ts",
-        "packages/server/src/services/agent-builder/pipeline/agentflowContract.test.ts",
-        "packages/server/src/services/agent-builder/pipeline/index.ts",
-        "packages/server/src/controllers/agent-builder/index.ts",
-        "packages/server/src/routes/agent-builder/index.ts",
-        "AI-Agent/tasks/B-011.md",
+        "packages/ui/src/api/agentBuilder.js",
+        "packages/ui/src/api/agentBuilder.test.js",
+        "packages/ui/src/views/agent-builder/TestChatPane.jsx",
+        "packages/ui/src/views/agent-builder/testChatHelper.js",
+        "packages/ui/src/views/agent-builder/testChatHelper.test.js",
+        "packages/ui/src/views/agent-builder/index.jsx",
         "AI-Agent/tasks/B-012.md",
+        "AI-Agent/tasks/B-013.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "129/129 tests pass trong module Agent Builder trên packages/server (Jest 13/13 suites).",
-        "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0.",
-        "4/4 tests pass trong packages/ui/src/api/agentBuilder.test.js (Jest).",
+        "84/84 tests pass trong packages/ui (Jest 4/4 suites).",
+        "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
         "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
     ],
     "blockers": [],
     "nextActions": [
-        "Commit và push task B-011 lên origin/main theo yêu cầu người dùng.",
-        "Bắt đầu triển khai task B-012 (PH3-T01–PH3-T02): Panel Chat Thử Nghiệm với Agent Draft và Hiển Thị Tiến Trình (Mở đầu Phase 3)."
+        "Commit và push task B-012 lên origin/main theo yêu cầu người dùng.",
+        "Bắt đầu triển khai task B-013 (PH3-T03–PH3-T04): Chạy Thử Assistant Có Kiểm Soát và Sửa Cấu Hình Bằng Chat."
     ],
-    "nextTask": "B-012",
+    "nextTask": "B-013",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -70,8 +63,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "045d99d09a4d1d37704932c3300ab1e787e6bea5",
+        "head": "a99c6c6443890b9a30b7ea031be810a3ce7f0467",
         "branch": "main",
-        "sourceFingerprint": "670fe643d715b3f87abd8054e4f49bfa29bb08d4ab501a7bf928d809badce75a"
+        "sourceFingerprint": "205800c493c73e661f59d5afb5bd278710a8f33972d9104a09d6afbcc6e2eea2"
     }
 }

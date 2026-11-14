@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Grid, Alert, Snackbar, Typography } from '@mui/material'
+import { Grid, Alert, Snackbar, Typography, Box, Tabs, Tab } from '@mui/material'
+import { IconSettings, IconMessageCode } from '@tabler/icons-react'
 import MainCard from '@/ui-component/cards/MainCard'
 import { BackdropLoader } from '@/ui-component/loading/BackdropLoader'
 import agentBuilderApi from '@/api/agentBuilder'
 import ChatPane from './ChatPane'
 import SpecCard from './SpecCard'
+import TestChatPane from './TestChatPane'
 import RevisionsDialog from './RevisionsDialog'
 
 const AgentBuilderView = () => {
@@ -24,6 +26,13 @@ const AgentBuilderView = () => {
     const [snackbarMessage, setSnackbarMessage] = useState('')
     const [revisions, setRevisions] = useState([])
     const [isRevisionsOpen, setIsRevisionsOpen] = useState(false)
+
+    // Phase 3 State: Quản lý Build & Chat Thử Nghiệm (PH3-T01, PH3-T02)
+    const [activeTab, setActiveTab] = useState('spec') // 'spec' | 'test'
+    const [currentFlowId, setCurrentFlowId] = useState(null)
+    const [currentBuildJobId, setCurrentBuildJobId] = useState(null)
+    const [buildStatus, setBuildStatus] = useState(null) // null | 'building' | 'failed' | 'completed' | 'cancelled'
+    const [buildError, setBuildError] = useState(null)
 
     // Tạo Client Message ID chống gửi lặp
     const generateClientMessageId = () => {
@@ -50,6 +59,18 @@ const AgentBuilderView = () => {
             if (data.readiness) {
                 setReadiness(data.readiness)
             }
+
+            // Tải lịch sử draft nếu có
+            try {
+                const draftRes = await agentBuilderApi.getDraftHistory(sid)
+                if (draftRes.data && draftRes.data.length > 0) {
+                    const latestDraft = draftRes.data[draftRes.data.length - 1]
+                    setCurrentFlowId(latestDraft.flowId)
+                    setBuildStatus('completed')
+                }
+            } catch {
+                // Không bắt buộc phải có draft
+            }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Lỗi khi tải phiên Agent Builder:', err)
@@ -71,8 +92,51 @@ const AgentBuilderView = () => {
             setSpec(null)
             setRevisionNumber(1)
             setReadiness(null)
+            setCurrentFlowId(null)
+            setBuildStatus(null)
+            setActiveTab('spec')
         }
     }, [paramSessionId, loadSession])
+
+    // Lắng nghe sự kiện SSE realtime từ backend (PH3-T02)
+    useEffect(() => {
+        if (!sessionId) return
+
+        let eventSource
+        try {
+            const baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000'
+            eventSource = new EventSource(`${baseURL}/api/v1/agent-builder/sessions/${sessionId}/events`)
+
+            eventSource.addEventListener('build_completed', (e) => {
+                try {
+                    const payload = JSON.parse(e.data)
+                    if (payload.flowId) {
+                        setCurrentFlowId(payload.flowId)
+                    }
+                    setBuildStatus('completed')
+                    setSnackbarMessage('Biên dịch Agentflow V2 hoàn tất thành công!')
+                } catch {
+                    // Ignore parse error
+                }
+            })
+
+            eventSource.addEventListener('build_failed', (e) => {
+                try {
+                    const payload = JSON.parse(e.data)
+                    setBuildStatus('failed')
+                    setBuildError(payload.error || 'Biên dịch thất bại')
+                } catch {
+                    // Ignore parse error
+                }
+            })
+        } catch {
+            // Ignore SSE connection error
+        }
+
+        return () => {
+            if (eventSource) eventSource.close()
+        }
+    }, [sessionId])
 
     // Xử lý gửi tin nhắn đàm thoại
     const handleSendMessage = async (content) => {
@@ -161,6 +225,9 @@ const AgentBuilderView = () => {
         setSpec(null)
         setRevisionNumber(1)
         setReadiness(null)
+        setCurrentFlowId(null)
+        setBuildStatus(null)
+        setActiveTab('spec')
         navigate('/agent-builder')
     }
 
@@ -178,10 +245,48 @@ const AgentBuilderView = () => {
         }
     }
 
-    // Xử lý khi nhấn nút "Tạo Agentflow V2"
-    const handleGenerateAgentflow = () => {
-        setSnackbarMessage('Cấu hình đã sẵn sàng! Chuyển tiếp tới bước sinh Agentflow V2...')
-        // Placeholder cho bước tích hợp Task B-006 (Agentflow Generator)
+    // Xử lý khi nhấn nút "Tạo Agentflow V2" (PH3-T01, PH3-T02)
+    const handleGenerateAgentflow = async () => {
+        if (!sessionId) return
+        setBuildStatus('building')
+        setBuildError(null)
+        setActiveTab('test') // Tự động chuyển qua tab chat thử nghiệm để người dùng thấy tiến trình
+
+        try {
+            const res = await agentBuilderApi.executeBuild(sessionId, {})
+            const data = res.data
+
+            if (data.flowId) {
+                setCurrentFlowId(data.flowId)
+            }
+            if (data.jobId) {
+                setCurrentBuildJobId(data.jobId)
+            }
+            setBuildStatus('completed')
+            setSnackbarMessage(
+                data.isExisting
+                    ? 'Bản draft Agentflow đã tồn tại cho phiên bản này. Bạn có thể bắt đầu thử nghiệm!'
+                    : 'Đã tạo bản draft Agentflow V2 thành công!'
+            )
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi biên dịch Agentflow:', err)
+            setBuildStatus('failed')
+            setBuildError(err?.response?.data?.message || err?.message || 'Biên dịch Agentflow thất bại.')
+        }
+    }
+
+    // Hủy bỏ tác vụ build đang chạy
+    const handleCancelBuild = async () => {
+        if (!currentBuildJobId) return
+        try {
+            await agentBuilderApi.cancelBuild(currentBuildJobId, { reason: 'User cancelled via UI' })
+            setBuildStatus('cancelled')
+            setSnackbarMessage('Đã gửi yêu cầu hủy tác vụ build.')
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi hủy build:', err)
+        }
     }
 
     return (
@@ -211,20 +316,54 @@ const AgentBuilderView = () => {
             )}
 
             <Grid container spacing={2} sx={{ flex: 1, height: '100%', minHeight: 0 }}>
-                {/* Cột trái: Khung Chat trò chuyện (7/12 desktop) */}
-                <Grid item xs={12} md={7} lg={7.5} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* Cột trái: Khung Chat trò chuyện đàm thoại thiết kế (7/12 desktop) */}
+                <Grid item xs={12} md={7} lg={7} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <ChatPane messages={messages} isSending={isSending} onSendMessage={handleSendMessage} onNewSession={handleNewSession} />
                 </Grid>
 
-                {/* Cột phải: Thẻ tóm tắt Spec và Missing Fields (5/12 desktop) */}
-                <Grid item xs={12} md={5} lg={4.5} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <SpecCard
-                        spec={spec}
-                        readiness={readiness}
-                        revisionNumber={revisionNumber}
-                        onOpenRevisions={handleOpenRevisions}
-                        onGenerateAgentflow={handleGenerateAgentflow}
-                    />
+                {/* Cột phải: Tabs chuyển đổi Cấu hình Spec / Chat Thử Nghiệm (5/12 desktop) */}
+                <Grid item xs={12} md={5} lg={5} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5 }}>
+                        <Tabs
+                            value={activeTab}
+                            onChange={(e, val) => setActiveTab(val)}
+                            textColor='primary'
+                            indicatorColor='primary'
+                            variant='fullWidth'
+                        >
+                            <Tab icon={<IconSettings size={18} />} iconPosition='start' label='Cấu hình Agent' value='spec' />
+                            <Tab icon={<IconMessageCode size={18} />} iconPosition='start' label='Chat Thử Nghiệm' value='test' />
+                        </Tabs>
+                    </Box>
+
+                    {/* Nội dung Tab Cấu hình Spec */}
+                    {activeTab === 'spec' && (
+                        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                            <SpecCard
+                                spec={spec}
+                                readiness={readiness}
+                                revisionNumber={revisionNumber}
+                                onOpenRevisions={handleOpenRevisions}
+                                onGenerateAgentflow={handleGenerateAgentflow}
+                            />
+                        </Box>
+                    )}
+
+                    {/* Nội dung Tab Chat Thử Nghiệm (PH3-T01, PH3-T02) */}
+                    {activeTab === 'test' && (
+                        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                            <TestChatPane
+                                flowId={currentFlowId}
+                                flowName={spec?.name || 'Trợ lý Agentflow'}
+                                revisionNo={revisionNumber}
+                                evaluationExamples={spec?.evaluationExamples || []}
+                                buildStatus={buildStatus}
+                                buildError={buildError}
+                                onCancelBuild={handleCancelBuild}
+                                onRetryBuild={handleGenerateAgentflow}
+                            />
+                        </Box>
+                    )}
                 </Grid>
             </Grid>
 
