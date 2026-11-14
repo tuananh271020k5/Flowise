@@ -18,4 +18,10 @@ router.get('/sessions/:id/revisions', agentBuilderController.getRevisions)
 // SUBSCRIBE REALTIME EVENTS (Server-Sent Events)
 router.get('/sessions/:id/events', agentBuilderController.subscribeEvents)
 
+// EXECUTE BUILD (Idempotent Flowise Agentflow V2 Draft Generation)
+router.post('/sessions/:id/builds', agentBuilderController.buildSession)
+
+// LIST DRAFT REVISIONS HISTORY
+router.get('/sessions/:id/drafts', agentBuilderController.getDraftHistory)
+
 export default router

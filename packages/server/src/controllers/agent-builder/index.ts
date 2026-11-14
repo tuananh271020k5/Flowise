@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import { StatusCodes } from 'http-status-codes'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import sessionService from '../../services/agent-builder/sessionService'
+import buildPipelineService from '../../services/agent-builder/pipeline/buildPipelineService'
 
 const getWorkspaceId = (req: Request): string => {
     return req.user?.activeWorkspaceId || (req.body?.workspaceId as string) || (req.query?.workspaceId as string) || 'default'
@@ -90,10 +91,46 @@ const subscribeEvents = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+const buildSession = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const { specRevisionId, customBuildKey } = req.body || {}
+
+        const result = await buildPipelineService.executeBuild({
+            sessionId: req.params.id,
+            workspaceId,
+            specRevisionId,
+            customBuildKey
+        })
+
+        return res.status(result.isExisting ? StatusCodes.OK : StatusCodes.CREATED).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getDraftHistory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const history = await buildPipelineService.getDraftHistory(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(history)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
     addMessage,
     getRevisions,
-    subscribeEvents
+    subscribeEvents,
+    buildSession,
+    getDraftHistory
 }

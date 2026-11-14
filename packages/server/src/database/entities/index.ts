@@ -32,6 +32,7 @@ import { ScheduleTriggerLog } from './ScheduleTriggerLog'
 import { BuilderSession } from './BuilderSession'
 import { BuilderMessage } from './BuilderMessage'
 import { AgentSpecRevision } from './AgentSpecRevision'
+import { AgentDraftRevision } from './AgentDraftRevision'
 
 export const entities = {
     ChatFlow,
@@ -69,5 +70,6 @@ export const entities = {
     ScheduleTriggerLog,
     BuilderSession,
     BuilderMessage,
-    AgentSpecRevision
+    AgentSpecRevision,
+    AgentDraftRevision
 }

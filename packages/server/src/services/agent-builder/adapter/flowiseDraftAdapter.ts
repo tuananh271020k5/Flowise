@@ -1,7 +1,7 @@
 import { StatusCodes } from 'http-status-codes'
 import { DataSource, Repository } from 'typeorm'
 import { ChatFlow, EnumChatflowType } from '../../../database/entities/ChatFlow'
-import { InternalFlowiseError } from '../../../errors/internalFlowiseError'
+import { AdapterError } from '../errors/builderErrors'
 import { getRunningExpressApp } from '../../../utils/getRunningExpressApp'
 import { CompiledFlowGraph } from '../generator/compiler'
 import { validateFlowGraph } from '../generator/flowValidator'
@@ -60,13 +60,18 @@ export class FlowiseDraftAdapter {
         metadata?: { deployed?: boolean; isPublic?: boolean }
     ): Promise<ChatFlow> {
         if (!workspaceId) {
-            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Workspace ID is required')
+            throw new AdapterError('ADAPTER_WORKSPACE_REQUIRED', 'Workspace ID is required', StatusCodes.BAD_REQUEST)
         }
 
         // 1. Thẩm định graph bằng Server Flow Validator (PH2-T05)
         const validation = validateFlowGraph(graph)
         if (!validation.valid) {
-            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, `Đồ thị Agentflow không hợp lệ: ${validation.errors.join('; ')}`)
+            throw new AdapterError(
+                'ADAPTER_INVALID_GRAPH',
+                `Đồ thị Agentflow không hợp lệ: ${validation.errors.join('; ')}`,
+                StatusCodes.BAD_REQUEST,
+                validation.errors
+            )
         }
 
         // 2. Serialize flowData 1 lần duy nhất
@@ -91,26 +96,31 @@ export class FlowiseDraftAdapter {
      */
     async updateDraft(flowId: string, workspaceId: string, graph: CompiledFlowGraph): Promise<ChatFlow> {
         if (!flowId) {
-            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Flow ID is required')
+            throw new AdapterError('ADAPTER_FLOW_ID_REQUIRED', 'Flow ID is required', StatusCodes.BAD_REQUEST)
         }
         if (!workspaceId) {
-            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Workspace ID is required')
+            throw new AdapterError('ADAPTER_WORKSPACE_REQUIRED', 'Workspace ID is required', StatusCodes.BAD_REQUEST)
         }
 
         const existingFlow = await this.chatflowRepo.findOneBy({ id: flowId })
         if (!existingFlow) {
-            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Chatflow ${flowId} not found`)
+            throw new AdapterError('ADAPTER_DRAFT_NOT_FOUND', `Chatflow ${flowId} not found`, StatusCodes.NOT_FOUND)
         }
 
         // Cách ly chéo workspace (Negative Auth: 403 Forbidden)
         if (existingFlow.workspaceId !== workspaceId) {
-            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
+            throw new AdapterError('ADAPTER_WORKSPACE_MISMATCH', 'Access denied: Workspace mismatch', StatusCodes.FORBIDDEN)
         }
 
         // Thẩm định graph trước khi cập nhật
         const validation = validateFlowGraph(graph)
         if (!validation.valid) {
-            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, `Đồ thị Agentflow không hợp lệ: ${validation.errors.join('; ')}`)
+            throw new AdapterError(
+                'ADAPTER_INVALID_GRAPH',
+                `Đồ thị Agentflow không hợp lệ: ${validation.errors.join('; ')}`,
+                StatusCodes.BAD_REQUEST,
+                validation.errors
+            )
         }
 
         existingFlow.name = graph.flowConfig?.name || existingFlow.name
@@ -125,12 +135,12 @@ export class FlowiseDraftAdapter {
     async getDraftById(flowId: string, workspaceId: string): Promise<FlowDraftSnapshot> {
         const flow = await this.chatflowRepo.findOneBy({ id: flowId })
         if (!flow) {
-            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Chatflow ${flowId} not found`)
+            throw new AdapterError('ADAPTER_DRAFT_NOT_FOUND', `Chatflow ${flowId} not found`, StatusCodes.NOT_FOUND)
         }
 
         // Cách ly chéo workspace
         if (flow.workspaceId !== workspaceId) {
-            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
+            throw new AdapterError('ADAPTER_WORKSPACE_MISMATCH', 'Access denied: Workspace mismatch', StatusCodes.FORBIDDEN)
         }
 
         let parsedFlowData: SerializedFlowData

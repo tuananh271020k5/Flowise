@@ -1,5 +1,39 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-010 / PH2-T07–T08
+
+Hoàn thành B-010 (PH2-T07 Chuẩn Hóa Lỗi và PH2-T08 Pipeline Build Idempotency & Revision Mapping):
+
+-   **Chuẩn Hóa Error Contract (PH2-T07):** Xây dựng hierarchy lỗi hoàn chỉnh trong `errors/builderErrors.ts` (`BuilderError`, `GeneratorError`, `CompilerError`, `AdapterError`, `BuildPipelineError`). Hàm `sanitizeErrorMessage` tự động lọc bỏ Bearer tokens, OpenAI API keys (`sk-...`) và password/secret. Method `toPayload()` chuẩn hóa `{ code, message, statusCode, retryable, details }`.
+-   **Pipeline Build Idempotency & Revision Mapping (PH2-T08):** Xây dựng `BuildPipelineService` và entity `AgentDraftRevision` (cùng migration TypeORM SQLite). Đảm bảo:
+    -   Idempotency 100%: Cùng `buildKey` (`sessionId:specRevisionId`) gọi lại không tạo duplicate ChatFlow hay draft revision rác.
+    -   Khi có revision mới trong cùng session: Tự động cập nhật draft ChatFlow hiện hữu thay vì tạo mới tràn lan.
+    -   Tích hợp phát SSE `build_completed` realtime.
+    -   Bổ sung routes `/api/v1/agent-builder/sessions/:id/builds` và `/sessions/:id/drafts`.
+-   **Kiểm thử nghiệm thu:**
+    -   10 unit tests cho `builderErrors.test.ts` (100% pass).
+    -   8 unit tests cho `buildPipelineService.test.ts` (100% pass).
+    -   Toàn bộ backend test suite `agent-builder` đạt 11/11 test suites pass, 115/115 tests pass.
+    -   TypeScript type check (`tsc --noEmit`) đạt exit 0.
+    -   UI test `agentBuilder.test.js` 4/4 pass.
+    -   Harness tests 14 pass, 1 skipped (symlink host policy).
+    -   Lập task tiếp theo `B-011.md` (PH2-T09 và PH2-T10) để hoàn tất Gate Phase 2.
+
+## 15/11/2026 — B-009 / PH2-T05–T06
+
+Hoàn thành B-009 (PH2-T05 Server Validation cho Flow và PH2-T06 Flowise CRUD Adapter):
+
+-   **Server Flow Validator (PH2-T05):** Xây dựng `flowValidator.ts` thẩm định toàn diện cấu trúc graph Flowise Agentflow V2: kiểm tra graph connectivity, đảm bảo có đúng 1 Start node (1.4), ít nhất 1 Agent node (3.2), chặn Start mồ côi (disconnected), kiểm tra tính toàn vẹn của edges, và kiểm tra metadata registry whitelist chống chèn node lạ.
+-   **Flowise Draft Adapter (PH2-T06):** Xây dựng `flowiseDraftAdapter.ts` thực hiện CRUD an toàn cho bản draft `ChatFlow`: serialize `flowData` đúng 1 lần duy nhất thành chuỗi JSON chống double stringify; gán policy an toàn `type: EnumChatflowType.AGENTFLOW`, `deployed: false`, `isPublic: false`; đảm bảo cách ly chéo workspace (Negative Auth: 403 Forbidden khi workspace không khớp).
+-   **Kiểm thử nghiệm thu:**
+    -   Viết 7 unit tests cho `flowValidator.test.ts` (100% pass).
+    -   Viết 10 unit tests cho `flowiseDraftAdapter.test.ts` (100% pass).
+    -   Toàn bộ backend test suite `agent-builder` đạt 9/9 test suites pass, 95/95 tests pass.
+    -   TypeScript type check (`tsc --noEmit`) đạt exit 0.
+    -   UI test `agentBuilder.test.js` 4/4 pass.
+    -   Harness tests 14 pass, 1 skipped (symlink host policy).
+    -   Lập task tiếp theo `B-010.md` (PH2-T07 và PH2-T08).
+
 ## 15/11/2026 — B-009 / PH2-T05–T06
 
 Hoàn thành B-009 (PH2-T05 Server Validation cho Flow và PH2-T06 Flowise CRUD Adapter):

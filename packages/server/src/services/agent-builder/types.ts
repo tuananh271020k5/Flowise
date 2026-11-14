@@ -93,7 +93,15 @@ export interface SpecPatchResult {
     changeSummary: string
 }
 
-export type SSEEventType = 'connected' | 'message' | 'revision' | 'readiness' | 'build_dispatched' | 'error'
+export type SSEEventType =
+    | 'connected'
+    | 'message'
+    | 'revision'
+    | 'readiness'
+    | 'build_dispatched'
+    | 'build_completed'
+    | 'build_failed'
+    | 'error'
 
 export interface SSEPayload {
     type: SSEEventType
