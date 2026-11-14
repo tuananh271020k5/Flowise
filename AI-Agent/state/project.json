@@ -1,51 +1,48 @@
 {
     "schemaVersion": 1,
-    "revision": 23,
-    "updatedAt": "2026-11-14T17:42:07.297Z",
+    "revision": 24,
+    "updatedAt": "2026-11-14T18:26:21.783Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-010",
+    "currentTask": "B-011",
     "status": "completed",
-    "productStage": "phase2_build_pipeline_and_idempotency_ready",
-    "summary": "B-010/PH2-T07–T08 hoàn thành: Chuẩn Hóa Lỗi và Pipeline Build Idempotency & Revision Mapping. builderErrors.ts chuẩn hóa lỗi Generator/Compiler/Adapter/Pipeline, tự động redact secrets. buildPipelineService.ts điều phối pipeline build từ Spec -> Plan -> Compiler -> Validator -> Flowise Draft, đảm bảo Idempotency 100% qua AgentDraftRevision và buildKey. 115/115 tests pass (11/11 suites), tsc 0 error, 4/4 UI tests pass, harness 14/14 pass. Lập task B-011.",
+    "productStage": "phase2_gate_completed_flowise_runtime_verified",
+    "summary": "B-011/PH2-T09–T10 hoàn thành: Build Job Lifecycle và Contract Test với Flowise Runtime. Khép lại 100% Phase 2. BuildJob entity và BuildJobManager quản lý trạng thái, timeout, retry attempts và hủy bỏ (superseded) khi có revision mới. agentflowContract.test.ts kiểm chứng end-to-end từ Vietnamese Spec -> Plan -> Compiler -> Flowise Draft -> Canvas Validation đạt 100% tiêu chí Flowise V2 runtime. 129/129 tests pass (13/13 suites), tsc 0 error, 4/4 UI tests pass, harness 14/14 pass. Lập task B-012 mở đầu Phase 3.",
     "decisions": [
-        "Sử dụng buildKey kết hợp giữa sessionId và specRevisionId để đảm bảo tính idempotent tuyệt đối khi build lặp lại.",
-        "Lưu bảng mapping agent_draft_revision để liên kết và truy vết lịch sử giữa SpecRevision và ChatFlow draft.",
-        "Tự động lọc bỏ các chuỗi nhạy cảm (Bearer [REDACTED], API keys, password) trong error message trước khi trả ra client.",
-        "Khi cùng session có revision mới, thực hiện update draft thay vì tạo mới flow để tránh flow mồ côi."
+        "Xây dựng BuildJobManager để quản lý toàn diện vòng đời tác vụ build và tự động hủy (supersede) job cũ khi có revision mới.",
+        "Bảo đảm bản draft ChatFlow tuân thủ 100% cấu trúc Flowise Agentflow V2 và policy an toàn deployed=false, isPublic=false.",
+        "Khép lại Phase 2 và sẵn sàng bước vào Phase 3 (Chat thử nghiệm với draft và hoàn thiện Demo D1)."
     ],
     "changedFiles": [
-        "packages/server/src/services/agent-builder/errors/builderErrors.ts",
-        "packages/server/src/services/agent-builder/errors/builderErrors.test.ts",
-        "packages/server/src/services/agent-builder/errors/index.ts",
-        "packages/server/src/database/entities/AgentDraftRevision.ts",
+        "packages/server/src/database/entities/BuildJob.ts",
         "packages/server/src/database/entities/index.ts",
-        "packages/server/src/database/migrations/sqlite/1782000000000-AddAgentDraftRevision.ts",
+        "packages/server/src/database/migrations/sqlite/1783000000000-AddBuildJobEntity.ts",
         "packages/server/src/database/migrations/sqlite/index.ts",
+        "packages/server/src/services/agent-builder/pipeline/buildJobManager.ts",
+        "packages/server/src/services/agent-builder/pipeline/buildJobManager.test.ts",
         "packages/server/src/services/agent-builder/pipeline/buildPipelineService.ts",
         "packages/server/src/services/agent-builder/pipeline/buildPipelineService.test.ts",
+        "packages/server/src/services/agent-builder/pipeline/agentflowContract.test.ts",
         "packages/server/src/services/agent-builder/pipeline/index.ts",
         "packages/server/src/controllers/agent-builder/index.ts",
         "packages/server/src/routes/agent-builder/index.ts",
-        "packages/server/src/services/agent-builder/types.ts",
-        "packages/server/src/services/agent-builder/index.ts",
-        "AI-Agent/tasks/B-010.md",
         "AI-Agent/tasks/B-011.md",
+        "AI-Agent/tasks/B-012.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "115/115 tests pass trong module Agent Builder trên packages/server (Jest 11/11 suites).",
+        "129/129 tests pass trong module Agent Builder trên packages/server (Jest 13/13 suites).",
         "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0.",
         "4/4 tests pass trong packages/ui/src/api/agentBuilder.test.js (Jest).",
         "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
     ],
     "blockers": [],
     "nextActions": [
-        "Commit và push task B-010 lên origin/main theo yêu cầu người dùng.",
-        "Bắt đầu triển khai task B-011 (PH2-T09–PH2-T10): Build Job Lifecycle và Contract Test với Flowise Runtime (hoàn thành Phase 2)."
+        "Commit và push task B-011 lên origin/main theo yêu cầu người dùng.",
+        "Bắt đầu triển khai task B-012 (PH3-T01–PH3-T02): Panel Chat Thử Nghiệm với Agent Draft và Hiển Thị Tiến Trình (Mở đầu Phase 3)."
     ],
-    "nextTask": "B-011",
+    "nextTask": "B-012",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -73,8 +70,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "83c2ac796c8b48057eb595737c24ecd32ea07475",
+        "head": "045d99d09a4d1d37704932c3300ab1e787e6bea5",
         "branch": "main",
-        "sourceFingerprint": "845115584b771acd39b9e6e9483d3bb14cb16a4c110c53c06f2b6afad4188f30"
+        "sourceFingerprint": "670fe643d715b3f87abd8054e4f49bfa29bb08d4ab501a7bf928d809badce75a"
     }
 }

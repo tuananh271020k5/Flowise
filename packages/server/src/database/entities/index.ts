@@ -33,6 +33,7 @@ import { BuilderSession } from './BuilderSession'
 import { BuilderMessage } from './BuilderMessage'
 import { AgentSpecRevision } from './AgentSpecRevision'
 import { AgentDraftRevision } from './AgentDraftRevision'
+import { BuildJob } from './BuildJob'
 
 export const entities = {
     ChatFlow,
@@ -71,5 +72,6 @@ export const entities = {
     BuilderSession,
     BuilderMessage,
     AgentSpecRevision,
-    AgentDraftRevision
+    AgentDraftRevision,
+    BuildJob
 }

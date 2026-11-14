@@ -9,6 +9,7 @@ import { StatusCodes } from 'http-status-codes'
 import { BuilderSession } from '../../../database/entities/BuilderSession'
 import { AgentSpecRevision } from '../../../database/entities/AgentSpecRevision'
 import { AgentDraftRevision } from '../../../database/entities/AgentDraftRevision'
+import { BuildJob } from '../../../database/entities/BuildJob'
 import { ChatFlow, EnumChatflowType } from '../../../database/entities/ChatFlow'
 import { BuildPipelineService } from './buildPipelineService'
 import { AgentSpec } from '../types'
@@ -69,6 +70,7 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
     let mockSessionRepo: ReturnType<typeof createMockRepository<BuilderSession>>
     let mockRevisionRepo: ReturnType<typeof createMockRepository<AgentSpecRevision>>
     let mockDraftRevisionRepo: ReturnType<typeof createMockRepository<AgentDraftRevision>>
+    let mockJobRepo: ReturnType<typeof createMockRepository<BuildJob>>
     let mockChatflowRepo: ReturnType<typeof createMockRepository<ChatFlow>>
     let mockDataSource: any
     let pipelineService: BuildPipelineService
@@ -92,6 +94,7 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
         mockSessionRepo = createMockRepository<BuilderSession>()
         mockRevisionRepo = createMockRepository<AgentSpecRevision>()
         mockDraftRevisionRepo = createMockRepository<AgentDraftRevision>()
+        mockJobRepo = createMockRepository<BuildJob>()
         mockChatflowRepo = createMockRepository<ChatFlow>()
 
         mockDataSource = {
@@ -99,6 +102,7 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
                 if (entity === BuilderSession) return mockSessionRepo
                 if (entity === AgentSpecRevision) return mockRevisionRepo
                 if (entity === AgentDraftRevision) return mockDraftRevisionRepo
+                if (entity === BuildJob) return mockJobRepo
                 if (entity === ChatFlow) return mockChatflowRepo
                 throw new Error(`Unexpected entity ${entity?.name}`)
             })

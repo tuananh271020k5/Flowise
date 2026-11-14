@@ -47,6 +47,7 @@ import { AddScheduleEntities1772000000000 } from './1772000000000-AddScheduleEnt
 import { AddSSOIdentityBinding1780000000000 } from '../../../enterprise/database/migrations/sqlite/1780000000000-AddSSOIdentityBinding'
 import { AddAgentBuilderEntities1781000000000 } from './1781000000000-AddAgentBuilderEntities'
 import { AddAgentDraftRevision1782000000000 } from './1782000000000-AddAgentDraftRevision'
+import { AddBuildJobEntity1783000000000 } from './1783000000000-AddBuildJobEntity'
 
 import { AddAuthTables1720230151482 } from '../../../enterprise/database/migrations/sqlite/1720230151482-AddAuthTables'
 import { AddWorkspace1720230151484 } from '../../../enterprise/database/migrations/sqlite/1720230151484-AddWorkspace'
@@ -120,5 +121,6 @@ export const sqliteMigrations = [
     AddScheduleEntities1772000000000,
     AddSSOIdentityBinding1780000000000,
     AddAgentBuilderEntities1781000000000,
-    AddAgentDraftRevision1782000000000
+    AddAgentDraftRevision1782000000000,
+    AddBuildJobEntity1783000000000
 ]

@@ -125,6 +125,33 @@ const getDraftHistory = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+const cancelBuild = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Build Job ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const { reason } = req.body || {}
+        const cancelled = await buildPipelineService.cancelBuild(req.params.id, workspaceId, reason)
+        return res.status(StatusCodes.OK).json(cancelled)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getBuildJob = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Build Job ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const job = await buildPipelineService.getBuildJob(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(job)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -132,5 +159,7 @@ export default {
     getRevisions,
     subscribeEvents,
     buildSession,
-    getDraftHistory
+    getDraftHistory,
+    cancelBuild,
+    getBuildJob
 }

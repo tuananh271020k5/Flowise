@@ -3,6 +3,7 @@ import { DataSource, Repository } from 'typeorm'
 import { BuilderSession } from '../../../database/entities/BuilderSession'
 import { AgentSpecRevision } from '../../../database/entities/AgentSpecRevision'
 import { AgentDraftRevision } from '../../../database/entities/AgentDraftRevision'
+import { BuildJob } from '../../../database/entities/BuildJob'
 import { ChatFlow } from '../../../database/entities/ChatFlow'
 import { getRunningExpressApp } from '../../../utils/getRunningExpressApp'
 import { AgentSpec } from '../types'
@@ -10,6 +11,7 @@ import { createAgentPlan, validateAgentPlan } from '../generator/agentPlan'
 import compiler from '../generator/compiler'
 import { validateFlowGraph } from '../generator/flowValidator'
 import { FlowiseDraftAdapter } from '../adapter/flowiseDraftAdapter'
+import { BuildJobManager } from './buildJobManager'
 import collectorService from '../collectorService'
 import { AdapterError, BuildPipelineError, CompilerError } from '../errors/builderErrors'
 
@@ -21,6 +23,7 @@ export interface BuildExecutionResult {
     buildKey: string
     flowName: string
     revisionNo: number
+    jobId?: string
 }
 
 const getActiveDataSource = (customDataSource?: DataSource): DataSource => {
@@ -32,9 +35,11 @@ const getActiveDataSource = (customDataSource?: DataSource): DataSource => {
 
 export class BuildPipelineService {
     private draftAdapter: FlowiseDraftAdapter
+    private jobManager: BuildJobManager
 
     constructor(private customDataSource?: DataSource) {
         this.draftAdapter = new FlowiseDraftAdapter(customDataSource)
+        this.jobManager = new BuildJobManager(customDataSource)
     }
 
     private get ds(): DataSource {
@@ -109,11 +114,18 @@ export class BuildPipelineService {
             )
         }
 
-        // 4. Kiểm tra Idempotency thông qua buildKey
+        // 4. Kiểm tra Idempotency thông qua buildKey & BuildJob (PH2-T09)
         const buildKey = customBuildKey || `${sessionId}:${targetRevision.id}`
+        const { job, isNew } = await this.jobManager.createOrGetJob({
+            sessionId,
+            workspaceId,
+            specRevisionId: targetRevision.id,
+            customBuildKey: buildKey
+        })
+
         const existingDraftRevision = await this.draftRevisionRepo.findOneBy({ buildKey })
 
-        if (existingDraftRevision) {
+        if (existingDraftRevision && !isNew && job.state === 'completed') {
             try {
                 // Kiểm tra flow còn tồn tại trong DB không
                 const existingDraft = await this.draftAdapter.getDraftById(existingDraftRevision.flowId, workspaceId)
@@ -124,94 +136,122 @@ export class BuildPipelineService {
                     draftRevisionId: existingDraftRevision.id,
                     buildKey,
                     flowName: existingDraft.chatflow.name,
-                    revisionNo: targetRevision.revisionNo
+                    revisionNo: targetRevision.revisionNo,
+                    jobId: job.id
                 }
             } catch {
                 // Nếu flow đã bị xóa trước đó, tiếp tục quy trình tái tạo mới
             }
         }
 
-        // 5. Chuyển đổi và thẩm định Spec
-        let spec: AgentSpec
+        // Bắt đầu job
+        await this.jobManager.startJob(job.id, workspaceId)
+
         try {
-            spec = JSON.parse(targetRevision.spec)
-        } catch (e: any) {
-            throw new BuildPipelineError('INVALID_SPEC_JSON', `Dữ liệu spec không phải JSON hợp lệ: ${e.message}`)
-        }
-
-        // 6. Lập AgentPlan và Validate Plan
-        const plan = createAgentPlan(spec, targetRevision.id)
-        const planValidation = validateAgentPlan(plan)
-        if (!planValidation.valid) {
-            throw new CompilerError('COMPILER_INVALID_PLAN', `Kế hoạch biên dịch không hợp lệ: ${planValidation.errors.join('; ')}`)
-        }
-
-        // 7. Biên dịch Graph tất định
-        const compiledGraph = compiler.compile(plan)
-
-        // 8. Server Flow Validation
-        const flowValidation = validateFlowGraph(compiledGraph)
-        if (!flowValidation.valid) {
-            throw new CompilerError('COMPILER_INVALID_GRAPH', `Đồ thị sinh ra không hợp lệ: ${flowValidation.errors.join('; ')}`)
-        }
-
-        // 9. Lưu trữ hoặc cập nhật ChatFlow Draft
-        // Tìm draft trước đó của cùng session nếu có
-        const previousDrafts = await this.draftRevisionRepo.find({
-            where: { sessionId },
-            order: { createdDate: 'DESC' },
-            take: 1
-        })
-
-        let targetFlow: ChatFlow
-        if (previousDrafts.length > 0) {
+            // 5. Chuyển đổi và thẩm định Spec
+            let spec: AgentSpec
             try {
-                targetFlow = await this.draftAdapter.updateDraft(previousDrafts[0].flowId, workspaceId, compiledGraph)
-            } catch {
+                spec = JSON.parse(targetRevision.spec)
+            } catch (e: any) {
+                throw new BuildPipelineError('INVALID_SPEC_JSON', `Dữ liệu spec không phải JSON hợp lệ: ${e.message}`)
+            }
+
+            // 6. Lập AgentPlan và Validate Plan
+            const plan = createAgentPlan(spec, targetRevision.id)
+            const planValidation = validateAgentPlan(plan)
+            if (!planValidation.valid) {
+                throw new CompilerError('COMPILER_INVALID_PLAN', `Kế hoạch biên dịch không hợp lệ: ${planValidation.errors.join('; ')}`)
+            }
+
+            // 7. Biên dịch Graph tất định
+            const compiledGraph = compiler.compile(plan)
+
+            // 8. Server Flow Validation
+            const flowValidation = validateFlowGraph(compiledGraph)
+            if (!flowValidation.valid) {
+                throw new CompilerError('COMPILER_INVALID_GRAPH', `Đồ thị sinh ra không hợp lệ: ${flowValidation.errors.join('; ')}`)
+            }
+
+            // 9. Lưu trữ hoặc cập nhật ChatFlow Draft
+            // Tìm draft trước đó của cùng session nếu có
+            const previousDrafts = await this.draftRevisionRepo.find({
+                where: { sessionId },
+                order: { createdDate: 'DESC' },
+                take: 1
+            })
+
+            let targetFlow: ChatFlow
+            if (previousDrafts.length > 0) {
+                try {
+                    targetFlow = await this.draftAdapter.updateDraft(previousDrafts[0].flowId, workspaceId, compiledGraph)
+                } catch {
+                    targetFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
+                }
+            } else {
                 targetFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
             }
-        } else {
-            targetFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
-        }
 
-        // 10. Ghi nhận AgentDraftRevision mapping
-        const draftRevision = this.draftRevisionRepo.create({
-            sessionId,
-            specRevisionId: targetRevision.id,
-            buildKey,
-            flowId: targetFlow.id,
-            planId: plan.id,
-            templateId: plan.templateId,
-            templateVersion: plan.templateVersion
-        })
-        const savedDraftRevision = await this.draftRevisionRepo.save(draftRevision)
-
-        // 11. Cập nhật BuilderSession
-        session.state = 'ready'
-        session.title = compiledGraph.flowConfig?.name || session.title
-        await this.sessionRepo.save(session)
-
-        // 12. Phát SSE thông báo build hoàn tất
-        collectorService.broadcastSSE(sessionId, {
-            type: 'build_completed',
-            data: {
+            // 10. Ghi nhận AgentDraftRevision mapping
+            const draftRevision = this.draftRevisionRepo.create({
+                sessionId,
+                specRevisionId: targetRevision.id,
+                buildKey,
                 flowId: targetFlow.id,
+                planId: plan.id,
+                templateId: plan.templateId,
+                templateVersion: plan.templateVersion
+            })
+            const savedDraftRevision = await this.draftRevisionRepo.save(draftRevision)
+
+            // 11. Cập nhật BuilderSession
+            session.state = 'ready'
+            session.title = compiledGraph.flowConfig?.name || session.title
+            await this.sessionRepo.save(session)
+
+            // 12. Hoàn thành Job
+            await this.jobManager.completeJob(job.id, workspaceId, targetFlow.id)
+
+            // 13. Phát SSE thông báo build hoàn tất
+            collectorService.broadcastSSE(sessionId, {
+                type: 'build_completed',
+                data: {
+                    flowId: targetFlow.id,
+                    buildKey,
+                    flowName: targetFlow.name,
+                    revisionNo: targetRevision.revisionNo,
+                    jobId: job.id
+                },
+                timestamp: new Date().toISOString()
+            })
+
+            return {
+                success: true,
+                isExisting: false,
+                flowId: targetFlow.id,
+                draftRevisionId: savedDraftRevision.id,
                 buildKey,
                 flowName: targetFlow.name,
-                revisionNo: targetRevision.revisionNo
-            },
-            timestamp: new Date().toISOString()
-        })
-
-        return {
-            success: true,
-            isExisting: false,
-            flowId: targetFlow.id,
-            draftRevisionId: savedDraftRevision.id,
-            buildKey,
-            flowName: targetFlow.name,
-            revisionNo: targetRevision.revisionNo
+                revisionNo: targetRevision.revisionNo,
+                jobId: job.id
+            }
+        } catch (error: any) {
+            await this.jobManager.failJob(job.id, workspaceId, error.message || 'Build failed')
+            throw error
         }
+    }
+
+    /**
+     * Hủy bỏ tác vụ build đang chạy (PH2-T09).
+     */
+    async cancelBuild(jobId: string, workspaceId: string, reason?: string): Promise<BuildJob> {
+        return this.jobManager.cancelJob(jobId, workspaceId, reason)
+    }
+
+    /**
+     * Lấy trạng thái của tác vụ build theo jobId.
+     */
+    async getBuildJob(jobId: string, workspaceId: string): Promise<BuildJob> {
+        return this.jobManager.getJobById(jobId, workspaceId)
     }
 
     /**

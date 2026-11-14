@@ -1,5 +1,23 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-011 / PH2-T09–T10 (Hoàn tất Gate Phase 2)
+
+Hoàn thành B-011 (PH2-T09 Build Job Lifecycle và PH2-T10 Contract Test với Flowise Runtime). Khép lại 100% Phase 2:
+
+-   **Build Job Lifecycle (PH2-T09):** Xây dựng entity `BuildJob` và service `BuildJobManager`. Hỗ trợ đầy đủ vòng đời trạng thái (`pending` | `running` | `completed` | `failed` | `cancelled`), kiểm soát timeout (`timeoutMs`), số lần thử tối đa (`maxAttempts: 3`), và tự động hủy bỏ (`cancelled / superseded`) các job cũ khi phiên thiết kế có bản đặc tả mới thay thế. Thêm endpoints API `/api/v1/agent-builder/builds/:id` và `/builds/:id/cancel`.
+-   **Flowise Agentflow V2 Runtime Contract Test (PH2-T10):** Xây dựng bộ kiểm thử hợp đồng end-to-end `agentflowContract.test.ts` kiểm chứng toàn diện từ Vietnamese Spec → Spec Revision → Readiness check → AgentPlan → Compiler tất định → FlowValidator → FlowiseDraftAdapter → ChatFlow entity:
+    -   Khớp 100% cấu trúc Canvas của Flowise V2 runtime (Start 1.4, Agent 3.2, output/input anchors, handles).
+    -   Negative Auth: Bắt buộc `deployed: false` và `isPublic: false` cho draft; chặn đọc/sửa từ workspace khác (403 Forbidden).
+    -   Idempotency: Thực thi build lặp lại 3 lần vẫn duy trì 1 flowId duy nhất và 1 build job duy nhất.
+-   **Kiểm thử nghiệm thu:**
+    -   8 unit tests cho `buildJobManager.test.ts` (100% pass).
+    -   3 integration contract tests cho `agentflowContract.test.ts` (100% pass).
+    -   Toàn bộ backend test suite `agent-builder` đạt 13/13 test suites pass, 129/129 tests pass.
+    -   TypeScript type check (`tsc --noEmit`) đạt exit 0.
+    -   UI test `agentBuilder.test.js` 4/4 pass.
+    -   Harness test 14 pass, 1 skipped (symlink host policy).
+    -   Lập task tiếp theo `B-012.md` (PH3-T01 và PH3-T02) mở đầu Phase 3.
+
 ## 15/11/2026 — B-010 / PH2-T07–T08
 
 Hoàn thành B-010 (PH2-T07 Chuẩn Hóa Lỗi và PH2-T08 Pipeline Build Idempotency & Revision Mapping):

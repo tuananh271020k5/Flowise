@@ -24,4 +24,8 @@ router.post('/sessions/:id/builds', agentBuilderController.buildSession)
 // LIST DRAFT REVISIONS HISTORY
 router.get('/sessions/:id/drafts', agentBuilderController.getDraftHistory)
 
+// BUILD JOB STATUS & CANCELLATION (PH2-T09)
+router.get('/builds/:id', agentBuilderController.getBuildJob)
+router.post('/builds/:id/cancel', agentBuilderController.cancelBuild)
+
 export default router
