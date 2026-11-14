@@ -1,5 +1,26 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-014 / PH3-T05–T06 (Hiển Thị Diff, Khôi Phục Cấu Hình & Xử Lý Hủy/Ghi Đè Build)
+
+Hoàn thành B-014 (PH3-T05 Hiển thị diff và khôi phục cấu hình; PH3-T06 Xử lý cancel và sửa khi build đang chạy):
+
+-   **Spec Diff Computation Service (PH3-T05):** Xây dựng `specDiffService.ts` so sánh chi tiết giữa 2 AgentSpec: tên trợ lý, mục tiêu, hướng dẫn vận hành, danh sách công cụ (added, removed, unchanged), mô hình AI, và kịch bản kiểm thử; trả về tóm tắt biến đổi bằng tiếng Việt trực quan.
+-   **API Endpoints Diff & Rollback (PH3-T05):**
+    -   `GET /api/v1/agent-builder/sessions/:id/diff?rev1=...&rev2=...`
+    -   `POST /api/v1/agent-builder/sessions/:id/rollback`: Khôi phục về revision chỉ định bằng cách tạo revision mới kế thừa cấu hình cũ (bảo toàn toàn bộ lịch sử tiến trình), ghi nhận tin nhắn thông báo vào phiên và tự động kích hoạt build đồng bộ draft nếu spec đạt `buildReady: true`.
+-   **Giao Diện RevisionsDialog & Diff View (PH3-T05):** Nâng cấp `RevisionsDialog.jsx` hỗ trợ xem khác biệt (Diff) trực quan so với bản liền trước, xem raw JSON, và nút "Khôi phục" (Rollback) cập nhật tức thì trạng thái phiên làm việc.
+-   **Cancel Guard & Superseded Guard (PH3-T06):**
+    -   Cập nhật `buildPipelineService.ts`: Bổ sung kiểm tra trước và trong quá trình biên dịch/cập nhật draft. Nếu job bị người dùng hủy (`Cancel Guard`), pipeline dừng ngay không ghi đè draft.
+    -   Nếu phát hiện session đã có revision mới hơn trong khi job đang thực thi (`Superseded Guard`), job cũ sẽ tự động bị hủy với lý do `superseded` và kết quả cũ bị loại bỏ an toàn, không bao giờ ghi đè draft của revision mới hơn.
+-   **Kiểm thử & Nghiệm thu:**
+    -   15 test suites server với 148 tests pass 100% (bao gồm `specDiffService.test.ts`, `sessionService.test.ts`, `buildPipelineService.test.ts` với Cancel Guard và Superseded Guard).
+    -   TypeScript typecheck (`tsc --noEmit`) exit 0.
+    -   87 UI tests pass 100% (4/4 suites).
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   Lập task tiếp theo `B-015.md` (PH3-T07 và PH3-T08 - Nghiệm thu Gate D1).
+
+
 ## 15/11/2026 — B-013 / PH3-T03–T04 (Chạy Bộ Thử Có Kiểm Soát & Sửa Cấu Hình Bằng Chat)
 
 Hoàn thành B-013 (PH3-T03 Chạy bộ thử assistant có kiểm soát và PH3-T04 Sửa cấu hình Agent bằng chat):

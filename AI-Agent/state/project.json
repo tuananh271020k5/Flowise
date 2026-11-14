@@ -1,46 +1,49 @@
 {
   "schemaVersion": 1,
-  "revision": 26,
-  "updatedAt": "2026-11-14T19:21:46.290Z",
+  "revision": 27,
+  "updatedAt": "2026-11-14T20:11:46.445Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-013",
+  "currentTask": "B-014",
   "status": "completed",
-  "productStage": "phase3_evaluation_runner_and_chat_edit_ready",
-  "summary": "B-013/PH3-T03–T04 hoàn thành: Chạy Thử Assistant Có Kiểm Soát và Sửa Cấu Hình Bằng Chat. EvaluationRunnerService chạy batch test với budget cap và so khớp assertions, route /sessions/:id/test-suite, TestChatPane hiển thị batch report dialog. sessionService tự động sync draft khi người dùng sửa Agent qua chat. 14 server suites pass (137 tests), 4 UI suites pass (85 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-014.",
+  "productStage": "phase3_diff_rollback_and_cancel_guard_ready",
+  "summary": "B-014/PH3-T05–T06 hoàn thành: Hiển Thị Diff, Khôi Phục Cấu Hình và Xử Lý Hủy/Ghi Đè Build. specDiffService tính toán diff chi tiết và tóm tắt tiếng Việt, route /sessions/:id/diff và /sessions/:id/rollback. RevisionsDialog hỗ trợ xem diff và nút khôi phục (rollback). buildPipelineService bổ sung Cancel Guard và Superseded Guard chống ghi đè draft khi job cũ bị hủy hoặc bị thay thế. 15 server suites pass (148 tests), 4 UI suites pass (87 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-015.",
   "decisions": [
-    "Bảo vệ tài nguyên LLM với maxExamples (mặc định 10) trong batch evaluation runner.",
-    "Tự động kích hoạt build pipeline cập nhật draft khi người dùng chat điều chỉnh spec đạt buildReady: true.",
-    "Hiển thị hộp thoại kết quả batch test chi tiết gồm tỷ lệ pass/fail, thời gian và trạng thái từng assertion."
+    "Rollback tạo một revision mới kế thừa cấu hình cũ để bảo toàn 100% lịch sử các bước đàm thoại.",
+    "Áp dụng Cancel Guard và Superseded Guard trong build pipeline để ngăn chặn hoàn toàn việc job cũ ghi đè bản draft của revision mới hơn.",
+    "Cung cấp giao diện xem diff trực quan so sánh giữa các phiên bản ngay trong RevisionsDialog."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.ts",
-    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.test.ts",
-    "packages/server/src/services/agent-builder/pipeline/index.ts",
+    "packages/server/src/services/agent-builder/specDiffService.ts",
+    "packages/server/src/services/agent-builder/specDiffService.test.ts",
     "packages/server/src/services/agent-builder/sessionService.ts",
+    "packages/server/src/services/agent-builder/sessionService.test.ts",
+    "packages/server/src/services/agent-builder/pipeline/buildPipelineService.ts",
+    "packages/server/src/services/agent-builder/pipeline/buildPipelineService.test.ts",
     "packages/server/src/controllers/agent-builder/index.ts",
     "packages/server/src/routes/agent-builder/index.ts",
     "packages/ui/src/api/agentBuilder.js",
     "packages/ui/src/api/agentBuilder.test.js",
-    "packages/ui/src/views/agent-builder/TestChatPane.jsx",
-    "AI-Agent/tasks/B-013.md",
+    "packages/ui/src/views/agent-builder/RevisionsDialog.jsx",
+    "packages/ui/src/views/agent-builder/index.jsx",
     "AI-Agent/tasks/B-014.md",
+    "AI-Agent/tasks/B-015.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "137/137 tests pass trong packages/server (Jest 14/14 suites agent-builder).",
+    "148/148 tests pass trong packages/server (Jest 15/15 suites agent-builder).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
-    "85/85 tests pass trong packages/ui (Jest 4/4 suites).",
+    "87/87 tests pass trong packages/ui (Jest 4/4 suites).",
     "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-013 lên origin/main.",
-    "Triển khai B-014 (PH3-T05 và PH3-T06): Hiển thị diff, khôi phục cấu hình và xử lý huỷ/ghi đè build."
+    "Commit và push task B-014 lên origin/main theo yêu cầu người dùng.",
+    "Triển khai B-015 (PH3-T07 và PH3-T08): Khôi phục sau refresh/reconnect và nghiệm thu demo ba kịch bản (Gate D1)."
   ],
-  "nextTask": "B-014",
+  "nextTask": "B-015",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -68,8 +71,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "6b8062c0dd14eca6a5401419d58a1efa8bb3f0f5",
+    "head": "44ca99fcc13fef0c0dce016e8027fb9b4db52117",
     "branch": "main",
-    "sourceFingerprint": "a7b10193a2f4807f3ca09e8d9f3d96bd488c85ea7d6bf982eb0217477ff918e9"
+    "sourceFingerprint": "472f9191ed824bce5321cd6d11e98f03cdb69b129af9b75d2ecbd05f72fee76f"
   }
 }

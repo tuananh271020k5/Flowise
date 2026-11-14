@@ -407,5 +407,115 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
             expect(history).toHaveLength(1)
             expect(history[0].buildKey).toBe(`${session.id}:rev-1`)
         })
+
+        it('không ghi đè draft khi job đã bị hủy trước hoặc trong khi build (PH3-T06 Cancel Guard)', async () => {
+            const session = await mockSessionRepo.save({
+                id: 'sess-cancel-test',
+                workspaceId: 'ws-alpha',
+                organizationId: 'org-1',
+                userId: 'user-1',
+                title: 'Trợ lý Test Cancel',
+                state: 'ready',
+                currentRevisionNo: 1
+            })
+
+            const rev1 = await mockRevisionRepo.save({
+                id: 'rev-cancel-1',
+                sessionId: session.id,
+                revisionNo: 1,
+                spec: JSON.stringify(readySpec),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]',
+                specReady: true,
+                buildReady: true,
+                testReady: true
+            })
+
+            // Giả lập job đã bị hủy
+            const buildKey = `${session.id}:${rev1.id}`
+            await mockJobRepo.save({
+                id: 'job-cancelled-1',
+                sessionId: session.id,
+                workspaceId: 'ws-alpha',
+                specRevisionId: rev1.id,
+                buildKey,
+                state: 'cancelled',
+                cancelReason: 'User cancelled',
+                attempts: 0,
+                maxAttempts: 3,
+                timeoutMs: 30000
+            })
+
+            const result = await pipelineService.executeBuild({
+                sessionId: session.id,
+                workspaceId: 'ws-alpha',
+                specRevisionId: rev1.id,
+                customBuildKey: buildKey
+            })
+
+            expect(result.cancelled).toBe(true)
+            expect(result.success).toBe(false)
+            expect(result.message).toContain('đã bị hủy')
+
+            // Không tạo chatflow draft nào
+            const drafts = await pipelineService.getDraftHistory(session.id, 'ws-alpha')
+            expect(drafts).toHaveLength(0)
+        })
+
+        it('tự động hủy job cũ và không ghi đè draft khi có revision mới hơn thay thế (PH3-T06 Superseded Guard)', async () => {
+            const session = await mockSessionRepo.save({
+                id: 'sess-supersede-test',
+                workspaceId: 'ws-alpha',
+                organizationId: 'org-1',
+                userId: 'user-1',
+                title: 'Trợ lý Test Supersede',
+                state: 'ready',
+                currentRevisionNo: 2
+            })
+
+            // Revision 1 cũ
+            const rev1 = await mockRevisionRepo.save({
+                id: 'rev-super-1',
+                sessionId: session.id,
+                revisionNo: 1,
+                spec: JSON.stringify({ ...readySpec, name: 'Tên Cũ Rev 1' }),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]',
+                specReady: true,
+                buildReady: true,
+                testReady: true
+            })
+
+            // Trong lúc job rev1 đang chờ, người dùng đã tạo revision 2 mới hơn
+            await mockRevisionRepo.save({
+                id: 'rev-super-2',
+                sessionId: session.id,
+                revisionNo: 2,
+                spec: JSON.stringify({ ...readySpec, name: 'Tên Mới Rev 2' }),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]',
+                specReady: true,
+                buildReady: true,
+                testReady: true
+            })
+
+            // Khi rev1 được thực thi, nó phát hiện đã có revision 2 mới hơn -> supersede và discard
+            const result = await pipelineService.executeBuild({
+                sessionId: session.id,
+                workspaceId: 'ws-alpha',
+                specRevisionId: rev1.id
+            })
+
+            expect(result.cancelled).toBe(true)
+            expect(result.success).toBe(false)
+            expect(result.message).toContain('superseded')
+
+            // Không ghi đè draft revision
+            const drafts = await pipelineService.getDraftHistory(session.id, 'ws-alpha')
+            expect(drafts).toHaveLength(0)
+        })
     })
 })

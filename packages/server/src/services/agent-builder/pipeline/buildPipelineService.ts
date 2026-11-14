@@ -24,6 +24,8 @@ export interface BuildExecutionResult {
     flowName: string
     revisionNo: number
     jobId?: string
+    cancelled?: boolean
+    message?: string
 }
 
 const getActiveDataSource = (customDataSource?: DataSource): DataSource => {
@@ -56,6 +58,10 @@ export class BuildPipelineService {
 
     private get draftRevisionRepo(): Repository<AgentDraftRevision> {
         return this.ds.getRepository(AgentDraftRevision)
+    }
+
+    private get jobRepo(): Repository<BuildJob> {
+        return this.ds.getRepository(BuildJob)
     }
 
     /**
@@ -144,6 +150,22 @@ export class BuildPipelineService {
             }
         }
 
+        // 4.1. Kiểm tra nếu Job đã bị hủy từ trước (PH3-T06 Cancel Guard)
+        if (job.state === 'cancelled') {
+            return {
+                success: false,
+                isExisting: false,
+                cancelled: true,
+                flowId: '',
+                draftRevisionId: '',
+                buildKey,
+                flowName: '',
+                revisionNo: targetRevision.revisionNo,
+                jobId: job.id,
+                message: `Tác vụ build ${job.id} đã bị hủy (${job.cancelReason || 'cancelled'})`
+            }
+        }
+
         // Bắt đầu job
         await this.jobManager.startJob(job.id, workspaceId)
 
@@ -170,6 +192,44 @@ export class BuildPipelineService {
             const flowValidation = validateFlowGraph(compiledGraph)
             if (!flowValidation.valid) {
                 throw new CompilerError('COMPILER_INVALID_GRAPH', `Đồ thị sinh ra không hợp lệ: ${flowValidation.errors.join('; ')}`)
+            }
+
+            // 8.1. Kiểm tra Hủy bỏ hoặc Superseded Guard (PH3-T06)
+            const currentJob = await this.jobRepo.findOneBy({ id: job.id })
+            if (currentJob?.state === 'cancelled') {
+                return {
+                    success: false,
+                    isExisting: false,
+                    cancelled: true,
+                    flowId: '',
+                    draftRevisionId: '',
+                    buildKey,
+                    flowName: '',
+                    revisionNo: targetRevision.revisionNo,
+                    jobId: job.id,
+                    message: `Tác vụ build ${job.id} đã bị hủy (${currentJob.cancelReason || 'cancelled'})`
+                }
+            }
+
+            const newerRevisions = await this.revisionRepo.find({
+                where: { sessionId },
+                order: { revisionNo: 'DESC' },
+                take: 1
+            })
+            if (newerRevisions.length > 0 && newerRevisions[0].revisionNo > targetRevision.revisionNo) {
+                await this.jobManager.cancelJob(job.id, workspaceId, `superseded by revision ${newerRevisions[0].revisionNo}`)
+                return {
+                    success: false,
+                    isExisting: false,
+                    cancelled: true,
+                    flowId: '',
+                    draftRevisionId: '',
+                    buildKey,
+                    flowName: '',
+                    revisionNo: targetRevision.revisionNo,
+                    jobId: job.id,
+                    message: `Tác vụ build của revision ${targetRevision.revisionNo} đã bị superseded bởi revision mới hơn (${newerRevisions[0].revisionNo})`
+                }
             }
 
             // 9. Lưu trữ hoặc cập nhật ChatFlow Draft

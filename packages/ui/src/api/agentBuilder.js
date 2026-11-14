@@ -20,6 +20,10 @@ const testPrediction = (flowId, body) => client.post(`/prediction/${flowId}`, bo
 
 const runTestSuite = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/test-suite`, body)
 
+const rollbackRevision = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/rollback`, body)
+
+const getDiff = (sessionId, params) => client.get(`/agent-builder/sessions/${sessionId}/diff`, { params })
+
 export default {
     createSession,
     getSession,
@@ -30,5 +34,7 @@ export default {
     cancelBuild,
     getDraftHistory,
     testPrediction,
-    runTestSuite
+    runTestSuite,
+    rollbackRevision,
+    getDiff
 }

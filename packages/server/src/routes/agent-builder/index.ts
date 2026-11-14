@@ -31,4 +31,8 @@ router.post('/builds/:id/cancel', agentBuilderController.cancelBuild)
 // RUN CONTROLLED TEST SUITE (PH3-T03)
 router.post('/sessions/:id/test-suite', agentBuilderController.runTestSuite)
 
+// SPEC DIFF & ROLLBACK (PH3-T05)
+router.get('/sessions/:id/diff', agentBuilderController.getSpecDiff)
+router.post('/sessions/:id/rollback', agentBuilderController.rollbackRevision)
+
 export default router

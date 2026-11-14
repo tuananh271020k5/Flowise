@@ -9,6 +9,7 @@ import { StatusCodes } from 'http-status-codes'
 import { BuilderSession } from '../../database/entities/BuilderSession'
 import { BuilderMessage } from '../../database/entities/BuilderMessage'
 import { AgentSpecRevision } from '../../database/entities/AgentSpecRevision'
+import { AgentDraftRevision } from '../../database/entities/AgentDraftRevision'
 import { BuilderSessionService } from './sessionService'
 import agentBuilderController from '../../controllers/agent-builder'
 import sessionService from './sessionService'
@@ -66,6 +67,7 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
     let sessionMockRepo: ReturnType<typeof createMockRepository<BuilderSession>>
     let messageMockRepo: ReturnType<typeof createMockRepository<BuilderMessage>>
     let revisionMockRepo: ReturnType<typeof createMockRepository<AgentSpecRevision>>
+    let draftRevisionMockRepo: ReturnType<typeof createMockRepository<AgentDraftRevision>>
     let mockDataSource: any
     let service: BuilderSessionService
 
@@ -73,12 +75,14 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
         sessionMockRepo = createMockRepository<BuilderSession>()
         messageMockRepo = createMockRepository<BuilderMessage>()
         revisionMockRepo = createMockRepository<AgentSpecRevision>()
+        draftRevisionMockRepo = createMockRepository<AgentDraftRevision>()
 
         mockDataSource = {
             getRepository: jest.fn((entity: any) => {
                 if (entity === BuilderSession) return sessionMockRepo
                 if (entity === BuilderMessage) return messageMockRepo
                 if (entity === AgentSpecRevision) return revisionMockRepo
+                if (entity === AgentDraftRevision) return draftRevisionMockRepo
                 throw new Error(`Unknown entity in test: ${entity}`)
             })
         }
@@ -440,6 +444,148 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
 
             await agentBuilderController.subscribeEvents(req, res, next)
             expect(sessionService.subscribeEvents).toHaveBeenCalledWith('sess-1', 'ws-controller-test', res)
+        })
+
+        it('rollbackRevision trả về HTTP 200 OK', async () => {
+            const req = makeReq({
+                params: { id: 'sess-1' },
+                body: { revisionId: 'rev-target' }
+            })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(sessionService, 'rollbackRevision').mockResolvedValue({} as any)
+
+            await agentBuilderController.rollbackRevision(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('getSpecDiff trả về HTTP 200 OK', async () => {
+            const req = makeReq({
+                params: { id: 'sess-1' },
+                query: { rev1: 'rev-1', rev2: 'rev-2' }
+            })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(sessionService, 'getSpecDiff').mockResolvedValue({} as any)
+
+            await agentBuilderController.getSpecDiff(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+    })
+
+    describe('rollbackRevision (PH3-T05)', () => {
+        it('tạo revision mới kế thừa cấu hình cũ và giữ nguyên lịch sử', async () => {
+            const session = await sessionMockRepo.save({
+                id: 'sess-rb-1',
+                workspaceId: 'ws-123',
+                organizationId: 'org-123',
+                userId: 'user-1',
+                title: 'Phiên Rollback',
+                state: 'ready',
+                currentRevisionNo: 2
+            })
+
+            const oldSpec = {
+                name: 'Trợ Lý Ban Đầu',
+                goal: 'Hỗ trợ kỹ thuật',
+                instructions: 'Luôn trả lời ngắn gọn',
+                tools: ['calculator']
+            }
+
+            const rev1 = await revisionMockRepo.save({
+                id: 'rev-old-1',
+                sessionId: session.id,
+                revisionNo: 1,
+                spec: JSON.stringify(oldSpec),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]',
+                specReady: true,
+                buildReady: true,
+                testReady: true
+            })
+
+            const rev2 = await revisionMockRepo.save({
+                id: 'rev-new-2',
+                sessionId: session.id,
+                revisionNo: 2,
+                spec: JSON.stringify({ ...oldSpec, name: 'Trợ Lý Bản 2 Đã Đổi Tên' }),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]',
+                specReady: true,
+                buildReady: true,
+                testReady: true
+            })
+
+            session.currentSpecRevisionId = rev2.id
+            await sessionMockRepo.save(session)
+
+            // Thực hiện khôi phục về rev1
+            const snapshot = await service.rollbackRevision(session.id, 'ws-123', rev1.id)
+
+            // Revision mới tạo phải có revisionNo = 3 (không làm mất lịch sử rev1 và rev2)
+            expect(snapshot.currentSpecRevision).toBeDefined()
+            expect(snapshot.currentSpecRevision?.revisionNo).toBe(3)
+            expect(snapshot.currentSpecRevision?.reasonCodes).toContain('Khôi phục về phiên bản #1')
+
+            const restoredSpec = JSON.parse(snapshot.currentSpecRevision!.spec)
+            expect(restoredSpec.name).toBe('Trợ Lý Ban Đầu')
+
+            // Đảm bảo có tin nhắn thông báo trong lịch sử
+            const messages = await messageMockRepo.find({ where: { sessionId: session.id } })
+            expect(messages.some((m) => m.content.includes('Đã khôi phục cấu hình'))).toBe(true)
+        })
+
+        it('từ chối khôi phục khi khác workspace (Negative Auth: 403 Forbidden)', async () => {
+            const session = await sessionMockRepo.save({
+                id: 'sess-rb-2',
+                workspaceId: 'ws-team-alpha',
+                organizationId: 'org-123',
+                userId: 'user-1'
+            })
+
+            await expect(service.rollbackRevision(session.id, 'ws-team-beta', 'rev-any')).rejects.toThrow(
+                'Access denied: Workspace mismatch'
+            )
+        })
+    })
+
+    describe('getSpecDiff (PH3-T05)', () => {
+        it('so sánh diff chính xác giữa 2 revision trong phiên', async () => {
+            const session = await sessionMockRepo.save({
+                id: 'sess-diff-1',
+                workspaceId: 'ws-123',
+                organizationId: 'org-123',
+                userId: 'user-1'
+            })
+
+            const rev1 = await revisionMockRepo.save({
+                id: 'rev-diff-1',
+                sessionId: session.id,
+                revisionNo: 1,
+                spec: JSON.stringify({ name: 'Trợ Lý Alpha', goal: 'Mục tiêu 1' }),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]'
+            })
+
+            const rev2 = await revisionMockRepo.save({
+                id: 'rev-diff-2',
+                sessionId: session.id,
+                revisionNo: 2,
+                spec: JSON.stringify({ name: 'Trợ Lý Beta', goal: 'Mục tiêu 2' }),
+                assumptions: '[]',
+                missingFields: '[]',
+                reasonCodes: '[]'
+            })
+
+            const diff = await service.getSpecDiff(session.id, 'ws-123', rev1.id, rev2.id)
+            expect(diff.hasChanges).toBe(true)
+            expect(diff.name.from).toBe('Trợ Lý Alpha')
+            expect(diff.name.to).toBe('Trợ Lý Beta')
         })
     })
 })

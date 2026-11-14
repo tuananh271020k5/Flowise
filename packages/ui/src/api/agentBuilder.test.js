@@ -106,4 +106,24 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/test-suite', payload)
         expect(res.data.passedCount).toBe(3)
     })
+
+    it('rollbackRevision gửi POST request tới /agent-builder/sessions/:id/rollback', async () => {
+        const payload = { revisionId: 'rev-target' }
+        client.post.mockResolvedValueOnce({ data: { session: { id: 's1' } } })
+
+        const res = await agentBuilderApi.rollbackRevision('s1', payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/rollback', payload)
+        expect(res.data.session.id).toBe('s1')
+    })
+
+    it('getDiff gửi GET request tới /agent-builder/sessions/:id/diff', async () => {
+        const params = { rev1: 'rev-1', rev2: 'rev-2' }
+        client.get.mockResolvedValueOnce({ data: { hasChanges: true, summary: [] } })
+
+        const res = await agentBuilderApi.getDiff('s1', params)
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/diff', { params })
+        expect(res.data.hasChanges).toBe(true)
+    })
 })

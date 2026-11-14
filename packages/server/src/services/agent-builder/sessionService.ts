@@ -9,6 +9,7 @@ import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import collectorService, { CollectorService } from './collectorService'
 import buildPipelineService from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
+import { computeSpecDiff, SpecDiffResult } from './specDiffService'
 import { AgentSpec, BuildIntent, ReadinessResult } from './types'
 import { Response } from 'express'
 
@@ -437,6 +438,152 @@ export class BuilderSessionService {
             where: { sessionId },
             order: { revisionNo: 'ASC' }
         })
+    }
+
+    /**
+     * Tính toán diff giữa 2 revision trong phiên (PH3-T05).
+     */
+    async getSpecDiff(sessionId: string, workspaceId: string, rev1Id?: string, rev2Id?: string): Promise<SpecDiffResult> {
+        const session = await this.sessionRepo.findOneBy({ id: sessionId })
+        if (!session) {
+            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+        }
+        if (session.workspaceId !== workspaceId) {
+            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
+        }
+
+        let rev1: AgentSpecRevision | null = null
+        let rev2: AgentSpecRevision | null = null
+
+        if (rev1Id && rev2Id) {
+            rev1 = await this.revisionRepo.findOneBy({ id: rev1Id, sessionId })
+            rev2 = await this.revisionRepo.findOneBy({ id: rev2Id, sessionId })
+        } else {
+            // Mặc định lấy 2 revisions mới nhất
+            const revisions = await this.revisionRepo.find({
+                where: { sessionId },
+                order: { revisionNo: 'DESC' },
+                take: 2
+            })
+            rev2 = revisions[0] || null
+            rev1 = revisions[1] || null
+        }
+
+        let spec1: AgentSpec | null = null
+        let spec2: AgentSpec | null = null
+
+        if (rev1) {
+            try {
+                spec1 = JSON.parse(rev1.spec)
+            } catch {
+                spec1 = null
+            }
+        }
+        if (rev2) {
+            try {
+                spec2 = JSON.parse(rev2.spec)
+            } catch {
+                spec2 = null
+            }
+        }
+
+        return computeSpecDiff(spec1, spec2)
+    }
+
+    /**
+     * Khôi phục (Rollback) cấu hình về một revision trước đó (PH3-T05).
+     * Tạo một revision mới kế thừa spec cũ (bảo toàn lịch sử) và tự động đồng bộ draft nếu sẵn sàng.
+     */
+    async rollbackRevision(sessionId: string, workspaceId: string, targetRevisionId: string): Promise<SessionSnapshot> {
+        const session = await this.sessionRepo.findOneBy({ id: sessionId })
+        if (!session) {
+            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+        }
+        if (session.workspaceId !== workspaceId) {
+            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
+        }
+
+        const targetRevision = await this.revisionRepo.findOneBy({ id: targetRevisionId, sessionId })
+        if (!targetRevision) {
+            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Bản đặc tả ${targetRevisionId} không tồn tại trong phiên`)
+        }
+
+        let targetSpec: AgentSpec
+        try {
+            targetSpec = JSON.parse(targetRevision.spec)
+        } catch (e: any) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, `Dữ liệu spec không hợp lệ: ${e.message}`)
+        }
+
+        // Tìm revisionNo lớn nhất hiện tại
+        const latestRevisions = await this.revisionRepo.find({
+            where: { sessionId },
+            order: { revisionNo: 'DESC' },
+            take: 1
+        })
+        const nextRevNo = (latestRevisions[0]?.revisionNo || 0) + 1
+
+        // Tạo revision mới mang nội dung của spec cũ (giữ toàn vẹn lịch sử)
+        const newRevision = this.revisionRepo.create({
+            sessionId,
+            revisionNo: nextRevNo,
+            spec: targetRevision.spec,
+            assumptions: targetRevision.assumptions || '[]',
+            missingFields: targetRevision.missingFields || '[]',
+            reasonCodes: JSON.stringify([`Khôi phục về phiên bản #${targetRevision.revisionNo} (${targetSpec.name || 'Agent'})`]),
+            specReady: targetRevision.specReady,
+            buildReady: targetRevision.buildReady,
+            testReady: targetRevision.testReady
+        })
+        const savedRevision = await this.revisionRepo.save(newRevision)
+
+        session.currentSpecRevisionId = savedRevision.id
+        await this.sessionRepo.save(session)
+
+        // Thêm tin nhắn hệ thống thông báo việc khôi phục
+        const rollbackMessage = this.messageRepo.create({
+            sessionId,
+            role: 'assistant',
+            clientMessageId: `rollback-${Date.now()}`,
+            content: `Đã khôi phục cấu hình Agent về phiên bản #${targetRevision.revisionNo} (${targetSpec.name || 'Trợ lý'}).`,
+            specRevisionId: savedRevision.id
+        })
+        await this.messageRepo.save(rollbackMessage)
+
+        // Phát sự kiện SSE thông báo spec được cập nhật
+        const readiness = computeReadiness(targetSpec)
+        this.collector.broadcastSSE(sessionId, {
+            type: 'revision',
+            data: {
+                revisionNumber: savedRevision.revisionNo,
+                spec: targetSpec,
+                readiness
+            },
+            timestamp: new Date().toISOString()
+        })
+
+        // Tự động đồng bộ draft nếu spec đạt buildReady và session đã từng có draft trước đó
+        if (savedRevision.buildReady) {
+            try {
+                const previousDrafts = await this.draftRevisionRepo.find({
+                    where: { sessionId },
+                    order: { createdDate: 'DESC' },
+                    take: 1
+                })
+                if (previousDrafts.length > 0) {
+                    await buildPipelineService.executeBuild({
+                        sessionId,
+                        workspaceId,
+                        specRevisionId: savedRevision.id
+                    })
+                }
+            } catch (err: any) {
+                // eslint-disable-next-line no-console
+                console.error('Không thể tự động đồng bộ draft sau khi rollback:', err?.message)
+            }
+        }
+
+        return this.getSessionById(sessionId, workspaceId)
     }
 
     /**

@@ -185,6 +185,37 @@ const runTestSuite = async (req: Request, res: Response, next: NextFunction) => 
     }
 }
 
+const rollbackRevision = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const { revisionId } = req.body || {}
+        if (!revisionId) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'revisionId is required for rollback')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const snapshot = await sessionService.rollbackRevision(req.params.id, workspaceId, revisionId)
+        return res.status(StatusCodes.OK).json(snapshot)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getSpecDiff = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const { rev1, rev2 } = req.query as { rev1?: string; rev2?: string }
+        const diff = await sessionService.getSpecDiff(req.params.id, workspaceId, rev1, rev2)
+        return res.status(StatusCodes.OK).json(diff)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -195,5 +226,7 @@ export default {
     getDraftHistory,
     cancelBuild,
     getBuildJob,
-    runTestSuite
+    runTestSuite,
+    rollbackRevision,
+    getSpecDiff
 }

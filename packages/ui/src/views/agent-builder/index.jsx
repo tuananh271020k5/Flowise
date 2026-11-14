@@ -245,6 +245,35 @@ const AgentBuilderView = () => {
         }
     }
 
+    // Khôi phục về revision trước đó (PH3-T05)
+    const handleRollback = async (revisionId, revNo) => {
+        if (!sessionId || !revisionId) return
+        try {
+            setIsLoading(true)
+            const res = await agentBuilderApi.rollbackRevision(sessionId, { revisionId })
+            const data = res.data
+            if (data.session) {
+                setSessionId(data.session.id)
+                setMessages(data.messages || [])
+                if (data.currentSpecRevision) {
+                    setSpec(data.currentSpecRevision.spec || null)
+                    setRevisionNumber(data.currentSpecRevision.revisionNumber || data.currentSpecRevision.revisionNo || 1)
+                }
+                if (data.readiness) {
+                    setReadiness(data.readiness)
+                }
+                setSnackbarMessage(`Đã khôi phục thành công về phiên bản #${revNo}!`)
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi khôi phục revision:', err)
+            setError(err?.response?.data?.message || 'Khôi phục phiên bản thất bại.')
+            throw err
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     // Xử lý khi nhấn nút "Tạo Agentflow V2" (PH3-T01, PH3-T02)
     const handleGenerateAgentflow = async () => {
         if (!sessionId) return
@@ -368,7 +397,14 @@ const AgentBuilderView = () => {
             </Grid>
 
             {/* Dialog xem lịch sử các revision */}
-            <RevisionsDialog open={isRevisionsOpen} onClose={() => setIsRevisionsOpen(false)} revisions={revisions} />
+            <RevisionsDialog
+                open={isRevisionsOpen}
+                onClose={() => setIsRevisionsOpen(false)}
+                revisions={revisions}
+                currentRevisionNumber={revisionNumber}
+                sessionId={sessionId}
+                onRollback={handleRollback}
+            />
 
             {/* Thông báo Snackbar */}
             <Snackbar
