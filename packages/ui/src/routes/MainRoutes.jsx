@@ -58,6 +58,9 @@ const Account = Loadable(lazy(() => import('@/views/account')))
 // logs routing
 const Logs = Loadable(lazy(() => import('@/views/serverlogs')))
 
+// agent builder routing
+const AgentBuilder = Loadable(lazy(() => import('@/views/agent-builder')))
+
 // executions routing
 const Executions = Loadable(lazy(() => import('@/views/agentexecutions')))
 
@@ -93,6 +96,22 @@ const MainRoutes = {
             element: (
                 <RequireAuth permission={'agentflows:view'}>
                     <Agentflows />
+                </RequireAuth>
+            )
+        },
+        {
+            path: '/agent-builder',
+            element: (
+                <RequireAuth permission={'agentflows:view'}>
+                    <AgentBuilder />
+                </RequireAuth>
+            )
+        },
+        {
+            path: '/agent-builder/:id',
+            element: (
+                <RequireAuth permission={'agentflows:view'}>
+                    <AgentBuilder />
                 </RequireAuth>
             )
         },

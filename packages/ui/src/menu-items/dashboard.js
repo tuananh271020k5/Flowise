@@ -85,6 +85,15 @@ const dashboard = {
                     permission: 'agentflows:view'
                 },
                 {
+                    id: 'agentBuilder',
+                    title: 'Agent Builder',
+                    type: 'item',
+                    url: '/agent-builder',
+                    icon: icons.IconRobot,
+                    breadcrumbs: true,
+                    permission: 'agentflows:view'
+                },
+                {
                     id: 'executions',
                     title: 'Executions',
                     type: 'item',

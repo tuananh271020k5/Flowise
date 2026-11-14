@@ -1,5 +1,19 @@
 # Nhật ký bàn giao ngắn
 
+## 14/11/2026 — B-005 / PH1-T07–T08
+
+Hoàn thành B-005 (PH1-T07 và PH1-T08): Tạo Giao diện Chat Builder và Hiển thị Thẻ Spec Tóm tắt (Spec Summary Card) trên `packages/ui`.
+
+-   Xây dựng API client tại `packages/ui/src/api/agentBuilder.js` (`createSession`, `getSession`, `sendMessage`, `getRevisions`) và 4/4 Jest tests đạt tại `agentBuilder.test.js`.
+-   Xây dựng view và các components tại `packages/ui/src/views/agent-builder/`:
+    -   `ChatPane.jsx`: Khung chat hội thoại đàm thoại tiếng Việt, tự động cuộn (auto-scroll), banner onboarding tiếng Việt kèm 3 starter scenarios (CSKH FAQ, Phân loại ticket, Tóm tắt báo cáo), bong bóng chat avatar User/Bot, render Markdown bằng `MemoizedReactMarkdown`, indicator đang phân tích.
+    -   `SpecCard.jsx`: Thẻ tóm tắt Spec, thanh trạng thái sẵn sàng (Readiness Indicator) với chip màu (`ready`/`collecting`/`error`), thanh tiến trình phần trăm hoàn thiện, bảng cảnh báo `missingFields` với nhãn tiếng Việt dễ hiểu, thông tin chi tiết Tên, Mục tiêu, Ngôn ngữ, Model, Kết quả kỳ vọng, Công cụ, Kịch bản mẫu, nút "Tạo Agentflow V2 Ngay" khi ready.
+    -   `RevisionsDialog.jsx`: Hộp thoại xem toàn bộ lịch sử các revision của Agent Spec, tác giả, thời gian, tóm tắt thay đổi và JSON spec viewer.
+    -   `index.jsx`: Trang view chính quản lý state phiên, khôi phục lịch sử chat và spec từ URL `/:id`, tạo `clientMessageId` chống gửi trùng, hỗ trợ tạo phiên mới.
+-   Cập nhật routing trong `packages/ui/src/routes/MainRoutes.jsx` với các route `/agent-builder` và `/agent-builder/:id`.
+-   Thêm menu item "Agent Builder" trong `packages/ui/src/menu-items/dashboard.js`.
+-   Kiểm thử và biên dịch: Vite build `flowise-ui` hoàn tất không lỗi (exit code 0); 4/4 unit tests UI pass; 37/37 tests module Agent Builder backend pass. Cập nhật `B-005.md` hoàn thành, lập `B-006.md` (PH1-T09–T10) và cập nhật allowlist harness.
+
 ## 14/11/2026 — B-004 / PH1-T03–T04
 
 Hoàn thành B-004 (PH1-T03–T04): Thiết kế lưu trữ Session/Message/Spec Revision và API hội thoại Builder. Tạo các TypeORM entities: `BuilderSession` (`builder_session`), `BuilderMessage` (`builder_message`, unique index theo `sessionId` và `clientMessageId`), `AgentSpecRevision` (`agent_spec_revision`, unique index theo `sessionId` và `revisionNo`). Thêm migration SQLite `1781000000000-AddAgentBuilderEntities.ts` và đăng ký trong `entities`. Xây dựng `BuilderSessionService` tại `packages/server/src/services/agent-builder/sessionService.ts` với đầy đủ tính năng tạo phiên, đọc snapshot, thêm tin nhắn idempotent chống duplicate, từ chối xung đột revision (409 Conflict), chặn truy cập chéo workspace (403 Forbidden). Xây dựng Controller và Routes tại `/api/v1/agent-builder` (`POST /sessions`, `GET /sessions/:id`, `POST /sessions/:id/messages`, `GET /sessions/:id/revisions`). Bộ unit/integration tests tại `sessionService.test.ts` đạt 16/16 tests pass; tổng module Agent Builder đạt 37/37 tests pass; `tsc --noEmit` đạt exit code 0. Cập nhật `B-004.md` hoàn thành, tạo `B-005.md` (PH1-T07–T08) và cập nhật allowlist harness.
