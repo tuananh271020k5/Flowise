@@ -4,6 +4,7 @@ import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import sessionService from '../../services/agent-builder/sessionService'
 import buildPipelineService from '../../services/agent-builder/pipeline/buildPipelineService'
 import evaluationRunnerService from '../../services/agent-builder/pipeline/evaluationRunnerService'
+import knowledgeStoreService from '../../services/agent-builder/knowledge/knowledgeStoreService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -216,6 +217,54 @@ const getSpecDiff = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
+const listKnowledgeStores = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const stores = await knowledgeStoreService.listWorkspaceStores(workspaceId)
+        return res.status(StatusCodes.OK).json(stores)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getKnowledgeStore = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Store ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const store = await knowledgeStoreService.getStoreById(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(store)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getKnowledgeStoreChunks = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Store ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const limit = req.query?.limit ? parseInt(req.query.limit as string, 10) : undefined
+        const offset = req.query?.offset ? parseInt(req.query.offset as string, 10) : undefined
+        const chunks = await knowledgeStoreService.getStoreChunks(req.params.id, workspaceId, { limit, offset })
+        return res.status(StatusCodes.OK).json(chunks)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const seedKnowledgeStore = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const store = await knowledgeStoreService.seedSampleDocumentStore(workspaceId)
+        return res.status(StatusCodes.CREATED).json(store)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -228,5 +277,9 @@ export default {
     getBuildJob,
     runTestSuite,
     rollbackRevision,
-    getSpecDiff
+    getSpecDiff,
+    listKnowledgeStores,
+    getKnowledgeStore,
+    getKnowledgeStoreChunks,
+    seedKnowledgeStore
 }

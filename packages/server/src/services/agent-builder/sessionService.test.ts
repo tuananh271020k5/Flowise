@@ -13,6 +13,7 @@ import { AgentDraftRevision } from '../../database/entities/AgentDraftRevision'
 import { BuilderSessionService } from './sessionService'
 import agentBuilderController from '../../controllers/agent-builder'
 import sessionService from './sessionService'
+import knowledgeStoreService from './knowledge/knowledgeStoreService'
 import { Request, Response, NextFunction } from 'express'
 
 function createMockRepository<T extends { id?: string }>() {
@@ -471,6 +472,50 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
 
             await agentBuilderController.getSpecDiff(req, res, next)
             expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('listKnowledgeStores trả về HTTP 200 OK', async () => {
+            const req = makeReq()
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(knowledgeStoreService, 'listWorkspaceStores').mockResolvedValue([] as any)
+
+            await agentBuilderController.listKnowledgeStores(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('getKnowledgeStore trả về HTTP 200 OK', async () => {
+            const req = makeReq({ params: { id: 'ks-1' } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(knowledgeStoreService, 'getStoreById').mockResolvedValue({ id: 'ks-1' } as any)
+
+            await agentBuilderController.getKnowledgeStore(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('getKnowledgeStoreChunks trả về HTTP 200 OK', async () => {
+            const req = makeReq({ params: { id: 'ks-1' }, query: { limit: '10' } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(knowledgeStoreService, 'getStoreChunks').mockResolvedValue([] as any)
+
+            await agentBuilderController.getKnowledgeStoreChunks(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('seedKnowledgeStore trả về HTTP 201 CREATED', async () => {
+            const req = makeReq()
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(knowledgeStoreService, 'seedSampleDocumentStore').mockResolvedValue({ id: 'ks-seeded' } as any)
+
+            await agentBuilderController.seedKnowledgeStore(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.CREATED)
             expect(res.json).toHaveBeenCalled()
         })
     })

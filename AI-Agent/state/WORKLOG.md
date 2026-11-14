@@ -1,5 +1,26 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-016 / PH4-T01–T02 (Mở Đầu Phase 4: Tài Liệu Thử & Document Store Service)
+
+Hoàn thành B-016 (PH4-T01 Chuẩn bị bộ tài liệu thử có quyền sử dụng và PH4-T02 Tái sử dụng ingestion/document store phù hợp). Mở đầu Phase 4 (Knowledge Agent và MVP M1):
+
+-   **Bộ Tài Liệu Thử Có Bản Quyền (PH4-T01):** Tạo `companyPolicyFixture.ts` (Quy Chế Hoạt Động & Phúc Lợi Nhân Viên Năm 2026) với nguồn URI, tác giả (Phòng Nhân Sự), phân loại, phiên bản, cấp độ bảo mật `internal` và bộ câu hỏi chuẩn `goldenQAPairs` phục vụ kiểm thử đối soát tự động.
+-   **Knowledge Store Service & Tái Sử Dụng Document Store (PH4-T02):**
+    -   Xây dựng `knowledgeStoreService.ts` kết nối với entity `DocumentStore` và `DocumentStoreFileChunk` của Flowise.
+    -   Cung cấp các hàm quản lý: `listWorkspaceStores`, `getStoreById`, `getStoreChunks`, `seedSampleDocumentStore`, và `validateStoreReadyForRAG`.
+    -   Negative Auth: Kiểm soát chặt chẽ theo `workspaceId`, ném lỗi 403 Forbidden nếu người dùng cố truy cập document store của workspace khác.
+-   **Endpoints & Frontend Client (PH4-T02):**
+    -   Thêm các routes: `GET /knowledge/stores`, `GET /knowledge/stores/:id`, `GET /knowledge/stores/:id/chunks`, `POST /knowledge/seed`.
+    -   Thêm các phương thức API client tương ứng trong `agentBuilder.js`.
+-   **Kiểm thử & Nghiệm thu:**
+    -   17 test suites server với 163 tests pass 100% (bao gồm `knowledgeStoreService.test.ts` kiểm thử toàn diện CRUD, Negative Auth 403, 404, seed sample và chunking).
+    -   TypeScript typecheck (`tsc --noEmit`) exit 0.
+    -   91 UI tests pass 100%.
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   Lập task tiếp theo `B-017.md` (PH4-T03 và PH4-T04: Knowledge Template & Readiness).
+
+
 ## 15/11/2026 — B-015 / PH3-T07–T08 (Hoàn Tất Phase 3 & Đạt Chuẩn Gate D1)
 
 Hoàn thành B-015 (PH3-T07 Khôi phục sau refresh/reconnect và PH3-T08 Nghiệm thu demo ba kịch bản). **Chính thức khép lại 100% Phase 3 và đạt chuẩn Gate D1 (toàn bộ 36 task PH0–PH3)**:

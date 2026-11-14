@@ -1,40 +1,45 @@
 {
   "schemaVersion": 1,
-  "revision": 28,
-  "updatedAt": "2026-11-14T20:40:33.341Z",
+  "revision": 29,
+  "updatedAt": "2026-11-14T21:03:34.790Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-015",
+  "currentTask": "B-016",
   "status": "completed",
-  "productStage": "phase3_gate_d1_assistant_demo_completed",
-  "summary": "B-015/PH3-T07–T08 hoàn thành: Khôi Phục Sau Refresh/Reconnect và Nghiệm Thu Demo Ba Kịch Bản. Hoàn thành 100% Phase 3 và đạt chuẩn Gate D1 (36 task PH0–PH3). sessionService gửi sự kiện connected ban đầu, index.jsx tự động khôi phục kết nối SSE không gây build lặp. Bộ test phase3GateD1Demo.test.ts kiểm chứng toàn diện 3 kịch bản cốt lõi. 16 server suites pass (151 tests), 4 UI suites pass (87 tests), vite build exit 0 (21,181 modules), harness pass. Mở đầu Phase 4 với task B-016.",
+  "productStage": "phase4_knowledge_store_ready",
+  "summary": "B-016/PH4-T01–T02 hoàn thành: Chuẩn Bị Bộ Tài Liệu Thử và Tái Sử Dụng Document Store. Mở đầu Phase 4 (Knowledge Agent). companyPolicyFixture cung cấp tài liệu tri thức nội bộ và golden QA pairs. knowledgeStoreService tích hợp DocumentStore Flowise với phân quyền workspace và Negative Auth 403. Thêm các routes /knowledge/* và client API. 17 server suites pass (163 tests), 4 UI suites pass (91 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-017.",
   "decisions": [
-    "Hoàn thành và nghiệm thu Gate D1: Assistant Chat-to-Agent Builder không cần canvas kéo thả.",
-    "SSE gửi snapshot connected ban đầu giúp client phục hồi ngay sau khi reconnect.",
-    "Chuyển tiếp dự án sang Phase 4: Knowledge Agent và RAG Document Store."
+    "Tái sử dụng 100% thực thể DocumentStore và DocumentStoreFileChunk của Flowise cho RAG.",
+    "Đảm bảo cách ly phân quyền tuyệt đối: Chặn truy cập document store chéo workspace (403 Forbidden).",
+    "Cung cấp fixture quy chế nội bộ có sẵn để người dùng có thể seed và thử nghiệm Knowledge Agent tức thì."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/sessionService.ts",
-    "packages/server/src/services/agent-builder/phase3GateD1Demo.test.ts",
-    "packages/ui/src/views/agent-builder/index.jsx",
-    "AI-Agent/tasks/B-015.md",
+    "packages/server/src/services/agent-builder/knowledge/fixtures/companyPolicyFixture.ts",
+    "packages/server/src/services/agent-builder/knowledge/knowledgeStoreService.ts",
+    "packages/server/src/services/agent-builder/knowledge/knowledgeStoreService.test.ts",
+    "packages/server/src/controllers/agent-builder/index.ts",
+    "packages/server/src/routes/agent-builder/index.ts",
+    "packages/server/src/services/agent-builder/sessionService.test.ts",
+    "packages/ui/src/api/agentBuilder.js",
+    "packages/ui/src/api/agentBuilder.test.js",
     "AI-Agent/tasks/B-016.md",
+    "AI-Agent/tasks/B-017.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "151/151 tests pass trong packages/server (Jest 16/16 suites agent-builder bao gồm phase3GateD1Demo.test.ts).",
+    "163/163 tests pass trong packages/server (Jest 17/17 suites agent-builder bao gồm knowledgeStoreService.test.ts).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
-    "87/87 tests pass trong packages/ui (Jest 4/4 suites).",
+    "91/91 tests pass trong packages/ui (Jest 4/4 suites bao gồm knowledge stores API client).",
     "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-015 lên origin/main theo yêu cầu người dùng.",
-    "Bắt đầu Phase 4 với B-016 (PH4-T01 và PH4-T02): Chuẩn bị bộ tài liệu thử và tích hợp Document Store."
+    "Commit và push task B-016 lên origin/main theo yêu cầu người dùng.",
+    "Bắt đầu triển khai task B-017 (PH4-T03 và PH4-T04): Tạo Knowledge template có retrieval và bổ sung Knowledge spec & readiness."
   ],
-  "nextTask": "B-016",
+  "nextTask": "B-017",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -62,8 +67,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "5184fa6af7a618670f6e9d3cd637cb3766c875c7",
+    "head": "7ea0012d4e8547a6b12c0726e8b6e39c6adec274",
     "branch": "main",
-    "sourceFingerprint": "3201ff7c2a107a4d48ccf07305f5ffb3ca02790f49e7c5ed61c1910e62985b69"
+    "sourceFingerprint": "9c5153ed447c07668c1dee7ed4e9d99801f3968c568ee191d2d85d86fe27841a"
   }
 }

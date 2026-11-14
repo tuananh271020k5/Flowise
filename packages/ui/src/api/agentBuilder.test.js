@@ -126,4 +126,42 @@ describe('agentBuilder API client', () => {
         expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/diff', { params })
         expect(res.data.hasChanges).toBe(true)
     })
+
+    it('getKnowledgeStores gửi GET request tới /agent-builder/knowledge/stores', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'ks-1', name: 'HR Policy' }] })
+
+        const res = await agentBuilderApi.getKnowledgeStores()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/knowledge/stores', { params: undefined })
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('getKnowledgeStore gửi GET request tới /agent-builder/knowledge/stores/:id', async () => {
+        client.get.mockResolvedValueOnce({ data: { id: 'ks-1', name: 'HR Policy' } })
+
+        const res = await agentBuilderApi.getKnowledgeStore('ks-1')
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/knowledge/stores/ks-1')
+        expect(res.data.id).toBe('ks-1')
+    })
+
+    it('getKnowledgeStoreChunks gửi GET request tới /agent-builder/knowledge/stores/:id/chunks', async () => {
+        const params = { limit: 10 }
+        client.get.mockResolvedValueOnce({ data: [{ id: 'chunk-1' }] })
+
+        const res = await agentBuilderApi.getKnowledgeStoreChunks('ks-1', params)
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/knowledge/stores/ks-1/chunks', { params })
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('seedKnowledgeStore gửi POST request tới /agent-builder/knowledge/seed', async () => {
+        const payload = {}
+        client.post.mockResolvedValueOnce({ data: { id: 'ks-seeded' } })
+
+        const res = await agentBuilderApi.seedKnowledgeStore(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/knowledge/seed', payload)
+        expect(res.data.id).toBe('ks-seeded')
+    })
 })

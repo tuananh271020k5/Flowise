@@ -24,6 +24,14 @@ const rollbackRevision = (sessionId, body) => client.post(`/agent-builder/sessio
 
 const getDiff = (sessionId, params) => client.get(`/agent-builder/sessions/${sessionId}/diff`, { params })
 
+const getKnowledgeStores = (params) => client.get('/agent-builder/knowledge/stores', { params })
+
+const getKnowledgeStore = (id) => client.get(`/agent-builder/knowledge/stores/${id}`)
+
+const getKnowledgeStoreChunks = (id, params) => client.get(`/agent-builder/knowledge/stores/${id}/chunks`, { params })
+
+const seedKnowledgeStore = (body) => client.post('/agent-builder/knowledge/seed', body)
+
 export default {
     createSession,
     getSession,
@@ -36,5 +44,9 @@ export default {
     testPrediction,
     runTestSuite,
     rollbackRevision,
-    getDiff
+    getDiff,
+    getKnowledgeStores,
+    getKnowledgeStore,
+    getKnowledgeStoreChunks,
+    seedKnowledgeStore
 }

@@ -35,4 +35,10 @@ router.post('/sessions/:id/test-suite', agentBuilderController.runTestSuite)
 router.get('/sessions/:id/diff', agentBuilderController.getSpecDiff)
 router.post('/sessions/:id/rollback', agentBuilderController.rollbackRevision)
 
+// KNOWLEDGE STORES & RAG INGESTION (PH4-T01 & PH4-T02)
+router.get('/knowledge/stores', agentBuilderController.listKnowledgeStores)
+router.get('/knowledge/stores/:id', agentBuilderController.getKnowledgeStore)
+router.get('/knowledge/stores/:id/chunks', agentBuilderController.getKnowledgeStoreChunks)
+router.post('/knowledge/seed', agentBuilderController.seedKnowledgeStore)
+
 export default router
