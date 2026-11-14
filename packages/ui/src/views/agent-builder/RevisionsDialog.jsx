@@ -254,7 +254,12 @@ const RevisionsDialog = ({ open, onClose, revisions = [], currentRevisionNumber 
                                         <ListItem disableGutters disablePadding sx={{ alignItems: 'flex-start' }}>
                                             <ListItemText
                                                 primary={
-                                                    <Stack direction='row' alignItems='center' justifyContent='space-between' sx={{ mb: 1 }}>
+                                                    <Stack
+                                                        direction='row'
+                                                        alignItems='center'
+                                                        justifyContent='space-between'
+                                                        sx={{ mb: 1 }}
+                                                    >
                                                         <Stack direction='row' alignItems='center' spacing={1}>
                                                             <IconGitCommit
                                                                 size={18}

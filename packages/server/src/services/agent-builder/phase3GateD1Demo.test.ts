@@ -14,8 +14,6 @@ import { ChatFlow, EnumChatflowType } from '../../database/entities/ChatFlow'
 import { BuilderSessionService } from './sessionService'
 import { BuildPipelineService } from './pipeline/buildPipelineService'
 import { EvaluationRunnerService } from './pipeline/evaluationRunnerService'
-import { computeSpecDiff } from './specDiffService'
-import { computeReadiness } from './readiness'
 import { AgentSpec } from './types'
 
 function createMockRepository<T extends { id?: string }>() {

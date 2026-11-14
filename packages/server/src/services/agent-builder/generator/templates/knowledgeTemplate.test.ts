@@ -1,11 +1,7 @@
 import { AgentSpec } from '../../types'
 import { validateNodeMetadata } from '../nodeRegistry'
 import { validateFlowGraph } from '../flowValidator'
-import {
-    KNOWLEDGE_TEMPLATE_ID,
-    KNOWLEDGE_TEMPLATE_VERSION,
-    instantiateKnowledgeTemplate
-} from './knowledgeTemplate.v1'
+import { KNOWLEDGE_TEMPLATE_ID, KNOWLEDGE_TEMPLATE_VERSION, instantiateKnowledgeTemplate } from './knowledgeTemplate.v1'
 
 describe('Knowledge Flow Template v1.0 (PH4-T03 / B-017)', () => {
     const sampleKnowledgeSpec: AgentSpec = {
@@ -25,9 +21,7 @@ describe('Knowledge Flow Template v1.0 (PH4-T03 / B-017)', () => {
                 config: { topK: 4 }
             }
         ],
-        tools: [
-            { id: 'tool_calc', name: 'Tính toán lương thưởng', type: 'calculator' }
-        ],
+        tools: [{ id: 'tool_calc', name: 'Tính toán lương thưởng', type: 'calculator' }],
         policy: {
             visibility: 'private',
             executionMode: 'controlled-test',

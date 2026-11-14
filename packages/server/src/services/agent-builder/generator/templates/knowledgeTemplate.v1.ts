@@ -117,8 +117,7 @@ export const instantiateKnowledgeTemplate = (spec: AgentSpec): FlowiseAgentflowG
 
     // 4. Chuẩn hóa chỉ dẫn RAG: yêu cầu trích dẫn nguồn, từ chối suy diễn nếu thiếu căn cứ
     const baseInstruction =
-        spec.instructions ||
-        'Bạn là trợ lý AI chuyên trách giải đáp thắc mắc dựa trên kho tài liệu tri thức nội bộ được cung cấp.'
+        spec.instructions || 'Bạn là trợ lý AI chuyên trách giải đáp thắc mắc dựa trên kho tài liệu tri thức nội bộ được cung cấp.'
     const ragGuideline = [
         baseInstruction,
         '',

@@ -214,10 +214,7 @@ export class KnowledgeStoreService {
     /**
      * Kiểm tra tính sẵn sàng để tích hợp vào Knowledge Agent (RAG Readiness Check).
      */
-    async validateStoreReadyForRAG(
-        storeId: string,
-        workspaceId: string
-    ): Promise<{ ready: boolean; reason?: string; chunkCount: number }> {
+    async validateStoreReadyForRAG(storeId: string, workspaceId: string): Promise<{ ready: boolean; reason?: string; chunkCount: number }> {
         try {
             const store = await this.getStoreById(storeId, workspaceId)
             const chunks = await this.chunkRepo.find({ where: { storeId: store.id } })
