@@ -1,39 +1,41 @@
 {
     "schemaVersion": 1,
-    "revision": 15,
-    "updatedAt": "2026-11-14T12:28:45.172Z",
+    "revision": 16,
+    "updatedAt": "2026-11-14T14:48:02.367Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-002",
+    "currentTask": "B-003",
     "status": "completed",
-    "productStage": "baseline_verified",
-    "summary": "B-002/PH0-T07–T08 hoàn thành, khép lại Phase 0 Baseline: Chốt Trợ lý Onboarding tiếng Việt + 3 kịch bản demo (tạo mới, chạy thử, sửa qua chat); model profile default-builder-model; ma trận phân quyền Admin/Builder/Viewer/Anonymous và hướng khắc phục prediction ẩn danh của draft; kiểm kê Flowise Core Apache 2.0, Builder độc lập khỏi enterprise; owner fork Nguyễn Tuấn Anh. Lập task B-003 cho Phase 1.",
+    "productStage": "agent_spec_defined",
+    "summary": "B-003/PH1-T01–T02 hoàn thành: Định nghĩa AgentSpec v1 bằng Zod/TypeScript và hàm computeReadiness() tại packages/server/src/services/agent-builder/. Schema bảo vệ strict, phát hiện secret/script injection; computeReadiness tính toán deterministic specReady, buildReady, testReady, missingFields, assumptions và reasonCodes. Unit tests 21/21 pass; tsc typecheck 0 error. Lập task B-004.",
     "decisions": [
-        "Chọn Trợ lý Onboarding tiếng Việt làm assistant demo chuẩn cho Gate D1.",
-        "Tách route preview riêng và chặn gọi ẩn danh /api/v1/prediction/:id đối với draft chưa publish.",
-        "Builder thiết kế độc lập trong mã nguồn mở Apache 2.0, không phụ thuộc module enterprise Commercial License.",
-        "Credential model lưu ở .env hoặc Flowise Credential Manager local, không đưa vào git."
+        "Đặt module Builder mới tại packages/server/src/services/agent-builder/ độc lập với runtime cũ.",
+        "Dùng Zod với .strict() và regex detection để cấm đưa API key hoặc script độc hại vào spec.",
+        "computeReadiness tách biệt tính sẵn sàng kinh doanh (buildReady) với tính sẵn sàng kiểm thử (testReady)."
     ],
     "changedFiles": [
-        "AI-Agent/context/B-002_DECISIONS.md",
-        "AI-Agent/tasks/B-002.md",
+        "packages/server/src/services/agent-builder/types.ts",
+        "packages/server/src/services/agent-builder/schema.ts",
+        "packages/server/src/services/agent-builder/readiness.ts",
+        "packages/server/src/services/agent-builder/index.ts",
+        "packages/server/src/services/agent-builder/agentSpec.test.ts",
         "AI-Agent/tasks/B-003.md",
+        "AI-Agent/tasks/B-004.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "Tạo tài liệu quyết định B-002_DECISIONS.md bao phủ đủ 4 nội dung PH0-T07–T08.",
-        "Cập nhật B-002.md đạt 4/4 tiêu chí nghiệm thu.",
-        "Tạo B-003.md cho Phase 1 (PH1-T01 và PH1-T02).",
+        "21/21 tests pass trong packages/server/src/services/agent-builder/agentSpec.test.ts (Jest).",
+        "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0, không có lỗi kiểu.",
         "node --test AI-Agent/harness/harness.test.mjs: 15/15 pass (1 skip host symlink).",
-        "Harness context sinh pack B-003: 9817/12000 chars đạt ngân sách context."
+        "Harness context sinh pack B-004: 9379/12000 chars đạt ngân sách context."
     ],
-    "blockers": ["Provider cloud LLM cụ thể (OpenAI/Anthropic/Gemini) chờ input người dùng trước Phase 3 demo."],
+    "blockers": [],
     "nextActions": [
-        "Người dùng review các quyết định B-002 và tự commit/push theo GIT_WORKFLOW.md.",
-        "Bắt đầu Phase 1 với B-003 (PH1-T01 và PH1-T02): Định nghĩa AgentSpec v1 và quy tắc readiness."
+        "Người dùng review diff B-003 và commit/push theo GIT_WORKFLOW.md.",
+        "Triển khai B-004 (PH1-T03 và PH1-T04): Thiết kế lưu trữ Session/Message/SpecRevision và API hội thoại Builder."
     ],
-    "nextTask": "B-003",
+    "nextTask": "B-004",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -61,8 +63,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "1afe932d8c1afb103de57d6dd6b800677606bfc7",
+        "head": "8f231bee7760e8d383b4ddcd6bba60e4884e03fd",
         "branch": "main",
-        "sourceFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "sourceFingerprint": "b80c0a7b69e1845df53316fae2724db34891546537e31bc85b6d5c992750e9fc"
     }
 }
