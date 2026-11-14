@@ -283,7 +283,29 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
 
             expect(response.readiness?.buildReady).toBe(true)
             expect(response.session.state).toBe('ready')
+            expect(response.buildIntent).toBeDefined()
+            expect(response.buildIntent?.status).toBe('dispatched')
+            expect(response.session.buildIntent).toContain('"status":"dispatched"')
             expect(response.assistantMessage?.content).toContain('sẵn sàng (buildReady)')
+        })
+
+        it('tự động trích xuất patch tiếng Việt từ nội dung chat không cần specPatch (PH1-T09)', async () => {
+            const { session } = await service.createSession({
+                workspaceId: 'ws-1',
+                organizationId: 'org-1',
+                userId: 'user-1',
+                initialGoal: 'Trợ lý bán hàng'
+            })
+
+            const response = await service.addMessage(session.id, 'ws-1', {
+                clientMessageId: 'auto-extract-1',
+                content: 'Tôi muốn đặt tên là Trợ Lý Phụ Kiện và hướng dẫn là chào khách niềm nở, tư vấn tận tình.'
+            })
+
+            expect(response.currentSpecRevision).toBeDefined()
+            const parsedSpec = JSON.parse(response.currentSpecRevision!.spec)
+            expect(parsedSpec.name).toBe('Trợ Lý Phụ Kiện')
+            expect(parsedSpec.instructions).toContain('chào khách niềm nở')
         })
     })
 
@@ -408,6 +430,16 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
             await agentBuilderController.getRevisions(req, res, next)
             expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
             expect(res.json).toHaveBeenCalled()
+        })
+
+        it('subscribeEvents thiết lập SSE stream', async () => {
+            const req = makeReq({ params: { id: 'sess-1' } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(sessionService, 'subscribeEvents').mockResolvedValue(undefined)
+
+            await agentBuilderController.subscribeEvents(req, res, next)
+            expect(sessionService.subscribeEvents).toHaveBeenCalledWith('sess-1', 'ws-controller-test', res)
         })
     })
 })

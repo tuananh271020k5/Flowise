@@ -78,9 +78,22 @@ const getRevisions = async (req: Request, res: Response, next: NextFunction) => 
     }
 }
 
+const subscribeEvents = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        await sessionService.subscribeEvents(req.params.id, workspaceId, res)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
     addMessage,
-    getRevisions
+    getRevisions,
+    subscribeEvents
 }

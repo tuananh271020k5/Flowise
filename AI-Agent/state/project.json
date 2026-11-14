@@ -1,45 +1,47 @@
 {
     "schemaVersion": 1,
-    "revision": 18,
-    "updatedAt": "2026-11-14T15:48:02.065Z",
+    "revision": 19,
+    "updatedAt": "2026-11-14T16:11:17.928Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-005",
+    "currentTask": "B-006",
     "status": "completed",
-    "productStage": "chat_builder_ui_and_spec_card_ready",
-    "summary": "B-005/PH1-T07–T08 hoàn thành: Xây dựng giao diện Chat Builder và thẻ tóm tắt Spec Card trên packages/ui. API client agentBuilder.js; ChatPane khung chat đàm thoại tiếng Việt có starter scenarios; SpecCard tóm tắt spec, thanh readiness và cảnh báo missingFields; RevisionsDialog lịch sử version; route /agent-builder và /agent-builder/:id; menu dashboard. 4/4 UI tests pass, Vite build exit 0, 37/37 backend tests pass. Lập task B-006.",
+    "productStage": "phase1_collector_and_build_dispatch_completed",
+    "summary": "B-006/PH1-T09–T10 hoàn thành: Xây dựng CollectorService trích xuất structured spec patch tiếng Việt, phản hồi anti-reask không hỏi lặp lại thông tin; tự động dispatch BuildIntent khi spec đạt buildReady: true; quản lý SSE realtime events (message, revision, readiness, build_dispatched). Tích hợp BuilderSessionService, thêm cột buildIntent trong entity và migration. 49/49 backend tests pass, tsc typecheck 0 error, 4/4 UI tests pass. Khép lại toàn bộ Phase 1 và sẵn sàng cho Phase 2 (PH2-T01-T02).",
     "decisions": [
-        "Sử dụng Grid responsive MUI 7/12 (trái) và 5/12 (phải) cho ChatPane và SpecCard.",
-        "Hiển thị tiếng Việt tự nhiên và 3 starter scenarios từ B-002 khi bắt đầu phiên mới.",
-        "Tự động sinh clientMessageId bằng crypto.randomUUID() chống trùng lặp.",
-        "Gắn route /agent-builder và /agent-builder/:id kèm RequireAuth permission agentflows:view."
+        "Xử lý ngắt cụm từ nối tiếng Việt ('và', 'với', dấu câu) để trích xuất tên/mục tiêu/hướng dẫn chính xác.",
+        "Áp dụng cơ chế Anti-reask: chỉ hỏi trường trong missingFields còn thiếu, không hỏi lại dữ liệu đã có.",
+        "Tự phát sinh BuildIntent và lưu vào session.buildIntent khi computeReadiness trả về buildReady: true.",
+        "Hỗ trợ endpoint SSE /sessions/:id/events phát sự kiện theo thời gian thực tới frontend."
     ],
     "changedFiles": [
-        "packages/ui/src/api/agentBuilder.js",
-        "packages/ui/src/api/agentBuilder.test.js",
-        "packages/ui/src/views/agent-builder/index.jsx",
-        "packages/ui/src/views/agent-builder/ChatPane.jsx",
-        "packages/ui/src/views/agent-builder/SpecCard.jsx",
-        "packages/ui/src/views/agent-builder/RevisionsDialog.jsx",
-        "packages/ui/src/routes/MainRoutes.jsx",
-        "packages/ui/src/menu-items/dashboard.js",
-        "AI-Agent/tasks/B-005.md",
+        "packages/server/src/services/agent-builder/types.ts",
+        "packages/server/src/services/agent-builder/collectorService.ts",
+        "packages/server/src/services/agent-builder/collectorService.test.ts",
+        "packages/server/src/services/agent-builder/sessionService.ts",
+        "packages/server/src/services/agent-builder/sessionService.test.ts",
+        "packages/server/src/services/agent-builder/index.ts",
+        "packages/server/src/controllers/agent-builder/index.ts",
+        "packages/server/src/routes/agent-builder/index.ts",
+        "packages/server/src/database/entities/BuilderSession.ts",
+        "packages/server/src/database/migrations/sqlite/1781000000000-AddAgentBuilderEntities.ts",
         "AI-Agent/tasks/B-006.md",
+        "AI-Agent/tasks/B-007.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "Vite build production trên packages/ui biên dịch thành công (exit code 0).",
+        "49/49 tests pass trong module Agent Builder trên packages/server (Jest).",
+        "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0.",
         "4/4 tests pass trong packages/ui/src/api/agentBuilder.test.js (Jest).",
-        "37/37 tests pass cho toàn module Agent Builder trong packages/server (Jest).",
         "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
     ],
     "blockers": [],
     "nextActions": [
-        "Commit và push task B-005 lên origin/main theo yêu cầu người dùng.",
-        "Bắt đầu triển khai task B-006 (PH1-T09–PH1-T10): Collector Structured Spec Patch và Tự Dispatch Build khi Ready."
+        "Commit và push task B-006 lên origin/main theo yêu cầu người dùng.",
+        "Khởi động Phase 2 với Task B-007 (PH2-T01–PH2-T02): Assistant Flow Template có Version và Node Metadata Registry."
     ],
-    "nextTask": "B-006",
+    "nextTask": "B-007",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -67,8 +69,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "4eba6dc54cf72c5327e2effffe6fe5c9e8bc8931",
+        "head": "0960f1ef118fc85ec34fcc61c90099b08e26ea54",
         "branch": "main",
-        "sourceFingerprint": "06f82feb7526116007827f6ca53930cc7d94f5d95d69aee33911d584c8597a4e"
+        "sourceFingerprint": "f51a5bbcafdecda8fa7a716115785a9ff7e773eb31a11d1340dd29f9ef0bad71"
     }
 }

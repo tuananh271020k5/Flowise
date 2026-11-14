@@ -12,6 +12,7 @@ export class AddAgentBuilderEntities1781000000000 implements MigrationInterface 
                 "state" varchar NOT NULL DEFAULT 'collecting',
                 "currentSpecRevisionId" varchar,
                 "currentRevisionNo" integer NOT NULL DEFAULT 0,
+                "buildIntent" text,
                 "createdDate" datetime NOT NULL DEFAULT (datetime('now')),
                 "updatedDate" datetime NOT NULL DEFAULT (datetime('now')));`
         )

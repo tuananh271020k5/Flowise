@@ -28,6 +28,9 @@ export class BuilderSession {
     @Column({ type: 'integer', default: 0 })
     currentRevisionNo: number
 
+    @Column({ nullable: true, type: 'text' })
+    buildIntent?: string | null
+
     @CreateDateColumn()
     createdDate: Date
 

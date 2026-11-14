@@ -15,4 +15,7 @@ router.post('/sessions/:id/messages', agentBuilderController.addMessage)
 // LIST REVISIONS
 router.get('/sessions/:id/revisions', agentBuilderController.getRevisions)
 
+// SUBSCRIBE REALTIME EVENTS (Server-Sent Events)
+router.get('/sessions/:id/events', agentBuilderController.subscribeEvents)
+
 export default router

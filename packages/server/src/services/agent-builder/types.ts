@@ -1,6 +1,6 @@
 /**
  * Types and interfaces for AgentSpec v1 and Readiness rules.
- * Aligns with CONTRACTS.md and B-002/B-003 specifications.
+ * Aligns with CONTRACTS.md and B-002/B-003/B-006 specifications.
  */
 
 export type AgentSpecKind = 'assistant' | 'knowledge' | 'api-readonly' | 'data-readonly'
@@ -71,4 +71,32 @@ export interface AgentSpecValidationResult {
     success: boolean
     data?: AgentSpec
     errors?: string[]
+}
+
+export interface BuildIntent {
+    id: string
+    sessionId: string
+    revisionNo: number
+    spec: AgentSpec
+    status: 'pending' | 'dispatched' | 'completed' | 'failed'
+    dispatchedAt: string
+    metadata?: Record<string, unknown>
+}
+
+export interface BuildDispatcher {
+    dispatch(intent: BuildIntent): Promise<{ success: boolean; intentId: string; status: string }>
+}
+
+export interface SpecPatchResult {
+    patch: Partial<AgentSpec>
+    extractedFields: string[]
+    changeSummary: string
+}
+
+export type SSEEventType = 'connected' | 'message' | 'revision' | 'readiness' | 'build_dispatched' | 'error'
+
+export interface SSEPayload {
+    type: SSEEventType
+    data: unknown
+    timestamp: string
 }

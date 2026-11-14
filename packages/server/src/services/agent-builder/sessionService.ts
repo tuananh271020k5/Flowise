@@ -5,8 +5,10 @@ import { BuilderMessage } from '../../database/entities/BuilderMessage'
 import { BuilderSession } from '../../database/entities/BuilderSession'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
+import collectorService, { CollectorService } from './collectorService'
 import { computeReadiness } from './readiness'
-import { AgentSpec, ReadinessResult } from './types'
+import { AgentSpec, BuildIntent, ReadinessResult } from './types'
+import { Response } from 'express'
 
 export interface CreateSessionDTO {
     workspaceId: string
@@ -37,6 +39,7 @@ export interface AddMessageResponse {
     session: BuilderSession
     currentSpecRevision: AgentSpecRevision | null
     readiness: ReadinessResult | null
+    buildIntent?: BuildIntent | null
     idempotentReplay?: boolean
 }
 
@@ -54,7 +57,11 @@ export const getActiveDataSource = (customDataSource?: DataSource): DataSource =
  * Service managing conversational builder sessions, messages, and spec revisions.
  */
 export class BuilderSessionService {
-    constructor(private customDataSource?: DataSource) {}
+    private collector: CollectorService
+
+    constructor(private customDataSource?: DataSource, customCollector?: CollectorService) {
+        this.collector = customCollector || collectorService
+    }
 
     private get sessionRepo(): Repository<BuilderSession> {
         return getActiveDataSource(this.customDataSource).getRepository(BuilderSession)
@@ -85,7 +92,8 @@ export class BuilderSessionService {
             title,
             state: 'collecting',
             currentRevisionNo: 0,
-            currentSpecRevisionId: null
+            currentSpecRevisionId: null,
+            buildIntent: null
         })
 
         const savedSession = await this.sessionRepo.save(session)
@@ -106,13 +114,15 @@ export class BuilderSessionService {
             const savedUserMsg = await this.messageRepo.save(userMsg)
             messages.push(savedUserMsg)
 
-            // 2. Compute readiness on initial goal
+            // 2. Trích xuất patch ban đầu từ initial goal
+            const patchResult = this.collector.extractPatch(goalText)
             const initialSpec: Partial<AgentSpec> = {
                 schemaVersion: '1.0',
                 kind: 'assistant',
-                goal: goalText,
-                language: 'vi',
-                modelProfileRef: 'default-builder-model'
+                goal: patchResult.patch.goal || goalText,
+                language: patchResult.patch.language || 'vi',
+                modelProfileRef: 'default-builder-model',
+                ...patchResult.patch
             }
 
             readiness = computeReadiness(initialSpec)
@@ -135,8 +145,12 @@ export class BuilderSessionService {
             savedSession.currentRevisionNo = 1
             await this.sessionRepo.save(savedSession)
 
-            // 4. Create assistant guidance message
-            const assistantContent = this.generateGuidanceMessage(readiness)
+            // 4. Create assistant guidance message using Collector
+            const assistantContent = this.collector.generateCollectorResponse(
+                readiness.missingFields,
+                initialSpec,
+                patchResult.extractedFields
+            )
             const assistantMsg = this.messageRepo.create({
                 sessionId: savedSession.id,
                 role: 'assistant',
@@ -198,7 +212,8 @@ export class BuilderSessionService {
     }
 
     /**
-     * Appends a message to the session with idempotency check and revision conflict detection.
+     * Appends a message to the session with idempotency check, structured patch extraction,
+     * revision conflict detection, and auto-dispatch of build intent when ready.
      */
     async addMessage(sessionId: string, workspaceId: string, data: AddMessageDTO): Promise<AddMessageResponse> {
         if (!data.content || !data.content.trim()) {
@@ -217,18 +232,27 @@ export class BuilderSessionService {
             throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
         }
 
-        // 1. Idempotency Check: if clientMessageId already exists in this session, return existing snapshot
+        // 1. Idempotency Check
         const existingMsg = await this.messageRepo.findOneBy({
             sessionId,
             clientMessageId: data.clientMessageId
         })
         if (existingMsg) {
             const snapshot = await this.getSessionById(sessionId, workspaceId)
+            let existingIntent: BuildIntent | null = null
+            if (session.buildIntent) {
+                try {
+                    existingIntent = JSON.parse(session.buildIntent)
+                } catch {
+                    existingIntent = null
+                }
+            }
             return {
                 userMessage: existingMsg,
                 session: snapshot.session,
                 currentSpecRevision: snapshot.currentSpecRevision,
                 readiness: snapshot.readiness,
+                buildIntent: existingIntent,
                 idempotentReplay: true
             }
         }
@@ -250,37 +274,54 @@ export class BuilderSessionService {
         })
         const savedUserMsg = await this.messageRepo.save(userMsg)
 
-        // 4. Handle Spec Update / Collector Patch
+        // Phát sự kiện SSE: user message
+        this.collector.broadcastSSE(sessionId, {
+            type: 'message',
+            data: savedUserMsg,
+            timestamp: new Date().toISOString()
+        })
+
+        // 4. Load Base Spec
+        let baseSpec: Partial<AgentSpec> = {
+            schemaVersion: '1.0',
+            kind: 'assistant',
+            language: 'vi',
+            modelProfileRef: 'default-builder-model'
+        }
+
         let currentRevision: AgentSpecRevision | null = null
-        let readiness: ReadinessResult | null = null
-
-        if (data.specPatch && typeof data.specPatch === 'object') {
-            // Load existing spec
-            let baseSpec: Partial<AgentSpec> = {
-                schemaVersion: '1.0',
-                kind: 'assistant',
-                language: 'vi',
-                modelProfileRef: 'default-builder-model'
-            }
-
-            if (session.currentSpecRevisionId) {
-                const prevRev = await this.revisionRepo.findOneBy({ id: session.currentSpecRevisionId })
-                if (prevRev) {
-                    try {
-                        baseSpec = { ...baseSpec, ...JSON.parse(prevRev.spec) }
-                    } catch {
-                        // Keep baseSpec
-                    }
+        if (session.currentSpecRevisionId) {
+            const prevRev = await this.revisionRepo.findOneBy({ id: session.currentSpecRevisionId })
+            if (prevRev) {
+                try {
+                    baseSpec = { ...baseSpec, ...JSON.parse(prevRev.spec) }
+                    currentRevision = prevRev
+                } catch {
+                    // Keep baseSpec
                 }
             }
+        }
 
+        // 5. Trích xuất Patch từ nội dung chat (PH1-T09)
+        const extracted = this.collector.extractPatch(data.content, baseSpec)
+        const mergedPatch: Partial<AgentSpec> = {
+            ...extracted.patch,
+            ...(data.specPatch || {})
+        }
+
+        const hasSpecChanges = Object.keys(mergedPatch).length > 0
+        let readiness: ReadinessResult | null = null
+        let dispatchedIntent: BuildIntent | null = null
+
+        if (hasSpecChanges) {
             const updatedSpec = {
                 ...baseSpec,
-                ...data.specPatch
+                ...mergedPatch
             }
 
             readiness = computeReadiness(updatedSpec)
 
+            // Lưu Revision mới
             const nextRevisionNo = session.currentRevisionNo + 1
             const newRevision = this.revisionRepo.create({
                 sessionId,
@@ -297,27 +338,41 @@ export class BuilderSessionService {
 
             session.currentRevisionNo = nextRevisionNo
             session.currentSpecRevisionId = currentRevision.id
+
+            // 6. Tự động dispatch Build Intent khi đạt buildReady: true (PH1-T10)
             if (readiness.buildReady) {
+                dispatchedIntent = await this.collector.dispatchBuildIntent(sessionId, nextRevisionNo, updatedSpec as AgentSpec)
+                session.buildIntent = JSON.stringify(dispatchedIntent)
                 session.state = 'ready'
             }
+
             await this.sessionRepo.save(session)
-        } else if (session.currentSpecRevisionId) {
-            currentRevision = await this.revisionRepo.findOneBy({ id: session.currentSpecRevisionId })
-            if (currentRevision) {
-                try {
-                    readiness = computeReadiness(JSON.parse(currentRevision.spec))
-                } catch {
-                    readiness = null
-                }
+
+            // Phát sự kiện SSE: revision & readiness
+            this.collector.broadcastSSE(sessionId, {
+                type: 'revision',
+                data: currentRevision,
+                timestamp: new Date().toISOString()
+            })
+            this.collector.broadcastSSE(sessionId, {
+                type: 'readiness',
+                data: readiness,
+                timestamp: new Date().toISOString()
+            })
+        } else if (currentRevision) {
+            try {
+                readiness = computeReadiness(JSON.parse(currentRevision.spec))
+            } catch {
+                readiness = null
             }
         }
 
-        // 5. Generate Assistant Guidance Response
+        // 7. Sinh phản hồi đàm thoại của Collector (Anti-reask)
         let assistantMsg: BuilderMessage | undefined
         if (data.role !== 'assistant') {
-            const replyText = readiness
-                ? this.generateGuidanceMessage(readiness)
-                : 'Tôi đã ghi nhận thông tin của bạn. Hãy cho tôi biết thêm chi tiết về trợ lý bạn muốn xây dựng.'
+            const currentSpecState = hasSpecChanges ? { ...baseSpec, ...mergedPatch } : baseSpec
+            const missing = readiness ? readiness.missingFields : []
+            const replyText = this.collector.generateCollectorResponse(missing, currentSpecState, extracted.extractedFields)
 
             const assistantRecord = this.messageRepo.create({
                 sessionId,
@@ -327,6 +382,13 @@ export class BuilderSessionService {
                 specRevisionId: currentRevision?.id || null
             })
             assistantMsg = await this.messageRepo.save(assistantRecord)
+
+            // Phát sự kiện SSE: assistant message
+            this.collector.broadcastSSE(sessionId, {
+                type: 'message',
+                data: assistantMsg,
+                timestamp: new Date().toISOString()
+            })
         }
 
         return {
@@ -334,7 +396,8 @@ export class BuilderSessionService {
             assistantMessage: assistantMsg,
             session,
             currentSpecRevision: currentRevision,
-            readiness
+            readiness,
+            buildIntent: dispatchedIntent
         }
     }
 
@@ -357,24 +420,23 @@ export class BuilderSessionService {
     }
 
     /**
-     * Generates a helpful natural language response based on readiness evaluation.
+     * Đăng ký kết nối SSE cho phiên làm việc.
      */
-    private generateGuidanceMessage(readiness: ReadinessResult): string {
-        if (readiness.buildReady) {
-            return 'Tuyệt vời! Thông tin thiết kế trợ lý đã đầy đủ và đạt chuẩn sẵn sàng (buildReady). Hệ thống có thể tự động tạo bản draft Agentflow V2 bất cứ lúc nào.'
+    async subscribeEvents(sessionId: string, workspaceId: string, res: Response): Promise<void> {
+        const session = await this.sessionRepo.findOneBy({ id: sessionId })
+        if (!session) {
+            throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Session ${sessionId} not found`)
+        }
+        if (session.workspaceId !== workspaceId) {
+            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
         }
 
-        if (readiness.missingFields.length > 0) {
-            const fieldLabels: Record<string, string> = {
-                name: 'Tên trợ lý',
-                goal: 'Mục tiêu hoạt động chính',
-                instructions: 'Hướng dẫn / Chỉ dẫn phong cách trả lời'
-            }
-            const missingText = readiness.missingFields.map((f) => fieldLabels[f] || f).join(', ')
-            return `Chào bạn! Tôi đã ghi nhận thông tin. Để hoàn thiện thiết kế trợ lý, bạn hãy cung cấp thêm: ${missingText}.`
-        }
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        res.flushHeaders?.()
 
-        return 'Tôi đã ghi nhận thông tin. Hãy tiếp tục chia sẻ chi tiết về yêu cầu của bạn.'
+        this.collector.addSSEClient(sessionId, res)
     }
 }
 

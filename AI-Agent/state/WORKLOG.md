@@ -1,5 +1,21 @@
 # Nhật ký bàn giao ngắn
 
+## 14/11/2026 — B-006 / PH1-T09–T10
+
+Hoàn thành B-006 (PH1-T09 và PH1-T10): Collector Structured Spec Patch và Tự Dispatch Build khi Ready.
+
+-   Xây dựng `CollectorService` tại `packages/server/src/services/agent-builder/collectorService.ts`:
+    -   `extractPatch`: Phân tích ngôn ngữ tự nhiên tiếng Việt, trích xuất các trường cấu trúc (`name`, `goal`, `instructions`, `tools`, `evaluationExamples`, `language`), ngắt cụm từ nối (`và`, `với`, dấu câu) chính xác.
+    -   `generateCollectorResponse`: Phản hồi đàm thoại thông minh (Anti-reask), chỉ hỏi các trường trong `missingFields` còn thiếu, không hỏi lặp thông tin đã có, chúc mừng khi đạt `buildReady`.
+    -   `dispatchBuildIntent`: Tự động phát sinh `BuildIntent` khi spec đạt `buildReady: true`, gắn liền với revision hiện tại.
+    -   `SSEManager`: Quản lý stream Server-Sent Events đa client, broadcast các sự kiện `message`, `revision`, `readiness`, `build_dispatched`.
+    -   `MockBuildDispatcher`: Dispatcher giả lập phục vụ Phase 1 đúng theo tiêu chí PH1-T10.
+-   Tích hợp vào `BuilderSessionService`:
+    -   Thêm trường `buildIntent` vào `BuilderSession` entity và migration.
+    -   `addMessage` tự động trích xuất patch, lưu revision kèm `changeSummary`, tự động kích hoạt dispatch build intent khi `readiness.buildReady === true` và lưu vào session entity.
+    -   Thêm endpoint SSE tại `/api/v1/agent-builder/sessions/:id/events` (`subscribeEvents`).
+-   Kiểm thử và biên dịch: Toàn bộ 49/49 unit tests module Agent Builder backend pass 100% (10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-006.md` hoàn thành, lập `B-007.md` (PH2-T01–T02) và cập nhật allowlist harness.
+
 ## 14/11/2026 — B-005 / PH1-T07–T08
 
 Hoàn thành B-005 (PH1-T07 và PH1-T08): Tạo Giao diện Chat Builder và Hiển thị Thẻ Spec Tóm tắt (Spec Summary Card) trên `packages/ui`.
