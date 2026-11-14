@@ -1,5 +1,17 @@
 # Nhật ký bàn giao ngắn
 
+## 14/11/2026 — B-007 / PH2-T01–T02
+
+Bắt đầu Phase 2: Từ spec đến Flowise draft thật. Hoàn thành B-007 (PH2-T01 và PH2-T02): Assistant Flow Template có Version và Node Metadata Registry.
+
+-   Xây dựng `Node Metadata Registry` (`generator/nodeRegistry.ts`):
+    -   Định nghĩa whitelist metadata cho các node được phép dùng trong Agentflow V2: `startAgentflow` (pinned version 1.4 chuẩn theo runtime TASK-001, chặn version cũ 1.1), `agentAgentflow` (version 3.2), `directReplyAgentflow` (version 1.0), Chat Models (`chatOpenAI` 5.0, `chatGoogleGenerativeAI` 2.0, `chatAnthropic` 4.0, `chatOllama` 3.0), Tools (`calculator`, `webSearch`).
+    -   Hàm `validateNodeMetadata`: Kiểm tra chặt chẽ tên node, version, type, required inputs và từ chối mọi trường lạ hoặc node ngoài allowlist (ngăn chặn chèn mã độc/code runner không an toàn).
+-   Xây dựng `Assistant Flow Template v1.0` (`generator/templates/assistantTemplate.v1.ts`):
+    -   Kế thừa từ flow fixture đã được kiểm chứng ở TASK-001: Start node 1.4, Chat Model node, Agent node 3.2 với system prompt, kết nối Tool nodes.
+    -   Hàm `instantiateAssistantTemplate(spec)` chuyển đổi từ `AgentSpec v1` sang Agentflow V2 graph `{ nodes, edges }` hoàn chỉnh với các tọa độ trực quan và handles kết nối chính xác.
+-   Kiểm thử và biên dịch: Toàn bộ 65/65 unit tests module Agent Builder backend pass 100% (11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-007.md` hoàn thành, lập `B-008.md` (PH2-T03–T04) và cập nhật allowlist harness.
+
 ## 14/11/2026 — B-006 / PH1-T09–T10
 
 Hoàn thành B-006 (PH1-T09 và PH1-T10): Collector Structured Spec Patch và Tự Dispatch Build khi Ready.
@@ -15,20 +27,6 @@ Hoàn thành B-006 (PH1-T09 và PH1-T10): Collector Structured Spec Patch và T�
     -   `addMessage` tự động trích xuất patch, lưu revision kèm `changeSummary`, tự động kích hoạt dispatch build intent khi `readiness.buildReady === true` và lưu vào session entity.
     -   Thêm endpoint SSE tại `/api/v1/agent-builder/sessions/:id/events` (`subscribeEvents`).
 -   Kiểm thử và biên dịch: Toàn bộ 49/49 unit tests module Agent Builder backend pass 100% (10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-006.md` hoàn thành, lập `B-007.md` (PH2-T01–T02) và cập nhật allowlist harness.
-
-## 14/11/2026 — B-005 / PH1-T07–T08
-
-Hoàn thành B-005 (PH1-T07 và PH1-T08): Tạo Giao diện Chat Builder và Hiển thị Thẻ Spec Tóm tắt (Spec Summary Card) trên `packages/ui`.
-
--   Xây dựng API client tại `packages/ui/src/api/agentBuilder.js` (`createSession`, `getSession`, `sendMessage`, `getRevisions`) và 4/4 Jest tests đạt tại `agentBuilder.test.js`.
--   Xây dựng view và các components tại `packages/ui/src/views/agent-builder/`:
-    -   `ChatPane.jsx`: Khung chat hội thoại đàm thoại tiếng Việt, tự động cuộn (auto-scroll), banner onboarding tiếng Việt kèm 3 starter scenarios (CSKH FAQ, Phân loại ticket, Tóm tắt báo cáo), bong bóng chat avatar User/Bot, render Markdown bằng `MemoizedReactMarkdown`, indicator đang phân tích.
-    -   `SpecCard.jsx`: Thẻ tóm tắt Spec, thanh trạng thái sẵn sàng (Readiness Indicator) với chip màu (`ready`/`collecting`/`error`), thanh tiến trình phần trăm hoàn thiện, bảng cảnh báo `missingFields` với nhãn tiếng Việt dễ hiểu, thông tin chi tiết Tên, Mục tiêu, Ngôn ngữ, Model, Kết quả kỳ vọng, Công cụ, Kịch bản mẫu, nút "Tạo Agentflow V2 Ngay" khi ready.
-    -   `RevisionsDialog.jsx`: Hộp thoại xem toàn bộ lịch sử các revision của Agent Spec, tác giả, thời gian, tóm tắt thay đổi và JSON spec viewer.
-    -   `index.jsx`: Trang view chính quản lý state phiên, khôi phục lịch sử chat và spec từ URL `/:id`, tạo `clientMessageId` chống gửi trùng, hỗ trợ tạo phiên mới.
--   Cập nhật routing trong `packages/ui/src/routes/MainRoutes.jsx` với các route `/agent-builder` và `/agent-builder/:id`.
--   Thêm menu item "Agent Builder" trong `packages/ui/src/menu-items/dashboard.js`.
--   Kiểm thử và biên dịch: Vite build `flowise-ui` hoàn tất không lỗi (exit code 0); 4/4 unit tests UI pass; 37/37 tests module Agent Builder backend pass. Cập nhật `B-005.md` hoàn thành, lập `B-006.md` (PH1-T09–T10) và cập nhật allowlist harness.
 
 ## 14/11/2026 — B-004 / PH1-T03–T04
 
