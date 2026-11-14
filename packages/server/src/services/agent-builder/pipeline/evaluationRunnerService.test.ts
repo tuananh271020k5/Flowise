@@ -169,5 +169,82 @@ describe('EvaluationRunnerService (PH3-T03)', () => {
                 statusCode: StatusCodes.NOT_FOUND
             })
         })
+
+        it('Knowledge Agent: đính kèm sourceDocuments và đối soát trích dẫn nguồn thực tế (PH4-T06 / B-018)', async () => {
+            const knowledgeFlow = await mockChatflowRepo.save({
+                id: 'flow-knowledge-1',
+                name: 'Trợ lý Quy chế Nội bộ',
+                workspaceId: 'ws-alpha',
+                flowData: JSON.stringify({
+                    nodes: [
+                        { id: 'start_0', data: { name: 'startAgentflow', type: 'Start' } },
+                        { id: 'doc_0', data: { name: 'documentStoreTool', type: 'DocumentStoreTool' } },
+                        { id: 'agent_0', data: { name: 'agentAgentflow', type: 'Agent' } }
+                    ],
+                    edges: []
+                })
+            })
+
+            const knowledgeExamples: EvaluationExample[] = [
+                {
+                    input: 'Một tuần tôi được làm việc từ xa (remote) mấy ngày?',
+                    assertions: ['làm việc từ xa', '02 ngày']
+                },
+                {
+                    input: 'Nhân viên chính thức có bao nhiêu ngày phép năm?',
+                    assertions: ['nghỉ phép', '14 ngày']
+                }
+            ]
+
+            const report = await runner.runTestSuite({
+                flowId: knowledgeFlow.id,
+                workspaceId: 'ws-alpha',
+                examples: knowledgeExamples
+            })
+
+            expect(report.totalCount).toBe(2)
+            expect(report.passedCount).toBe(2)
+            expect(report.allPassed).toBe(true)
+
+            // Kiểm tra từng kết quả có chứa sourceDocuments thực tế
+            for (const item of report.results) {
+                expect(item.sourceDocuments).toBeDefined()
+                expect(item.sourceDocuments!.length).toBeGreaterThan(0)
+                expect(item.sourceDocuments![0].title).toContain('Quy Chế Hoạt Động')
+                expect(item.sourceDocuments![0].source).toContain('policy_2026.pdf')
+            }
+        })
+
+        it('Negative Citation Test: không tạo nguồn giả khi câu hỏi ngoài phạm vi tài liệu (PH4-T06 / B-018)', async () => {
+            const knowledgeFlow = await mockChatflowRepo.save({
+                id: 'flow-knowledge-negative',
+                name: 'Trợ lý Quy chế',
+                workspaceId: 'ws-alpha',
+                flowData: JSON.stringify({
+                    nodes: [{ id: 'doc_0', data: { name: 'documentStoreTool', type: 'DocumentStoreTool' } }],
+                    edges: []
+                })
+            })
+
+            const outOfDomainExamples: EvaluationExample[] = [
+                {
+                    input: 'Cho tôi biết bí quyết chế tạo tên lửa vũ trụ liên hành tinh?',
+                    assertions: ['không có thông tin', 'từ chối suy diễn']
+                }
+            ]
+
+            const report = await runner.runTestSuite({
+                flowId: knowledgeFlow.id,
+                workspaceId: 'ws-alpha',
+                examples: outOfDomainExamples
+            })
+
+            expect(report.totalCount).toBe(1)
+            expect(report.passedCount).toBe(1)
+            const item = report.results[0]
+            expect(item.sourceDocuments).toEqual([]) // Không tạo nguồn giả!
+            expect(item.output).toContain('không có thông tin')
+            expect(item.output).toContain('từ chối suy diễn')
+        })
     })
 })

@@ -50,3 +50,37 @@ export function extractPredictionText(responseData) {
     }
     return String(responseData)
 }
+
+/**
+ * Trích xuất danh sách tài liệu nguồn (sourceDocuments / citations) từ response của prediction API (PH4-T06).
+ */
+export function extractSourceDocuments(responseData) {
+    if (!responseData || typeof responseData !== 'object') return []
+
+    const rawSources = responseData.sourceDocuments || responseData.sources || responseData.citations
+    if (!Array.isArray(rawSources) || rawSources.length === 0) return []
+
+    return rawSources.map((item, index) => {
+        if (typeof item === 'string') {
+            return {
+                pageContent: item,
+                title: `Nguồn #${index + 1}`,
+                source: 'Tài liệu tham khảo'
+            }
+        }
+
+        const pageContent = item.pageContent || item.content || item.text || ''
+        const metadata = item.metadata || {}
+        const title = metadata.title || metadata.source || metadata.docName || `Đoạn trích #${index + 1}`
+        const source = metadata.source || metadata.sourceUri || ''
+
+        return {
+            pageContent,
+            title,
+            source,
+            chunkId: item.chunkId || metadata.chunkId || `chunk_${index}`,
+            docId: item.docId || metadata.docId || '',
+            metadata
+        }
+    })
+}

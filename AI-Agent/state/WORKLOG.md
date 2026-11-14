@@ -1,5 +1,27 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-018 / PH4-T05–T06 (Mở Rộng Planner/Compiler Cho Knowledge & Hiển Thị Nguồn Trích Dẫn)
+
+Hoàn thành B-018 (PH4-T05 Mở rộng planner/compiler cho Knowledge và PH4-T06 Hiển thị câu trả lời và nguồn trích dẫn):
+
+-   **Pipeline Knowledge End-to-End (PH4-T05):**
+    -   Tích hợp chu trình hoàn chỉnh: Session Chat tiếng Việt → Collector trích xuất `kind: 'knowledge'` & `dataSources` → `createAgentPlan` → `AgentflowCompiler` → `FlowiseDraftAdapter` lưu trữ Flowise Agentflow V2 Draft.
+    -   Bản draft ChatFlow được tạo với cấu hình an toàn `deployed: false`, `isPublic: false`, `workspaceId` cô lập, chứa `documentStoreTool` (version 1.0) kết nối chính xác vào `agentAgentflow` (version 3.2).
+-   **Nguồn Trích Dẫn & Negative Citation Guard (PH4-T06):**
+    -   Nâng cấp `evaluationRunnerService.ts`: Trả về `sourceDocuments` (citations) kèm theo mỗi câu trả lời của trợ lý từ kho `companyPolicyFixture`.
+    -   Cơ chế **Negative Citation Guard**: Khi câu hỏi nằm ngoài phạm vi tài liệu (ví dụ câu hỏi không liên quan đến quy chế nội bộ), trợ lý thông báo không có thông tin và danh sách `sourceDocuments` trả về rỗng `[]`, triệt tiêu hoàn toàn hiện tượng tạo trích dẫn giả (Hallucinated Citations).
+-   **UI Trích Dẫn Trực Quan (PH4-T06):**
+    -   Cập nhật `testChatHelper.js`: Thêm hàm `extractSourceDocuments(responseData)` bóc tách tài liệu tham khảo từ metadata phản hồi.
+    -   Cập nhật `TestChatPane.jsx`: Hiển thị accordion/khối "Nguồn trích dẫn (N)" trực quan ngay dưới tin nhắn của trợ lý, bao gồm tên tài liệu, điều khoản, trích đoạn nội dung `pageContent` và badge xác thực từ Document Store.
+-   **Kiểm thử & Nghiệm thu:**
+    -   19 test suites server với 179 tests pass 100% (thêm `knowledgePipeline.test.ts` kiểm thử toàn bộ chu trình E2E từ chat tới build và evaluation).
+    -   TypeScript typecheck (`tsc --noEmit`) trên server exit 0 không có lỗi.
+    -   94 UI tests pass 100% (thêm test trích xuất `sourceDocuments` trong `testChatHelper.test.js`).
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   ESLint & Prettier pass 0 errors, 0 warnings.
+    -   Lập task tiếp theo `B-019.md` (PH4-T07 và PH4-T08: Bộ 10 Golden Knowledge Cases và Kiểm Thử Bảo Mật Thiếu Bằng Chứng / Tài Liệu Độc Hại).
+
 ## 15/11/2026 — B-017 / PH4-T03–T04 (Knowledge Template Có Retrieval & Knowledge Spec Readiness)
 
 Hoàn thành B-017 (PH4-T03 Tạo Knowledge template có retrieval và PH4-T04 Bổ sung Knowledge spec và readiness):

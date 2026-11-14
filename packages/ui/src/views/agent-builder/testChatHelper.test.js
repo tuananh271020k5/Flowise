@@ -1,4 +1,4 @@
-import { validateAssertions, formatTestMessage, extractPredictionText } from './testChatHelper'
+import { validateAssertions, formatTestMessage, extractPredictionText, extractSourceDocuments } from './testChatHelper'
 
 describe('testChatHelper (PH3-T01 & PH3-T02)', () => {
     describe('validateAssertions', () => {
@@ -93,6 +93,50 @@ describe('testChatHelper (PH3-T01 & PH3-T02)', () => {
         it('xử lý an toàn khi responseData rỗng hoặc null', () => {
             expect(extractPredictionText(null)).toBe('')
             expect(extractPredictionText(undefined)).toBe('')
+        })
+    })
+
+    describe('extractSourceDocuments (PH4-T06)', () => {
+        it('trích xuất đúng danh sách sourceDocuments từ response object Flowise RAG', () => {
+            const mockResponse = {
+                text: 'Theo quy chế làm việc, nhân viên có 14 ngày phép năm.',
+                sourceDocuments: [
+                    {
+                        pageContent: 'Chế độ nghỉ phép: 14 ngày phép năm cho nhân viên chính thức.',
+                        metadata: {
+                            title: 'Quy Chế Hoạt Động 2026',
+                            source: 'file:///internal/hr/policy_2026.pdf',
+                            chunkId: 'chunk_1'
+                        }
+                    }
+                ]
+            }
+
+            const docs = extractSourceDocuments(mockResponse)
+            expect(docs).toHaveLength(1)
+            expect(docs[0].pageContent).toContain('14 ngày phép năm')
+            expect(docs[0].title).toBe('Quy Chế Hoạt Động 2026')
+            expect(docs[0].source).toBe('file:///internal/hr/policy_2026.pdf')
+            expect(docs[0].chunkId).toBe('chunk_1')
+        })
+
+        it('trích xuất an toàn từ mảng string đơn giản', () => {
+            const mockResponse = {
+                text: 'Câu trả lời',
+                sourceDocuments: ['Đoạn văn trích dẫn 1', 'Đoạn văn trích dẫn 2']
+            }
+
+            const docs = extractSourceDocuments(mockResponse)
+            expect(docs).toHaveLength(2)
+            expect(docs[0].pageContent).toBe('Đoạn văn trích dẫn 1')
+            expect(docs[0].title).toBe('Nguồn #1')
+        })
+
+        it('trả về mảng rỗng khi không có sourceDocuments hoặc responseData rỗng', () => {
+            expect(extractSourceDocuments(null)).toEqual([])
+            expect(extractSourceDocuments({})).toEqual([])
+            expect(extractSourceDocuments({ text: 'Chỉ có text' })).toEqual([])
+            expect(extractSourceDocuments({ text: 'Có mảng rỗng', sourceDocuments: [] })).toEqual([])
         })
     })
 })

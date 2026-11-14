@@ -30,10 +30,13 @@ import {
     IconAlertCircle,
     IconPlayerStop,
     IconPlayerPlay,
-    IconX
+    IconX,
+    IconFileText,
+    IconChevronDown,
+    IconChevronUp
 } from '@tabler/icons-react'
 import agentBuilderApi from '@/api/agentBuilder'
-import { validateAssertions, formatTestMessage, extractPredictionText } from './testChatHelper'
+import { validateAssertions, formatTestMessage, extractPredictionText, extractSourceDocuments } from './testChatHelper'
 
 const TestChatPane = ({
     sessionId,
@@ -54,7 +57,15 @@ const TestChatPane = ({
     const [isRunningSuite, setIsRunningSuite] = useState(false)
     const [suiteReport, setSuiteReport] = useState(null)
     const [isSuiteDialogOpen, setIsSuiteDialogOpen] = useState(false)
+    const [expandedCitations, setExpandedCitations] = useState({})
     const messagesEndRef = useRef(null)
+
+    const toggleCitation = (msgId) => {
+        setExpandedCitations((prev) => ({
+            ...prev,
+            [msgId]: !prev[msgId]
+        }))
+    }
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -113,6 +124,7 @@ const TestChatPane = ({
             })
 
             const replyContent = extractPredictionText(res.data)
+            const sourceDocuments = extractSourceDocuments(res.data)
 
             // Kiểm tra các assertions từ evaluationExamples nếu câu hỏi này khớp
             const matchedExample = evaluationExamples.find((ex) => ex.input && ex.input.trim().toLowerCase() === text.trim().toLowerCase())
@@ -121,7 +133,7 @@ const TestChatPane = ({
                 assertionResult = validateAssertions(replyContent, matchedExample.assertions)
             }
 
-            const botMsg = formatTestMessage('assistant', replyContent, { assertionResult })
+            const botMsg = formatTestMessage('assistant', replyContent, { assertionResult, sourceDocuments })
             setTestMessages((prev) => [...prev, botMsg])
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -349,6 +361,74 @@ const TestChatPane = ({
                                         variant='outlined'
                                         sx={{ height: 20, fontSize: '0.65rem' }}
                                     />
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Nguồn trích dẫn (PH4-T06 RAG Citations) */}
+                        {msg.sourceDocuments && msg.sourceDocuments.length > 0 && (
+                            <Box sx={{ mt: 0.75, width: '100%', maxWidth: '85%' }}>
+                                <Button
+                                    size='small'
+                                    variant='text'
+                                    color='primary'
+                                    onClick={() => toggleCitation(msg.id)}
+                                    startIcon={<IconFileText size={14} />}
+                                    endIcon={expandedCitations[msg.id] ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+                                    sx={{ fontSize: '0.72rem', py: 0.25, px: 0.75, textTransform: 'none' }}
+                                >
+                                    Nguồn trích dẫn ({msg.sourceDocuments.length})
+                                </Button>
+
+                                {expandedCitations[msg.id] && (
+                                    <Stack spacing={1} sx={{ mt: 0.5 }}>
+                                        {msg.sourceDocuments.map((doc, docIdx) => (
+                                            <Paper
+                                                key={docIdx}
+                                                variant='outlined'
+                                                sx={{
+                                                    p: 1.25,
+                                                    borderRadius: 1.5,
+                                                    backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : '#f8fafc',
+                                                    borderColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : '#e2e8f0'
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        mb: 0.5
+                                                    }}
+                                                >
+                                                    <Typography
+                                                        variant='caption'
+                                                        sx={{ fontWeight: 600, color: theme.palette.primary.main }}
+                                                    >
+                                                        {doc.title || `Tài liệu nguồn #${docIdx + 1}`}
+                                                    </Typography>
+                                                    <Chip
+                                                        label='Xác thực từ Store'
+                                                        size='small'
+                                                        color='info'
+                                                        variant='outlined'
+                                                        sx={{ height: 18, fontSize: '0.62rem' }}
+                                                    />
+                                                </Box>
+                                                <Typography
+                                                    variant='caption'
+                                                    sx={{
+                                                        display: 'block',
+                                                        color: theme.palette.text.secondary,
+                                                        whiteSpace: 'pre-wrap',
+                                                        lineHeight: 1.4
+                                                    }}
+                                                >
+                                                    {doc.pageContent}
+                                                </Typography>
+                                            </Paper>
+                                        ))}
+                                    </Stack>
                                 )}
                             </Box>
                         )}

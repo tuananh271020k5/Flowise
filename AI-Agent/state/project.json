@@ -1,49 +1,44 @@
 {
   "schemaVersion": 1,
-  "revision": 30,
-  "updatedAt": "2026-11-14T22:38:27.870Z",
+  "revision": 31,
+  "updatedAt": "2026-11-14T23:21:25.595Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-017",
+  "currentTask": "B-018",
   "status": "completed",
-  "productStage": "phase4_knowledge_template_ready",
-  "summary": "B-017/PH4-T03-T04 hoàn thành: Tạo Knowledge Template có retrieval và bổ sung Knowledge spec readiness. knowledgeTemplate.v1.ts sinh đồ thị Agentflow V2 kết nối DocumentStoreTool vào Agent Node với temperature 0.2 giảm hallucination và bộ nguyên tắc RAG. readiness.ts bắt buộc dataSources hợp lệ cho kind knowledge. collectorService trích xuất kho tài liệu tiếng Việt. 18 server suites pass (176 tests), 4 UI suites pass (91 tests), vite build exit 0, harness pass. Lập task B-018.",
+  "productStage": "phase4_knowledge_pipeline_ready",
+  "summary": "B-018/PH4-T05-T06 hoàn thành: Mở rộng planner/compiler cho Knowledge và hiển thị câu trả lời kèm nguồn trích dẫn. Chu trình hoàn chỉnh từ chat tiếng Việt trích xuất kind knowledge và dataSources -> tạo AgentPlan với documentStoreTool -> biên dịch Agentflow V2 Draft an toàn và cô lập workspace. EvaluationRunnerService đính kèm sourceDocuments và áp dụng Negative Citation Guard khi câu hỏi ngoài phạm vi. UI hiển thị accordion Nguồn trích dẫn (N) trực quan. 19 server suites pass (179 tests), 4 UI suites pass (94 tests), vite build exit 0, ESLint exit 0, harness pass 14/15. Lập task B-019.",
   "decisions": [
-    "Bổ sung documentStoreTool (1.0) và retrieverTool (3.0) vào whitelist allowlist của nodeRegistry.",
-    "Đặt temperature 0.2 cho Knowledge Model Node để giảm thiểu tối đa hiện tượng ảo giác (hallucination).",
-    "Bắt buộc có ít nhất một data source hợp lệ khi kind là knowledge trong computeReadiness."
+    "evaluationRunnerService trả về cấu trúc sourceDocuments chuẩn gồm documentName, chunkId, pageContent và metadata.",
+    "Áp dụng Negative Citation Guard: câu hỏi không liên quan hoặc ngoài phạm vi tài liệu trả về sourceDocuments rỗng để chống hallucination.",
+    "Giao diện TestChatPane hiển thị khối Nguồn trích dẫn dạng accordion trực quan kèm badge xác thực từ Document Store."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/generator/nodeRegistry.ts",
-    "packages/server/src/services/agent-builder/generator/nodeRegistry.test.ts",
-    "packages/server/src/services/agent-builder/generator/templates/knowledgeTemplate.v1.ts",
-    "packages/server/src/services/agent-builder/generator/templates/knowledgeTemplate.test.ts",
-    "packages/server/src/services/agent-builder/readiness.ts",
-    "packages/server/src/services/agent-builder/agentSpec.test.ts",
-    "packages/server/src/services/agent-builder/collectorService.ts",
-    "packages/server/src/services/agent-builder/collectorService.test.ts",
-    "packages/server/src/services/agent-builder/generator/agentPlan.ts",
-    "packages/server/src/services/agent-builder/generator/agentPlan.test.ts",
-    "packages/server/src/services/agent-builder/generator/compiler.ts",
-    "packages/server/src/services/agent-builder/generator/compiler.test.ts",
-    "AI-Agent/tasks/B-017.md",
+    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.ts",
+    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.test.ts",
+    "packages/server/src/services/agent-builder/knowledge/knowledgePipeline.test.ts",
+    "packages/ui/src/views/agent-builder/testChatHelper.js",
+    "packages/ui/src/views/agent-builder/testChatHelper.test.js",
+    "packages/ui/src/views/agent-builder/TestChatPane.jsx",
     "AI-Agent/tasks/B-018.md",
+    "AI-Agent/tasks/B-019.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "176/176 tests pass trong packages/server (Jest 18/18 suites agent-builder).",
+    "179/179 tests pass trong packages/server (Jest 19/19 suites agent-builder).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
-    "91/91 tests pass trong packages/ui (Jest 4/4 suites).",
+    "94/94 tests pass trong packages/ui (Jest 4/4 suites).",
     "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
+    "ESLint và Prettier trên toàn bộ file thay đổi exit code 0 (0 errors, 0 warnings).",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-017 lên origin/main theo yêu cầu người dùng.",
-    "Triển khai task B-018 (PH4-T05 và PH4-T06): Mở rộng planner/compiler cho Knowledge và hiển thị nguồn trích dẫn."
+    "Commit và push task B-018 lên origin/main và Flowise-Agent-Builder.",
+    "Triển khai task B-019 (PH4-T07 và PH4-T08): Bộ 10 Golden Knowledge Cases và Kiểm Thử Bảo Mật Thiếu Bằng Chứng / Tài Liệu Độc Hại."
   ],
-  "nextTask": "B-018",
+  "nextTask": "B-019",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -71,8 +66,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "dd8bb6a09fef7798b59e38983087eb2833e0c098",
+    "head": "ec9dd0f90023f8968ed9daea70f27e54c060d5c7",
     "branch": "main",
-    "sourceFingerprint": "632f877417d47c3bb8429a2ec6f2bae61859d7a8179907648b2c3d0734065681"
+    "sourceFingerprint": "84ad0fc56625b982df4bf30a7614613131b744870f3f2a2aa97c80888ebef52b"
   }
 }
