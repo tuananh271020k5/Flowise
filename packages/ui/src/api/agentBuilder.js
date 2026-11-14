@@ -18,6 +18,8 @@ const getDraftHistory = (id) => client.get(`/agent-builder/sessions/${id}/drafts
 
 const testPrediction = (flowId, body) => client.post(`/prediction/${flowId}`, body)
 
+const runTestSuite = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/test-suite`, body)
+
 export default {
     createSession,
     getSession,
@@ -27,5 +29,6 @@ export default {
     getBuildJob,
     cancelBuild,
     getDraftHistory,
-    testPrediction
+    testPrediction,
+    runTestSuite
 }

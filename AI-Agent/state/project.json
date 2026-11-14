@@ -1,70 +1,75 @@
 {
-    "schemaVersion": 1,
-    "revision": 25,
-    "updatedAt": "2026-11-14T18:39:56.542Z",
-    "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
-    "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-012",
-    "status": "completed",
-    "productStage": "phase3_test_chat_panel_and_progress_ready",
-    "summary": "B-012/PH3-T01–T02 hoàn thành: Panel Chat Thử Nghiệm với Agent Draft và Hiển Thị Tiến Trình. Mở đầu Phase 3. TestChatPane.jsx cung cấp giao diện chat thử nghiệm độc lập với phiên thiết kế, gửi prediction tới draft flowId, tự động đối soát assertions kiểm thử và cho phép gửi câu hỏi mẫu nhanh. Tabs trên UI cho phép chuyển đổi giữa cấu hình và chạy thử. SSE lắng nghe và cập nhật tiến trình build realtime. 84/84 UI tests pass (4/4 suites), vite build exit 0 (21,181 modules), harness 14/14 pass. Lập task B-013.",
-    "decisions": [
-        "Tách biệt hoàn toàn trạng thái đàm thoại thiết kế (ChatPane) và đàm thoại chạy thử (TestChatPane).",
-        "Tự động chuyển tab sang Chat Thử Nghiệm khi người dùng kích hoạt lệnh Tạo Agentflow V2 để người dùng theo dõi tiến trình build.",
-        "Hỗ trợ kiểm tra tự động các chuỗi assertion trong câu trả lời của Agent để người dùng đánh giá chất lượng ngay tại panel thử nghiệm."
-    ],
-    "changedFiles": [
-        "packages/ui/src/api/agentBuilder.js",
-        "packages/ui/src/api/agentBuilder.test.js",
-        "packages/ui/src/views/agent-builder/TestChatPane.jsx",
-        "packages/ui/src/views/agent-builder/testChatHelper.js",
-        "packages/ui/src/views/agent-builder/testChatHelper.test.js",
-        "packages/ui/src/views/agent-builder/index.jsx",
-        "AI-Agent/tasks/B-012.md",
-        "AI-Agent/tasks/B-013.md",
-        "AI-Agent/harness/config.json",
-        "AI-Agent/state/WORKLOG.md"
-    ],
-    "checks": [
-        "84/84 tests pass trong packages/ui (Jest 4/4 suites).",
-        "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
-        "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
-    ],
-    "blockers": [],
-    "nextActions": [
-        "Commit và push task B-012 lên origin/main theo yêu cầu người dùng.",
-        "Bắt đầu triển khai task B-013 (PH3-T03–PH3-T04): Chạy Thử Assistant Có Kiểm Soát và Sửa Cấu Hình Bằng Chat."
-    ],
-    "nextTask": "B-013",
-    "references": [
-        "AI-Agent/harness/GIT_WORKFLOW.md",
-        "AI-Agent/harness/HANDOFF.md",
-        "AI-Agent/tasks/PH6-T12.md",
-        "PLAN_TONG_HOP.md",
-        "AI-Agent/context/PROJECT_MAP.md",
-        "AI-Agent/context/BASELINE.md",
-        "AI-Agent/plans/MASTER_PLAN.md",
-        "AI-Agent/tasks/TASK-001.md",
-        "AI-Agent/tasks/B-002.md",
-        "AI-Agent/context/TASK-001_RUNTIME.md"
-    ],
-    "measurement": {
-        "actualInputTokens": null,
-        "actualOutputTokens": null,
-        "verifiedSavings": false
-    },
-    "repository": {
-        "origin": "https://github.com/tuananh271020k5/Flowise.git",
-        "upstream": "https://github.com/FlowiseAI/Flowise",
-        "trackingBranch": "origin/main",
-        "fetchVerified": true,
-        "pushVerified": true,
-        "baselinePatchCommit": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
-        "newCommitCreatedDuringSetup": false
-    },
-    "snapshot": {
-        "head": "a99c6c6443890b9a30b7ea031be810a3ce7f0467",
-        "branch": "main",
-        "sourceFingerprint": "205800c493c73e661f59d5afb5bd278710a8f33972d9104a09d6afbcc6e2eea2"
-    }
+  "schemaVersion": 1,
+  "revision": 26,
+  "updatedAt": "2026-11-14T19:21:46.290Z",
+  "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
+  "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
+  "currentTask": "B-013",
+  "status": "completed",
+  "productStage": "phase3_evaluation_runner_and_chat_edit_ready",
+  "summary": "B-013/PH3-T03–T04 hoàn thành: Chạy Thử Assistant Có Kiểm Soát và Sửa Cấu Hình Bằng Chat. EvaluationRunnerService chạy batch test với budget cap và so khớp assertions, route /sessions/:id/test-suite, TestChatPane hiển thị batch report dialog. sessionService tự động sync draft khi người dùng sửa Agent qua chat. 14 server suites pass (137 tests), 4 UI suites pass (85 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-014.",
+  "decisions": [
+    "Bảo vệ tài nguyên LLM với maxExamples (mặc định 10) trong batch evaluation runner.",
+    "Tự động kích hoạt build pipeline cập nhật draft khi người dùng chat điều chỉnh spec đạt buildReady: true.",
+    "Hiển thị hộp thoại kết quả batch test chi tiết gồm tỷ lệ pass/fail, thời gian và trạng thái từng assertion."
+  ],
+  "changedFiles": [
+    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.ts",
+    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.test.ts",
+    "packages/server/src/services/agent-builder/pipeline/index.ts",
+    "packages/server/src/services/agent-builder/sessionService.ts",
+    "packages/server/src/controllers/agent-builder/index.ts",
+    "packages/server/src/routes/agent-builder/index.ts",
+    "packages/ui/src/api/agentBuilder.js",
+    "packages/ui/src/api/agentBuilder.test.js",
+    "packages/ui/src/views/agent-builder/TestChatPane.jsx",
+    "AI-Agent/tasks/B-013.md",
+    "AI-Agent/tasks/B-014.md",
+    "AI-Agent/harness/config.json",
+    "AI-Agent/state/WORKLOG.md"
+  ],
+  "checks": [
+    "137/137 tests pass trong packages/server (Jest 14/14 suites agent-builder).",
+    "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
+    "85/85 tests pass trong packages/ui (Jest 4/4 suites).",
+    "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
+    "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Commit và push task B-013 lên origin/main.",
+    "Triển khai B-014 (PH3-T05 và PH3-T06): Hiển thị diff, khôi phục cấu hình và xử lý huỷ/ghi đè build."
+  ],
+  "nextTask": "B-014",
+  "references": [
+    "AI-Agent/harness/GIT_WORKFLOW.md",
+    "AI-Agent/harness/HANDOFF.md",
+    "AI-Agent/tasks/PH6-T12.md",
+    "PLAN_TONG_HOP.md",
+    "AI-Agent/context/PROJECT_MAP.md",
+    "AI-Agent/context/BASELINE.md",
+    "AI-Agent/plans/MASTER_PLAN.md",
+    "AI-Agent/tasks/TASK-001.md",
+    "AI-Agent/tasks/B-002.md",
+    "AI-Agent/context/TASK-001_RUNTIME.md"
+  ],
+  "measurement": {
+    "actualInputTokens": null,
+    "actualOutputTokens": null,
+    "verifiedSavings": false
+  },
+  "repository": {
+    "origin": "https://github.com/tuananh271020k5/Flowise.git",
+    "upstream": "https://github.com/FlowiseAI/Flowise",
+    "trackingBranch": "origin/main",
+    "fetchVerified": true,
+    "pushVerified": true,
+    "baselinePatchCommit": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
+    "newCommitCreatedDuringSetup": false
+  },
+  "snapshot": {
+    "head": "6b8062c0dd14eca6a5401419d58a1efa8bb3f0f5",
+    "branch": "main",
+    "sourceFingerprint": "a7b10193a2f4807f3ca09e8d9f3d96bd488c85ea7d6bf982eb0217477ff918e9"
+  }
 }

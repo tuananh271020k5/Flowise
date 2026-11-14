@@ -13,14 +13,30 @@ import {
     Alert,
     LinearProgress,
     Divider,
-    Tooltip
+    Tooltip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Card,
+    CardContent
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { IconSend, IconTrash, IconExternalLink, IconCheck, IconAlertCircle, IconPlayerStop } from '@tabler/icons-react'
+import {
+    IconSend,
+    IconTrash,
+    IconExternalLink,
+    IconCheck,
+    IconAlertCircle,
+    IconPlayerStop,
+    IconPlayerPlay,
+    IconX
+} from '@tabler/icons-react'
 import agentBuilderApi from '@/api/agentBuilder'
 import { validateAssertions, formatTestMessage, extractPredictionText } from './testChatHelper'
 
 const TestChatPane = ({
+    sessionId,
     flowId,
     flowName,
     revisionNo,
@@ -35,6 +51,9 @@ const TestChatPane = ({
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [testError, setTestError] = useState(null)
+    const [isRunningSuite, setIsRunningSuite] = useState(false)
+    const [suiteReport, setSuiteReport] = useState(null)
+    const [isSuiteDialogOpen, setIsSuiteDialogOpen] = useState(false)
     const messagesEndRef = useRef(null)
 
     const scrollToBottom = () => {
@@ -49,6 +68,25 @@ const TestChatPane = ({
     const handleClearChat = () => {
         setTestMessages([])
         setTestError(null)
+    }
+
+    // Chạy bộ kiểm thử tự động (PH3-T03: Controlled Test Runner)
+    const handleRunTestSuite = async () => {
+        if (!sessionId || isRunningSuite) return
+        setIsRunningSuite(true)
+        setTestError(null)
+
+        try {
+            const res = await agentBuilderApi.runTestSuite(sessionId, { maxExamples: 10 })
+            setSuiteReport(res.data)
+            setIsSuiteDialogOpen(true)
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi chạy bộ kiểm thử tự động:', err)
+            setTestError(err?.response?.data?.message || err?.message || 'Không thể chạy bộ kiểm thử tự động.')
+        } finally {
+            setIsRunningSuite(false)
+        }
     }
 
     // Gửi câu hỏi thử nghiệm tới Agentflow draft
@@ -333,7 +371,7 @@ const TestChatPane = ({
                 <div ref={messagesEndRef} />
             </Box>
 
-            {/* Gợi ý câu hỏi kiểm thử từ Evaluation Examples */}
+            {/* Gợi ý câu hỏi kiểm thử từ Evaluation Examples & Nút Chạy Test Suite */}
             {evaluationExamples.length > 0 && (
                 <Box
                     sx={{
@@ -343,9 +381,22 @@ const TestChatPane = ({
                         borderTop: `1px solid ${theme.palette.divider}`
                     }}
                 >
-                    <Typography variant='caption' color='textSecondary' display='block' sx={{ mb: 0.5, fontWeight: 500 }}>
-                        Câu hỏi mẫu thử nghiệm:
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant='caption' color='textSecondary' sx={{ fontWeight: 500 }}>
+                            Câu hỏi mẫu thử nghiệm:
+                        </Typography>
+                        <Button
+                            size='small'
+                            variant='text'
+                            color='primary'
+                            startIcon={isRunningSuite ? <CircularProgress size={12} /> : <IconPlayerPlay size={14} />}
+                            disabled={isRunningSuite || isLoading}
+                            onClick={handleRunTestSuite}
+                            sx={{ fontSize: '0.7rem', py: 0 }}
+                        >
+                            Chạy toàn bộ bộ test ({evaluationExamples.length})
+                        </Button>
+                    </Box>
                     <Stack direction='row' spacing={1} sx={{ overflowX: 'auto', pb: 0.5 }}>
                         {evaluationExamples.map((ex, idx) => (
                             <Chip
@@ -353,7 +404,7 @@ const TestChatPane = ({
                                 label={ex.input}
                                 size='small'
                                 clickable
-                                disabled={isLoading}
+                                disabled={isLoading || isRunningSuite}
                                 onClick={() => handleSendTest(ex.input)}
                                 sx={{ fontSize: '0.75rem' }}
                             />
@@ -385,18 +436,95 @@ const TestChatPane = ({
                     placeholder='Nhập câu hỏi để thử nghiệm với Agent...'
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || isRunningSuite}
                     variant='outlined'
                 />
-                <IconButton color='primary' type='submit' disabled={!input.trim() || isLoading}>
+                <IconButton color='primary' type='submit' disabled={!input.trim() || isLoading || isRunningSuite}>
                     <IconSend size={20} />
                 </IconButton>
             </Box>
+
+            {/* Dialog Báo Cáo Kết Quả Kiểm Thử (PH3-T03) */}
+            <Dialog open={isSuiteDialogOpen} onClose={() => setIsSuiteDialogOpen(false)} maxWidth='md' fullWidth>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant='h4'>Báo Cáo Kiểm Thử Tự Động (Batch Test Report)</Typography>
+                    <IconButton size='small' onClick={() => setIsSuiteDialogOpen(false)}>
+                        <IconX size={18} />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    {suiteReport && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {/* Summary banner */}
+                            <Alert severity={suiteReport.allPassed ? 'success' : 'warning'}>
+                                Kết quả:{' '}
+                                <strong>
+                                    {suiteReport.passedCount} / {suiteReport.totalCount} kịch bản Đạt tiêu chí
+                                </strong>{' '}
+                                (Thời gian thực thi: {suiteReport.executionTimeMs}ms)
+                            </Alert>
+
+                            {/* Danh sách từng kịch bản */}
+                            <Stack spacing={1.5}>
+                                {suiteReport.results?.map((res, i) => (
+                                    <Card key={i} variant='outlined'>
+                                        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                                                <Typography variant='subtitle2' fontWeight={600}>
+                                                    #{res.exampleIndex}. Câu hỏi: &quot;{res.input}&quot;
+                                                </Typography>
+                                                <Chip
+                                                    label={res.passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                                                    color={res.passed ? 'success' : 'error'}
+                                                    size='small'
+                                                    sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
+                                                />
+                                            </Box>
+                                            <Typography
+                                                variant='body2'
+                                                color='textSecondary'
+                                                sx={{ mb: 1, backgroundColor: theme.palette.grey[50], p: 1, borderRadius: 1 }}
+                                            >
+                                                <strong>Phản hồi:</strong> {res.output || '(Không có phản hồi)'}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                                <Typography variant='caption' sx={{ fontWeight: 500 }}>
+                                                    Tiêu chí mong đợi:
+                                                </Typography>
+                                                {res.assertions?.map((ast, aIdx) => {
+                                                    const isMatched = res.matchedAssertions?.includes(ast)
+                                                    return (
+                                                        <Chip
+                                                            key={aIdx}
+                                                            label={ast}
+                                                            size='small'
+                                                            color={isMatched ? 'success' : 'default'}
+                                                            variant={isMatched ? 'filled' : 'outlined'}
+                                                            sx={{ height: 18, fontSize: '0.65rem' }}
+                                                        />
+                                                    )
+                                                })}
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </Stack>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setIsSuiteDialogOpen(false)}>Đóng</Button>
+                    <Button variant='contained' color='primary' onClick={handleRunTestSuite} disabled={isRunningSuite}>
+                        Chạy Lại Bộ Kiểm Thử
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Paper>
     )
 }
 
 TestChatPane.propTypes = {
+    sessionId: PropTypes.string,
     flowId: PropTypes.string,
     flowName: PropTypes.string,
     revisionNo: PropTypes.number,

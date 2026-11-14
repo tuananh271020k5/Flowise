@@ -1,5 +1,23 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-013 / PH3-T03–T04 (Chạy Bộ Thử Có Kiểm Soát & Sửa Cấu Hình Bằng Chat)
+
+Hoàn thành B-013 (PH3-T03 Chạy bộ thử assistant có kiểm soát và PH3-T04 Sửa cấu hình Agent bằng chat):
+
+-   **Evaluation Runner Service (PH3-T03):** Xây dựng `evaluationRunnerService.ts` cho phép chạy bộ kiểm thử hàng loạt (`batch test runner`) theo danh sách `evaluationExamples` đã cấu hình trong AgentSpec. Kiểm tra các tiêu chí assertions, đánh giá Pass/Fail, tính tỷ lệ thành công (passRate) và bảo vệ ngân sách (`maxExamples: 10`, timeoutMs) để chống cạn kiệt LLM quota.
+-   **API Endpoint Chạy Test Suite (PH3-T03):** Thêm route `POST /api/v1/agent-builder/sessions/:id/test-suite` hỗ trợ chạy batch evaluation trực tiếp trên draft flow của session.
+-   **Giao Diện Batch Test Report (PH3-T03):** Cập nhật `TestChatPane.jsx` bổ sung nút "Chạy bộ thử nghiệm (Batch)" và Dialog báo cáo chi tiết hiển thị tổng quan số test case đạt, từng input, output của Agent và trạng thái khớp từng assertion.
+-   **Sửa Cấu Hình Agent Qua Chat & Tự Động Đồng Bộ Draft (PH3-T04):** Nâng cấp `sessionService.ts` trong hàm `addMessage`: khi người dùng gửi tin nhắn sửa đổi bằng tiếng Việt, hệ thống tự trích xuất patch, tạo revision mới; nếu spec đạt `buildReady: true` và session đã có bản draft flowise trước đó, hệ thống sẽ tự động kích hoạt `buildPipelineService.executeBuild` để cập nhật graph của flow draft và phát SSE `build_completed` mà người dùng không cần bấm thêm nút nào.
+-   **Kiểm thử & Nghiệm thu:**
+    -   8 unit tests cho `evaluationRunnerService.test.ts` (100% pass: chạy thành công, assertion match, budget protection maxExamples, negative auth 403, 404).
+    -   Tổng 14 test suites server với 137 tests pass 100%.
+    -   TypeScript typecheck (`tsc --noEmit`) exit 0.
+    -   85 UI tests pass 100%.
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   Lập task tiếp theo `B-014.md` (PH3-T05 và PH3-T06).
+
+
 ## 15/11/2026 — B-012 / PH3-T01–T02 (Mở đầu Phase 3)
 
 Hoàn thành B-012 (PH3-T01 Panel Chat với Agent Draft và PH3-T02 Hiển Thị Tiến Trình & Lỗi Đầu-Cuối):
@@ -15,6 +33,21 @@ Hoàn thành B-012 (PH3-T01 Panel Chat với Agent Draft và PH3-T02 Hiển Th�
     -   `vite build` trên `packages/ui` biên dịch thành công 21,181 modules với exit code 0.
     -   Harness tests 14 pass, 1 skipped (host symlink policy).
     -   Lập task tiếp theo `B-013.md` (PH3-T03 và PH3-T04).
+
+## 15/11/2026 — B-012 / PH3-T01–T02 (Mở đầu Phase 3)
+
+Hoàn thành B-012 (PH3-T01 Panel Chat với Agent Draft và PH3-T02 Hiển Thị Tiến Trình & Lỗi Đầu-Cuối):
+- **Test Preview Panel (PH3-T01):** Xây dựng component `TestChatPane.jsx` với giao diện đàm thoại thử nghiệm độc lập với phiên thiết kế. Cho phép gửi trực tiếp prediction tới draft `flowId`, lưu trữ lịch sử chat thử riêng biệt và hỗ trợ nút xóa hội thoại thử nghiệm.
+- **Assertion Validation & Quick Examples (PH3-T01):** Tự động hiển thị các câu hỏi mẫu từ `evaluationExamples` dưới dạng chip để gửi nhanh. Tự động kiểm tra câu trả lời của Agent có chứa các chuỗi `assertions` không và hiển thị huy hiệu "Đạt tiêu chí" hoặc "Chưa khớp tiêu chí" trực quan.
+- **Tiến trình & Lỗi Đầu-Cuối (PH3-T02):** Lắng nghe SSE từ server (`build_completed`, `build_failed`, `build_cancelled`). Hiển thị thanh tiến trình trực quan khi đang build kèm nút hủy, và hiển thị thông báo lỗi chi tiết khi build thất bại.
+- **Tabs Chuyển Đổi:** Bổ sung thanh Tabs ở cột phải `index.jsx` cho phép chuyển mượt mà giữa "Cấu hình Agent" (`SpecCard`) và "Chat Thử Nghiệm" (`TestChatPane`), tự động chuyển tab sang chat thử khi bấm nút "Tạo Agentflow V2".
+- **Kiểm thử & Build nghiệm thu:**
+  - 8 unit tests cho `testChatHelper.test.js` (100% pass).
+  - 9 API client tests cho `agentBuilder.test.js` (100% pass).
+  - Toàn bộ 4/4 UI test suites pass (84/84 tests).
+  - `vite build` trên `packages/ui` biên dịch thành công 21,181 modules với exit code 0.
+  - Harness tests 14 pass, 1 skipped (host symlink policy).
+  - Lập task tiếp theo `B-013.md` (PH3-T03 và PH3-T04).
 
 ## 15/11/2026 — B-011 / PH2-T09–T10 (Hoàn tất Gate Phase 2)
 

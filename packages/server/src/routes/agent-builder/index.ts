@@ -28,4 +28,7 @@ router.get('/sessions/:id/drafts', agentBuilderController.getDraftHistory)
 router.get('/builds/:id', agentBuilderController.getBuildJob)
 router.post('/builds/:id/cancel', agentBuilderController.cancelBuild)
 
+// RUN CONTROLLED TEST SUITE (PH3-T03)
+router.post('/sessions/:id/test-suite', agentBuilderController.runTestSuite)
+
 export default router

@@ -96,4 +96,14 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/prediction/f1', payload)
         expect(res.data.text).toBe('Chào bạn!')
     })
+
+    it('runTestSuite gửi POST request tới /agent-builder/sessions/:id/test-suite', async () => {
+        const payload = { maxExamples: 5 }
+        client.post.mockResolvedValueOnce({ data: { totalCount: 3, passedCount: 3 } })
+
+        const res = await agentBuilderApi.runTestSuite('s1', payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/test-suite', payload)
+        expect(res.data.passedCount).toBe(3)
+    })
 })

@@ -3,6 +3,8 @@ import { StatusCodes } from 'http-status-codes'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import sessionService from '../../services/agent-builder/sessionService'
 import buildPipelineService from '../../services/agent-builder/pipeline/buildPipelineService'
+import evaluationRunnerService from '../../services/agent-builder/pipeline/evaluationRunnerService'
+import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
     return req.user?.activeWorkspaceId || (req.body?.workspaceId as string) || (req.query?.workspaceId as string) || 'default'
@@ -152,6 +154,37 @@ const getBuildJob = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
+const runTestSuite = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const snapshot = await sessionService.getSessionById(req.params.id, workspaceId)
+        if (!snapshot.currentSpecRevision) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session does not have a valid spec revision')
+        }
+
+        const spec: AgentSpec = JSON.parse(snapshot.currentSpecRevision.spec)
+        const drafts = await buildPipelineService.getDraftHistory(req.params.id, workspaceId)
+        if (!drafts || drafts.length === 0) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Chưa có bản draft nào được tạo cho phiên này')
+        }
+
+        const latestDraft = drafts[drafts.length - 1]
+        const result = await evaluationRunnerService.runTestSuite({
+            flowId: latestDraft.flowId,
+            workspaceId,
+            examples: spec.evaluationExamples || [],
+            maxExamples: req.body?.maxExamples || 10
+        })
+
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -161,5 +194,6 @@ export default {
     buildSession,
     getDraftHistory,
     cancelBuild,
-    getBuildJob
+    getBuildJob,
+    runTestSuite
 }

@@ -1,11 +1,13 @@
 import { StatusCodes } from 'http-status-codes'
 import { DataSource, Repository } from 'typeorm'
 import { AgentSpecRevision } from '../../database/entities/AgentSpecRevision'
+import { AgentDraftRevision } from '../../database/entities/AgentDraftRevision'
 import { BuilderMessage } from '../../database/entities/BuilderMessage'
 import { BuilderSession } from '../../database/entities/BuilderSession'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import collectorService, { CollectorService } from './collectorService'
+import buildPipelineService from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
 import { AgentSpec, BuildIntent, ReadinessResult } from './types'
 import { Response } from 'express'
@@ -73,6 +75,10 @@ export class BuilderSessionService {
 
     private get revisionRepo(): Repository<AgentSpecRevision> {
         return getActiveDataSource(this.customDataSource).getRepository(AgentSpecRevision)
+    }
+
+    private get draftRevisionRepo(): Repository<AgentDraftRevision> {
+        return getActiveDataSource(this.customDataSource).getRepository(AgentDraftRevision)
     }
 
     /**
@@ -344,6 +350,20 @@ export class BuilderSessionService {
                 dispatchedIntent = await this.collector.dispatchBuildIntent(sessionId, nextRevisionNo, updatedSpec as AgentSpec)
                 session.buildIntent = JSON.stringify(dispatchedIntent)
                 session.state = 'ready'
+
+                // Tự động cập nhật draft ChatFlow sang revision mới nếu session đã có draft trước đó (PH3-T04)
+                try {
+                    const existingDraft = await this.draftRevisionRepo.findOneBy({ sessionId })
+                    if (existingDraft) {
+                        await buildPipelineService.executeBuild({
+                            sessionId,
+                            workspaceId,
+                            specRevisionId: currentRevision.id
+                        })
+                    }
+                } catch {
+                    // Không chặn luồng chat nếu auto sync gặp lỗi
+                }
             }
 
             await this.sessionRepo.save(session)
