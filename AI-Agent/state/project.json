@@ -1,44 +1,41 @@
 {
   "schemaVersion": 1,
-  "revision": 31,
-  "updatedAt": "2026-11-14T23:21:25.595Z",
+  "revision": 32,
+  "updatedAt": "2026-11-14T23:34:54.336Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-018",
+  "currentTask": "B-019",
   "status": "completed",
-  "productStage": "phase4_knowledge_pipeline_ready",
-  "summary": "B-018/PH4-T05-T06 hoàn thành: Mở rộng planner/compiler cho Knowledge và hiển thị câu trả lời kèm nguồn trích dẫn. Chu trình hoàn chỉnh từ chat tiếng Việt trích xuất kind knowledge và dataSources -> tạo AgentPlan với documentStoreTool -> biên dịch Agentflow V2 Draft an toàn và cô lập workspace. EvaluationRunnerService đính kèm sourceDocuments và áp dụng Negative Citation Guard khi câu hỏi ngoài phạm vi. UI hiển thị accordion Nguồn trích dẫn (N) trực quan. 19 server suites pass (179 tests), 4 UI suites pass (94 tests), vite build exit 0, ESLint exit 0, harness pass 14/15. Lập task B-019.",
+  "productStage": "phase4_knowledge_mvp_m1_ready",
+  "summary": "B-019/PH4-T07-T08 hoàn thành: Bộ 10 Golden Knowledge Cases và kiểm thử bảo mật thiếu bằng chứng / tài liệu độc hại. Chính thức hoàn tất 100% Phase 4 (Knowledge MVP M1). Mở rộng companyPolicyFixture đủ 10 chương mục quy chế thực tế, chạy trọn vẹn 10 Golden Cases đạt 100% Pass Rate kèm trích dẫn có căn cứ. evaluationRunnerService tích hợp Domain Concepts Scoring và Negative Citation Guard từ chối lịch sự khi ngoài phạm vi, cùng bộ lọc INJECTION_PATTERNS ngăn chặn prompt injection đòi in system prompt hoặc API key. 20 server suites pass (182 tests), 4 UI suites pass (94 tests), tsc exit 0, ESLint exit 0, harness pass 14/15. Lập task B-020.",
   "decisions": [
-    "evaluationRunnerService trả về cấu trúc sourceDocuments chuẩn gồm documentName, chunkId, pageContent và metadata.",
-    "Áp dụng Negative Citation Guard: câu hỏi không liên quan hoặc ngoài phạm vi tài liệu trả về sourceDocuments rỗng để chống hallucination.",
-    "Giao diện TestChatPane hiển thị khối Nguồn trích dẫn dạng accordion trực quan kèm badge xác thực từ Document Store."
+    "Mở rộng companyPolicyFixture với 10 chương mục nghiệp vụ thực tế phục vụ bộ 10 Golden Cases.",
+    "Tích hợp Domain Concepts Scoring trong evaluationRunnerService xếp hạng độ liên quan của chunk trước khi trích xuất.",
+    "Kích hoạt Negative Citation Guard trả về sourceDocuments rỗng khi câu hỏi nằm ngoài phạm vi tài liệu.",
+    "Bổ sung INJECTION_PATTERNS phát hiện và từ chối các chỉ thị ghi đè prompt hoặc cố tình đánh cắp secrets."
   ],
   "changedFiles": [
+    "packages/server/src/services/agent-builder/knowledge/fixtures/companyPolicyFixture.ts",
     "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.ts",
-    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.test.ts",
-    "packages/server/src/services/agent-builder/knowledge/knowledgePipeline.test.ts",
-    "packages/ui/src/views/agent-builder/testChatHelper.js",
-    "packages/ui/src/views/agent-builder/testChatHelper.test.js",
-    "packages/ui/src/views/agent-builder/TestChatPane.jsx",
-    "AI-Agent/tasks/B-018.md",
+    "packages/server/src/services/agent-builder/knowledge/knowledgeGoldenCases.test.ts",
     "AI-Agent/tasks/B-019.md",
+    "AI-Agent/tasks/B-020.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "179/179 tests pass trong packages/server (Jest 19/19 suites agent-builder).",
+    "182/182 tests pass trong packages/server (Jest 20/20 suites agent-builder).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
     "94/94 tests pass trong packages/ui (Jest 4/4 suites).",
-    "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
     "ESLint và Prettier trên toàn bộ file thay đổi exit code 0 (0 errors, 0 warnings).",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-018 lên origin/main và Flowise-Agent-Builder.",
-    "Triển khai task B-019 (PH4-T07 và PH4-T08): Bộ 10 Golden Knowledge Cases và Kiểm Thử Bảo Mật Thiếu Bằng Chứng / Tài Liệu Độc Hại."
+    "Commit và push task B-019 lên origin/main và Flowise-Agent-Builder.",
+    "Triển khai task B-020 (PH5-T01 và PH5-T02): Cổng Phê Duyệt Xuất Bản An Toàn và Audit Logging Cho Release Nội Bộ."
   ],
-  "nextTask": "B-019",
+  "nextTask": "B-020",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -66,8 +63,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "ec9dd0f90023f8968ed9daea70f27e54c060d5c7",
+    "head": "849177759708f439b501f6066e80dfb9481d1ec6",
     "branch": "main",
-    "sourceFingerprint": "84ad0fc56625b982df4bf30a7614613131b744870f3f2a2aa97c80888ebef52b"
+    "sourceFingerprint": "15c21a3861f66837f5f4c79573f84e64cd37c7d0a2669cf2ae2a4169ec33c6d7"
   }
 }

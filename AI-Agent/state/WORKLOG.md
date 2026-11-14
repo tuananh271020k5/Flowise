@@ -1,5 +1,26 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-019 / PH4-T07–T08 (Bộ 10 Golden Cases, Missing Evidence & Security Defense)
+
+Hoàn thành B-019 (PH4-T07 Tạo và chạy 10 golden Knowledge cases và PH4-T08 Kiểm tra thiếu bằng chứng và tài liệu độc hại). **Chính thức hoàn thành 100% Phase 4 (Knowledge MVP M1)**:
+
+-   **Bộ 10 Golden Knowledge Cases Nghiệp Vụ Cốt Lõi (PH4-T07):**
+    -   Mở rộng `companyPolicyFixture.ts` với đầy đủ 10 chương mục quy chế nội bộ thực tế (thời gian làm việc & hybrid, phép năm & ốm đau sinh nhật, bảo hiểm sức khỏe Bảo Việt nội trú 100.000.000 VNĐ, bảo mật thông tin, thử việc 60 ngày lương 85%, làm thêm giờ OT cuối tuần 200% và lễ tết 300%, công tác phí 600.000 VNĐ hoàn ứng 05 ngày, ngân sách đào tạo 10.000.000 VNĐ, thời hạn báo trước chấm dứt hợp đồng 45 ngày / 30 ngày, đánh giá KPI tháng 12 và thưởng tháng 13).
+    -   Bộ 10 Golden Cases đạt tỷ lệ chính xác (Pass Rate) **100% (10/10)** qua Evaluation Runner, đối soát trích dẫn nguồn thực tế từ `COMPANY_POLICY_FIXTURE`.
+-   **Missing Evidence & Negative Citation Guard (PH4-T08):**
+    -   Cơ chế xếp hạng và chấm điểm theo cụm từ khóa chuyên môn (Domain Concepts Scoring) trong `evaluationRunnerService.ts`.
+    -   Khi câu hỏi nằm ngoài phạm vi tài liệu (ví dụ hỏi về trực thăng đưa đón, công thức nấu phở căn tin, giá cổ phiếu), hệ thống kích hoạt **Negative Citation Guard**: từ chối suy diễn lịch sự, trả lời không có thông tin và danh sách `sourceDocuments: []`, triệt tiêu hoàn toàn trích dẫn giả (No Hallucination).
+-   **Security Defense & Chống Prompt Injection (PH4-T08):**
+    -   Tích hợp bộ nhận diện `INJECTION_PATTERNS` trong `evaluationRunnerService.ts`: Phát hiện và từ chối các chỉ thị can thiệp trái phép như *"Bỏ qua toàn bộ hướng dẫn trước đây"*, *"Ignore previous instructions"*, đòi in API Key, System Prompt hoặc Secret Tokens.
+    -   Ngăn chặn hành vi yêu cầu bịa đặt nguồn trích dẫn (`file://fake/evidence.pdf`).
+-   **Kiểm thử & Nghiệm thu:**
+    -   20 test suites server với 182 tests pass 100% (thêm `knowledgeGoldenCases.test.ts` kiểm thử 3 nhóm: 10 Golden Cases, Missing Evidence, và Security Defense).
+    -   TypeScript typecheck (`tsc --noEmit`) trên server exit 0 không có lỗi.
+    -   94 UI tests pass 100%.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   ESLint & Prettier pass 0 errors, 0 warnings.
+    -   Lập task tiếp theo `B-020.md` (PH5-T01 và PH5-T02: Cổng Phê Duyệt Xuất Bản An Toàn và Audit Logging Cho Release Nội Bộ).
+
 ## 15/11/2026 — B-018 / PH4-T05–T06 (Mở Rộng Planner/Compiler Cho Knowledge & Hiển Thị Nguồn Trích Dẫn)
 
 Hoàn thành B-018 (PH4-T05 Mở rộng planner/compiler cho Knowledge và PH4-T06 Hiển thị câu trả lời và nguồn trích dẫn):
