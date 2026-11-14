@@ -1,42 +1,41 @@
 {
     "schemaVersion": 1,
-    "revision": 20,
-    "updatedAt": "2026-11-14T16:27:58.533Z",
+    "revision": 21,
+    "updatedAt": "2026-11-14T17:04:54.342Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "B-007",
+    "currentTask": "B-008",
     "status": "completed",
-    "productStage": "phase2_template_and_node_registry_ready",
-    "summary": "B-007/PH2-T01–T02 hoàn thành: Mở đầu Phase 2. Xây dựng Node Metadata Registry (nodeRegistry.ts) pinned Start 1.4, Agent 3.2, Models, Tools, validateNodeMetadata chặn node lạ/version cũ; Xây dựng Assistant Flow Template v1.0 (assistantTemplate.v1.ts) kế thừa fixture TASK-001 khởi tạo graph chuẩn. 65/65 backend tests pass, tsc typecheck 0 error, 4/4 UI tests pass. Lập task B-008.",
+    "productStage": "phase2_agentplan_and_deterministic_compiler_ready",
+    "summary": "B-008/PH2-T03–T04 hoàn thành: Định nghĩa AgentPlan và Viết Deterministic Compiler. agentPlan.ts lập kế hoạch kiến trúc từ AgentSpec, validate template compatibility, spec readiness và chặn capability ngoài allowlist. compiler.ts biến đổi tất định từ AgentPlan sang graph Agentflow V2 ({ nodes, edges, viewport, flowConfig }), bố trí tọa độ lưới và handles chuẩn, chạy qua validateNodeMetadata 100%. Đạt kiểm thử 10/10 lần chạy cùng input ra cùng graph. 75/75 backend tests pass, tsc 0 error, 4/4 UI tests pass. Lập task B-009.",
     "decisions": [
-        "Ghim chặt chẽ Start node version 1.4 theo runtime Flowise V2 thực tế, từ chối version cũ 1.1.",
-        "Xây dựng Node Metadata Registry whitelist để chặn việc chèn node lạ ngoài allowlist.",
-        "Tạo Assistant Template v1.0 có định danh và version riêng, hỗ trợ khởi tạo deterministic từ AgentSpec."
+        "Sử dụng SHA-256 hash làm ID ổn định cho AgentPlan và các node định danh.",
+        "Áp dụng deterministic compiler không dùng LLM để bảo đảm cấu trúc graph không bị hallucination hoặc xô lệch.",
+        "Ràng buộc tính toàn vẹn qua validateNodeMetadata đối với 100% node sinh ra trước khi hoàn tất compile."
     ],
     "changedFiles": [
-        "packages/server/src/services/agent-builder/generator/nodeRegistry.ts",
-        "packages/server/src/services/agent-builder/generator/nodeRegistry.test.ts",
-        "packages/server/src/services/agent-builder/generator/templates/assistantTemplate.v1.ts",
-        "packages/server/src/services/agent-builder/generator/templates/assistantTemplate.test.ts",
+        "packages/server/src/services/agent-builder/generator/agentPlan.ts",
+        "packages/server/src/services/agent-builder/generator/agentPlan.test.ts",
+        "packages/server/src/services/agent-builder/generator/compiler.ts",
+        "packages/server/src/services/agent-builder/generator/compiler.test.ts",
         "packages/server/src/services/agent-builder/generator/index.ts",
-        "packages/server/src/services/agent-builder/index.ts",
-        "AI-Agent/tasks/B-007.md",
         "AI-Agent/tasks/B-008.md",
+        "AI-Agent/tasks/B-009.md",
         "AI-Agent/harness/config.json",
         "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "65/65 tests pass trong module Agent Builder trên packages/server (Jest).",
+        "75/75 tests pass trong module Agent Builder trên packages/server (Jest).",
         "TypeScript typecheck (tsc --noEmit) trên packages/server đạt exit code 0.",
         "4/4 tests pass trong packages/ui/src/api/agentBuilder.test.js (Jest).",
         "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
     ],
     "blockers": [],
     "nextActions": [
-        "Commit và push task B-007 lên origin/main theo yêu cầu người dùng.",
-        "Bắt đầu triển khai task B-008 (PH2-T03–PH2-T04): Định nghĩa AgentPlan và Viết Compiler Deterministic."
+        "Commit và push task B-008 lên origin/main theo yêu cầu người dùng.",
+        "Bắt đầu triển khai task B-009 (PH2-T05–PH2-T06): Server Validation cho Flow và Flowise CRUD Adapter."
     ],
-    "nextTask": "B-008",
+    "nextTask": "B-009",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -64,8 +63,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "dd38b18a58c98ad6a0795d7941089239454e0a87",
+        "head": "c5088fc9114d6d9058d1d2023e7b87aee43483d7",
         "branch": "main",
-        "sourceFingerprint": "a215430feb0ac186a7012c07f7fe1ff1b0fc46bf297512039c427a306925aa76"
+        "sourceFingerprint": "0a3186ab7396a6c9977b1038af00f3f993af4bfb57c9dd8eac85c208f4900296"
     }
 }

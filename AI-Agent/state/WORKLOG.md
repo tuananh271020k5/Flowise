@@ -1,5 +1,20 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-008 / PH2-T03–T04
+
+Hoàn thành B-008 (PH2-T03 và PH2-T04): Định nghĩa AgentPlan và Viết Compiler Deterministic.
+
+-   Xây dựng tầng trung gian `AgentPlan` (`generator/agentPlan.ts`):
+    -   Định nghĩa interface `AgentPlan`, `CapabilityBinding` ánh xạ mô hình, công cụ từ allowlist registry, loại bỏ mọi code injection.
+    -   Hàm `createAgentPlan`: Chuyển từ `AgentSpec v1` sang `AgentPlan`, tính toán `plan.id` bằng sha256 hash ổn định.
+    -   Hàm `validateAgentPlan`: Thẩm định template compatibility, spec readiness (`buildReady: true`), capabilities allowlist và phát hiện script/eval injection trong config.
+-   Xây dựng bộ biên dịch tất định `AgentflowCompiler` (`generator/compiler.ts`):
+    -   Biên dịch deterministic từ `AgentPlan` sang graph Flowise Agentflow V2 `{ nodes, edges, viewport, flowConfig }`.
+    -   Quy tắc tạo ID ổn định (`startAgentflow_0`, `agentAgentflow_0`, `tool_calculator_0`), tọa độ trực quan bố trí chuẩn, liên kết handles chính xác.
+    -   Tự động thẩm định 100% nodes qua `validateNodeMetadata` từ B-007.
+    -   Kiểm chứng tính tất định: Chạy 10 lần liên tiếp cùng input cho ra kết quả trùng khớp 100% không dựa vào LLM sinh raw graph.
+-   Kiểm thử và biên dịch: Toàn bộ 75/75 unit tests module Agent Builder backend pass 100% (7 tests agentPlan, 3 tests compiler, 11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-008.md` hoàn thành, lập `B-009.md` (PH2-T05–T06) và cập nhật allowlist harness.
+
 ## 14/11/2026 — B-007 / PH2-T01–T02
 
 Bắt đầu Phase 2: Từ spec đến Flowise draft thật. Hoàn thành B-007 (PH2-T01 và PH2-T02): Assistant Flow Template có Version và Node Metadata Registry.
@@ -11,22 +26,6 @@ Bắt đầu Phase 2: Từ spec đến Flowise draft thật. Hoàn thành B-007 
     -   Kế thừa từ flow fixture đã được kiểm chứng ở TASK-001: Start node 1.4, Chat Model node, Agent node 3.2 với system prompt, kết nối Tool nodes.
     -   Hàm `instantiateAssistantTemplate(spec)` chuyển đổi từ `AgentSpec v1` sang Agentflow V2 graph `{ nodes, edges }` hoàn chỉnh với các tọa độ trực quan và handles kết nối chính xác.
 -   Kiểm thử và biên dịch: Toàn bộ 65/65 unit tests module Agent Builder backend pass 100% (11 tests nodeRegistry, 5 tests assistantTemplate, 10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-007.md` hoàn thành, lập `B-008.md` (PH2-T03–T04) và cập nhật allowlist harness.
-
-## 14/11/2026 — B-006 / PH1-T09–T10
-
-Hoàn thành B-006 (PH1-T09 và PH1-T10): Collector Structured Spec Patch và Tự Dispatch Build khi Ready.
-
--   Xây dựng `CollectorService` tại `packages/server/src/services/agent-builder/collectorService.ts`:
-    -   `extractPatch`: Phân tích ngôn ngữ tự nhiên tiếng Việt, trích xuất các trường cấu trúc (`name`, `goal`, `instructions`, `tools`, `evaluationExamples`, `language`), ngắt cụm từ nối (`và`, `với`, dấu câu) chính xác.
-    -   `generateCollectorResponse`: Phản hồi đàm thoại thông minh (Anti-reask), chỉ hỏi các trường trong `missingFields` còn thiếu, không hỏi lặp thông tin đã có, chúc mừng khi đạt `buildReady`.
-    -   `dispatchBuildIntent`: Tự động phát sinh `BuildIntent` khi spec đạt `buildReady: true`, gắn liền với revision hiện tại.
-    -   `SSEManager`: Quản lý stream Server-Sent Events đa client, broadcast các sự kiện `message`, `revision`, `readiness`, `build_dispatched`.
-    -   `MockBuildDispatcher`: Dispatcher giả lập phục vụ Phase 1 đúng theo tiêu chí PH1-T10.
--   Tích hợp vào `BuilderSessionService`:
-    -   Thêm trường `buildIntent` vào `BuilderSession` entity và migration.
-    -   `addMessage` tự động trích xuất patch, lưu revision kèm `changeSummary`, tự động kích hoạt dispatch build intent khi `readiness.buildReady === true` và lưu vào session entity.
-    -   Thêm endpoint SSE tại `/api/v1/agent-builder/sessions/:id/events` (`subscribeEvents`).
--   Kiểm thử và biên dịch: Toàn bộ 49/49 unit tests module Agent Builder backend pass 100% (10 tests collectorService, 18 tests sessionService, 21 tests agentSpec); TypeScript typecheck (`tsc --noEmit`) 0 error; 4/4 UI tests pass. Cập nhật `B-006.md` hoàn thành, lập `B-007.md` (PH2-T01–T02) và cập nhật allowlist harness.
 
 ## 14/11/2026 — B-004 / PH1-T03–T04
 
