@@ -1,5 +1,9 @@
 # Nhật ký bàn giao ngắn
 
+## 14/11/2026 — B-002 / PH0-T07–T08
+
+Hoàn tất B-002 (PH0-T07–T08) khép lại Phase 0 Baseline. Chốt Trợ lý Onboarding tiếng Việt (_Onboarding Assistant_) làm assistant demo cùng 3 kịch bản: tạo mới qua chat đa lượt (auto-dispatch build khi đủ thông tin), chạy thử có kiểm soát tại Preview Panel với assertions tiếng Việt và tính tuần tự, và chỉnh sửa cấu hình qua chat sinh draft revision mới không qua canvas. Model profile ref `default-builder-model` đề xuất Cloud (OpenAI/Gemini) hoặc Local Ollama, secret giữ ở `.env`/credential store local, trạng thái provider cụ thể để `needs_input` cho Phase 3. Lập ma trận phân quyền Admin/Builder/Viewer/Anonymous, server scope workspace từ `req.user`; xử lý lỗ hổng prediction draft bằng route preview riêng và chặn gọi ẩn danh khi chưa publish. Kiểm kê mã nguồn xác nhận Flowise Core thuộc Apache 2.0, Builder độc lập không phụ thuộc `packages/server/src/enterprise/` (Commercial License); fork do Nguyễn Tuấn Anh sở hữu độc lập với upstream đã EOL. Tạo quyết định chi tiết tại `AI-Agent/context/B-002_DECISIONS.md`, cập nhật `B-002.md`, lập `B-003.md` cho Phase 1 (PH1-T01–T02).
+
 ## 14/11/2026 — TASK-001 / PH0-T01–T06
 
 Người dùng giao làm task đầu tiên và tự commit/push. Git `main` sạch tại `c31ae010` trước khi sửa. Tải Node 24.15.0/pnpm 10.26.0 portable vào thư mục local ignored, xác minh hash. Frozen install ban đầu lỗi mismatch giữa root `resolutions` và lockfile `overrides`; đồng bộ lockfile với pnpm 10 rồi frozen install exit 0. `pnpm build` exit 0, Turbo 6/6. Server SQLite local ở `127.0.0.1:3037` khởi tạo đầy đủ; Couchbase native node không load trên Windows nên integration đó chưa kiểm tra.

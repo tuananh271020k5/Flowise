@@ -1,51 +1,39 @@
 {
     "schemaVersion": 1,
-    "revision": 14,
-    "updatedAt": "2026-11-14T10:38:33.811Z",
+    "revision": 15,
+    "updatedAt": "2026-11-14T12:28:45.172Z",
     "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
     "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-    "currentTask": "TASK-001",
+    "currentTask": "B-002",
     "status": "completed",
     "productStage": "baseline_verified",
-    "summary": "TASK-001/PH0-T01–T06 hoàn thành: Node 24/pnpm 10, frozen install, build 6/6, SQLite local, UI Start 1.4 và Direct Reply V2, canvas/prediction đạt. Private draft prediction ẩn danh HTTP 200; instance đã dừng. B-002 handoff và context pack đã sẵn; chưa commit/push.",
+    "summary": "B-002/PH0-T07–T08 hoàn thành, khép lại Phase 0 Baseline: Chốt Trợ lý Onboarding tiếng Việt + 3 kịch bản demo (tạo mới, chạy thử, sửa qua chat); model profile default-builder-model; ma trận phân quyền Admin/Builder/Viewer/Anonymous và hướng khắc phục prediction ẩn danh của draft; kiểm kê Flowise Core Apache 2.0, Builder độc lập khỏi enterprise; owner fork Nguyễn Tuấn Anh. Lập task B-003 cho Phase 1.",
     "decisions": [
-        "Người dùng tự commit/push; AI không chạy git commit/push trong task này.",
-        "Đồng bộ pnpm-lock.yaml với root resolutions/overrides bằng pnpm 10; review diff lớn trước commit.",
-        "Dùng fixture chatInput gọn, không credential; không gọi Direct Reply là kiểm chứng LLM provider."
+        "Chọn Trợ lý Onboarding tiếng Việt làm assistant demo chuẩn cho Gate D1.",
+        "Tách route preview riêng và chặn gọi ẩn danh /api/v1/prediction/:id đối với draft chưa publish.",
+        "Builder thiết kế độc lập trong mã nguồn mở Apache 2.0, không phụ thuộc module enterprise Commercial License.",
+        "Credential model lưu ở .env hoặc Flowise Credential Manager local, không đưa vào git."
     ],
     "changedFiles": [
-        "pnpm-lock.yaml",
-        "PLAN_TONG_HOP.md",
-        "AI-Agent/tasks/TASK-001.md",
-        "AI-Agent/context/BASELINE.md",
-        "AI-Agent/context/PROJECT_MAP.md",
-        "AI-Agent/context/TASK-001_RUNTIME.md",
-        "AI-Agent/fixtures/TASK-001-direct-reply.agentflow.json",
-        "AI-Agent/plans/MASTER_PLAN.md",
-        "AI-Agent/harness/README.md",
-        "AI-Agent/state/WORKLOG.md",
-        "AI-Agent/state/project.json",
+        "AI-Agent/context/B-002_DECISIONS.md",
         "AI-Agent/tasks/B-002.md",
-        "AI-Agent/harness/harness.mjs",
-        "AGENTS.md",
-        "AI-Agent/harness/config.json"
+        "AI-Agent/tasks/B-003.md",
+        "AI-Agent/harness/config.json",
+        "AI-Agent/state/WORKLOG.md"
     ],
     "checks": [
-        "Node 24.15.0 và pnpm 10.26.0 hash nguồn phát hành khớp.",
-        "pnpm install --frozen-lockfile: exit 0 sau lockfile reconcile; pnpm build: exit 0, 6/6 tasks.",
-        "Server 127.0.0.1:3037: init complete, ping/root HTTP 200; dừng sau kiểm tra.",
-        "POST/GET/PUT chatflow private draft với session: HTTP 200; GET anonymous: 401.",
-        "Prediction private draft session và anonymous: HTTP 200, đúng Direct Reply text.",
-        "Edge headless: canvas 2 nodes, sameFlowData=true, pageErrors=[]; fixture không credential.",
-        "node --test AI-Agent/harness/harness.test.mjs: 15/15 pass; harness doctor: pass, Node engine satisfied, runtime probe not run.",
-        "Context pack B-002: 9148/12000 chars; git diff --check exit 0; state/config/fixture JSON pass."
+        "Tạo tài liệu quyết định B-002_DECISIONS.md bao phủ đủ 4 nội dung PH0-T07–T08.",
+        "Cập nhật B-002.md đạt 4/4 tiêu chí nghiệm thu.",
+        "Tạo B-003.md cho Phase 1 (PH1-T01 và PH1-T02).",
+        "node --test AI-Agent/harness/harness.test.mjs: 15/15 pass (1 skip host symlink).",
+        "Harness context sinh pack B-003: 9817/12000 chars đạt ngân sách context."
     ],
-    "blockers": ["Chưa có provider profile/credential cho LLM; cross-workspace/org và Couchbase native Windows chưa xác minh."],
+    "blockers": ["Provider cloud LLM cụ thể (OpenAI/Anthropic/Gemini) chờ input người dùng trước Phase 3 demo."],
     "nextActions": [
-        "Người dùng review diff lockfile/tài liệu và tự commit/push TASK-001 theo GIT_WORKFLOW.md.",
-        "Khi được giao B-002/PH0-T07–T08, đọc AI-Agent/tasks/B-002.md để chốt model profile, demo, owner fork/license và hướng bảo vệ draft prediction."
+        "Người dùng review các quyết định B-002 và tự commit/push theo GIT_WORKFLOW.md.",
+        "Bắt đầu Phase 1 với B-003 (PH1-T01 và PH1-T02): Định nghĩa AgentSpec v1 và quy tắc readiness."
     ],
-    "nextTask": "B-002",
+    "nextTask": "B-003",
     "references": [
         "AI-Agent/harness/GIT_WORKFLOW.md",
         "AI-Agent/harness/HANDOFF.md",
@@ -73,8 +61,8 @@
         "newCommitCreatedDuringSetup": false
     },
     "snapshot": {
-        "head": "c31ae010ad0da23b823abbc31c16a9e732025dad",
+        "head": "1afe932d8c1afb103de57d6dd6b800677606bfc7",
         "branch": "main",
-        "sourceFingerprint": "01cca70b7d52944edf97d88548ad2322c474e15b82e9a746ed3012099afe1d66"
+        "sourceFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
 }
