@@ -107,6 +107,43 @@ const AgentBuilderView = () => {
             const baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000'
             eventSource = new EventSource(`${baseURL}/api/v1/agent-builder/sessions/${sessionId}/events`)
 
+            eventSource.addEventListener('connected', () => {
+                // Đã kết nối/tái kết nối SSE thành công (PH3-T07)
+            })
+
+            eventSource.addEventListener('revision', (e) => {
+                try {
+                    const payload = JSON.parse(e.data)
+                    if (payload.spec) setSpec(payload.spec)
+                    if (payload.revisionNumber) setRevisionNumber(payload.revisionNumber)
+                    if (payload.readiness) setReadiness(payload.readiness)
+                } catch {
+                    // Ignore parse error
+                }
+            })
+
+            eventSource.addEventListener('message', (e) => {
+                try {
+                    const payload = JSON.parse(e.data)
+                    if (payload.eventType === 'build_cancelled') {
+                        setBuildStatus('cancelled')
+                        setSnackbarMessage('Tác vụ build đã bị hủy.')
+                    } else if (payload.id && payload.content) {
+                        setMessages((prev) => {
+                            if (prev.some((m) => m.id === payload.id)) return prev
+                            return [...prev, payload]
+                        })
+                    }
+                } catch {
+                    // Ignore parse error
+                }
+            })
+
+            eventSource.addEventListener('build_cancelled', () => {
+                setBuildStatus('cancelled')
+                setSnackbarMessage('Tác vụ build đã bị hủy.')
+            })
+
             eventSource.addEventListener('build_completed', (e) => {
                 try {
                     const payload = JSON.parse(e.data)

@@ -1,38 +1,29 @@
 {
   "schemaVersion": 1,
-  "revision": 27,
-  "updatedAt": "2026-11-14T20:11:46.445Z",
+  "revision": 28,
+  "updatedAt": "2026-11-14T20:40:33.341Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-014",
+  "currentTask": "B-015",
   "status": "completed",
-  "productStage": "phase3_diff_rollback_and_cancel_guard_ready",
-  "summary": "B-014/PH3-T05–T06 hoàn thành: Hiển Thị Diff, Khôi Phục Cấu Hình và Xử Lý Hủy/Ghi Đè Build. specDiffService tính toán diff chi tiết và tóm tắt tiếng Việt, route /sessions/:id/diff và /sessions/:id/rollback. RevisionsDialog hỗ trợ xem diff và nút khôi phục (rollback). buildPipelineService bổ sung Cancel Guard và Superseded Guard chống ghi đè draft khi job cũ bị hủy hoặc bị thay thế. 15 server suites pass (148 tests), 4 UI suites pass (87 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-015.",
+  "productStage": "phase3_gate_d1_assistant_demo_completed",
+  "summary": "B-015/PH3-T07–T08 hoàn thành: Khôi Phục Sau Refresh/Reconnect và Nghiệm Thu Demo Ba Kịch Bản. Hoàn thành 100% Phase 3 và đạt chuẩn Gate D1 (36 task PH0–PH3). sessionService gửi sự kiện connected ban đầu, index.jsx tự động khôi phục kết nối SSE không gây build lặp. Bộ test phase3GateD1Demo.test.ts kiểm chứng toàn diện 3 kịch bản cốt lõi. 16 server suites pass (151 tests), 4 UI suites pass (87 tests), vite build exit 0 (21,181 modules), harness pass. Mở đầu Phase 4 với task B-016.",
   "decisions": [
-    "Rollback tạo một revision mới kế thừa cấu hình cũ để bảo toàn 100% lịch sử các bước đàm thoại.",
-    "Áp dụng Cancel Guard và Superseded Guard trong build pipeline để ngăn chặn hoàn toàn việc job cũ ghi đè bản draft của revision mới hơn.",
-    "Cung cấp giao diện xem diff trực quan so sánh giữa các phiên bản ngay trong RevisionsDialog."
+    "Hoàn thành và nghiệm thu Gate D1: Assistant Chat-to-Agent Builder không cần canvas kéo thả.",
+    "SSE gửi snapshot connected ban đầu giúp client phục hồi ngay sau khi reconnect.",
+    "Chuyển tiếp dự án sang Phase 4: Knowledge Agent và RAG Document Store."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/specDiffService.ts",
-    "packages/server/src/services/agent-builder/specDiffService.test.ts",
     "packages/server/src/services/agent-builder/sessionService.ts",
-    "packages/server/src/services/agent-builder/sessionService.test.ts",
-    "packages/server/src/services/agent-builder/pipeline/buildPipelineService.ts",
-    "packages/server/src/services/agent-builder/pipeline/buildPipelineService.test.ts",
-    "packages/server/src/controllers/agent-builder/index.ts",
-    "packages/server/src/routes/agent-builder/index.ts",
-    "packages/ui/src/api/agentBuilder.js",
-    "packages/ui/src/api/agentBuilder.test.js",
-    "packages/ui/src/views/agent-builder/RevisionsDialog.jsx",
+    "packages/server/src/services/agent-builder/phase3GateD1Demo.test.ts",
     "packages/ui/src/views/agent-builder/index.jsx",
-    "AI-Agent/tasks/B-014.md",
     "AI-Agent/tasks/B-015.md",
+    "AI-Agent/tasks/B-016.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "148/148 tests pass trong packages/server (Jest 15/15 suites agent-builder).",
+    "151/151 tests pass trong packages/server (Jest 16/16 suites agent-builder bao gồm phase3GateD1Demo.test.ts).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
     "87/87 tests pass trong packages/ui (Jest 4/4 suites).",
     "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
@@ -40,10 +31,10 @@
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-014 lên origin/main theo yêu cầu người dùng.",
-    "Triển khai B-015 (PH3-T07 và PH3-T08): Khôi phục sau refresh/reconnect và nghiệm thu demo ba kịch bản (Gate D1)."
+    "Commit và push task B-015 lên origin/main theo yêu cầu người dùng.",
+    "Bắt đầu Phase 4 với B-016 (PH4-T01 và PH4-T02): Chuẩn bị bộ tài liệu thử và tích hợp Document Store."
   ],
-  "nextTask": "B-015",
+  "nextTask": "B-016",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -71,8 +62,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "44ca99fcc13fef0c0dce016e8027fb9b4db52117",
+    "head": "5184fa6af7a618670f6e9d3cd637cb3766c875c7",
     "branch": "main",
-    "sourceFingerprint": "472f9191ed824bce5321cd6d11e98f03cdb69b129af9b75d2ecbd05f72fee76f"
+    "sourceFingerprint": "3201ff7c2a107a4d48ccf07305f5ffb3ca02790f49e7c5ed61c1910e62985b69"
   }
 }

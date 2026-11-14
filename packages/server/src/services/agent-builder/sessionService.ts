@@ -7,7 +7,7 @@ import { BuilderSession } from '../../database/entities/BuilderSession'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import collectorService, { CollectorService } from './collectorService'
-import buildPipelineService from './pipeline/buildPipelineService'
+import buildPipelineService, { BuildPipelineService } from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
 import { computeSpecDiff, SpecDiffResult } from './specDiffService'
 import { AgentSpec, BuildIntent, ReadinessResult } from './types'
@@ -61,9 +61,11 @@ export const getActiveDataSource = (customDataSource?: DataSource): DataSource =
  */
 export class BuilderSessionService {
     private collector: CollectorService
+    private buildPipeline: BuildPipelineService
 
-    constructor(private customDataSource?: DataSource, customCollector?: CollectorService) {
+    constructor(private customDataSource?: DataSource, customCollector?: CollectorService, customPipeline?: BuildPipelineService) {
         this.collector = customCollector || collectorService
+        this.buildPipeline = customPipeline || new BuildPipelineService(this.customDataSource)
     }
 
     private get sessionRepo(): Repository<BuilderSession> {
@@ -356,7 +358,7 @@ export class BuilderSessionService {
                 try {
                     const existingDraft = await this.draftRevisionRepo.findOneBy({ sessionId })
                     if (existingDraft) {
-                        await buildPipelineService.executeBuild({
+                        await this.buildPipeline.executeBuild({
                             sessionId,
                             workspaceId,
                             specRevisionId: currentRevision.id
@@ -571,7 +573,7 @@ export class BuilderSessionService {
                     take: 1
                 })
                 if (previousDrafts.length > 0) {
-                    await buildPipelineService.executeBuild({
+                    await this.buildPipeline.executeBuild({
                         sessionId,
                         workspaceId,
                         specRevisionId: savedRevision.id
@@ -604,6 +606,19 @@ export class BuilderSessionService {
         res.flushHeaders?.()
 
         this.collector.addSSEClient(sessionId, res)
+
+        // Gửi sự kiện ban đầu 'connected' với thông tin phiên phục vụ khôi phục kết nối (PH3-T07)
+        const initialPayload = JSON.stringify({
+            type: 'connected',
+            data: {
+                sessionId: session.id,
+                state: session.state,
+                title: session.title,
+                currentSpecRevisionId: session.currentSpecRevisionId
+            },
+            timestamp: new Date().toISOString()
+        })
+        res.write(`data: ${initialPayload}\n\n`)
     }
 }
 

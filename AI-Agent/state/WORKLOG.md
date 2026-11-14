@@ -1,5 +1,26 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-015 / PH3-T07–T08 (Hoàn Tất Phase 3 & Đạt Chuẩn Gate D1)
+
+Hoàn thành B-015 (PH3-T07 Khôi phục sau refresh/reconnect và PH3-T08 Nghiệm thu demo ba kịch bản). **Chính thức khép lại 100% Phase 3 và đạt chuẩn Gate D1 (toàn bộ 36 task PH0–PH3)**:
+
+-   **Khôi Phục Sau Refresh/Reconnect (PH3-T07):**
+    -   Nâng cấp `sessionService.ts` trong `subscribeEvents`: gửi sự kiện ban đầu `'connected'` kèm snapshot thông tin phiên (`sessionId`, `state`, `currentSpecRevisionId`).
+    -   Cập nhật `index.jsx`: Tự động tái kết nối SSE và lắng nghe các sự kiện `connected`, `revision`, `message`, `build_cancelled`. Khi F5 hoặc rớt mạng kết nối lại, UI giữ vững snapshot, không kích hoạt build lại thừa thãi.
+-   **Nghiệm Thu Toàn Diện Ba Kịch Bản & Gate D1 (PH3-T08):**
+    -   Xây dựng bộ kiểm thử nghiệm thu tổng thể `phase3GateD1Demo.test.ts` kiểm chứng toàn bộ 3 kịch bản:
+        -   **Kịch bản 1:** Tạo Agent từ prompt tiếng Việt → Tích lũy spec qua các revisions → Đạt `buildReady: true` → Tự động biên dịch Agentflow V2 Draft (Start 1.4, Agent 3.2, Tools, ChatFlow entity an toàn `deployed: false`, `isPublic: false`).
+        -   **Kịch bản 2:** Chat thử nghiệm đối soát assertions chính xác → Chạy batch evaluation runner với budget cap (`maxExamples: 2`) và kiểm tra báo cáo tỷ lệ đạt.
+        -   **Kịch bản 3:** Sửa Agent qua chat → Tự động tạo revision mới và sync draft không qua canvas kéo thả → Tính toán Diff trực quan → Rollback kế thừa cấu hình cũ bảo toàn lịch sử → Kích hoạt Superseded Guard khi có revision mới hơn thay thế job cũ.
+-   **Kiểm thử & Nghiệm thu:**
+    -   16 test suites server với 151 tests pass 100%.
+    -   TypeScript typecheck (`tsc --noEmit`) exit 0.
+    -   87 UI tests pass 100%.
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   Đạt mốc **Gate D1**! Lập task tiếp theo `B-016.md` mở đầu Phase 4 (Knowledge Agent).
+
+
 ## 15/11/2026 — B-014 / PH3-T05–T06 (Hiển Thị Diff, Khôi Phục Cấu Hình & Xử Lý Hủy/Ghi Đè Build)
 
 Hoàn thành B-014 (PH3-T05 Hiển thị diff và khôi phục cấu hình; PH3-T06 Xử lý cancel và sửa khi build đang chạy):
