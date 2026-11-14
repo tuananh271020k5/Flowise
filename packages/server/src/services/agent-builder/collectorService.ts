@@ -145,6 +145,57 @@ export class CollectorService {
             extractedFields.push('language')
         }
 
+        // 7. Trích xuất loại Agent (kind: 'knowledge') (PH4-T04 / B-017)
+        const isKnowledgeIntent =
+            /(?:hỏi\s+đáp\s+tài\s+liệu|tra\s+cứu\s+(?:tài\s+liệu|quy\s+chế|chính\s+sách|văn\s+bản)|dựa\s+trên\s+tài\s+liệu|knowledge\s+agent|hệ\s+tri\s+thức|rag|kho\s+tài\s+liệu)/i.test(
+                lowerText
+            )
+        if (isKnowledgeIntent && existingSpec?.kind !== 'knowledge') {
+            patch.kind = 'knowledge'
+            extractedFields.push('kind')
+        }
+
+        // 8. Trích xuất nguồn tài liệu (dataSources) (PH4-T04 / B-017)
+        if (
+            lowerText.includes('quy chế nội bộ') ||
+            lowerText.includes('chính sách công ty') ||
+            lowerText.includes('company policy') ||
+            lowerText.includes('tài liệu nội bộ')
+        ) {
+            patch.dataSources = [
+                {
+                    id: 'fixture-docstore-company-policy',
+                    name: 'Quy chế làm việc nội bộ',
+                    type: 'documentStore'
+                }
+            ]
+            if (patch.kind !== 'knowledge' && existingSpec?.kind !== 'knowledge') {
+                patch.kind = 'knowledge'
+                extractedFields.push('kind')
+            }
+            extractedFields.push('dataSources')
+        } else {
+            const docStorePattern =
+                /(?:kho\s+tài\s+liệu|dùng\s+tài\s+liệu|sử\s+dụng\s+tài\s+liệu|nguồn\s+tài\s+liệu|tài\s+liệu)\s*[:=]?\s*["'“]?([^.,;\n"”]{3,80})/i
+            const docMatch = text.match(docStorePattern)
+            if (docMatch && docMatch[1]) {
+                const storeName = docMatch[1].trim()
+                const storeId = `store_${storeName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                patch.dataSources = [
+                    {
+                        id: storeId,
+                        name: storeName,
+                        type: 'documentStore'
+                    }
+                ]
+                if (patch.kind !== 'knowledge' && existingSpec?.kind !== 'knowledge') {
+                    patch.kind = 'knowledge'
+                    extractedFields.push('kind')
+                }
+                extractedFields.push('dataSources')
+            }
+        }
+
         // Tạo summary thay đổi
         let changeSummary = 'Cập nhật cấu hình Agent Spec'
         if (extractedFields.length > 0) {
@@ -154,7 +205,9 @@ export class CollectorService {
                 instructions: 'hướng dẫn phong cách',
                 tools: 'công cụ',
                 evaluationExamples: 'ví dụ kiểm thử',
-                language: 'ngôn ngữ'
+                language: 'ngôn ngữ',
+                kind: 'loại trợ lý (Knowledge Agent)',
+                dataSources: 'kho tài liệu tri thức'
             }
             const updatedNames = extractedFields.map((f) => labels[f] || f).join(', ')
             changeSummary = `Bổ sung: ${updatedNames}`
@@ -174,11 +227,16 @@ export class CollectorService {
     generateCollectorResponse(missingFields: string[], currentSpec: Partial<AgentSpec>, newlyExtracted: string[]): string {
         // Nếu đã đủ toàn bộ thông tin bắt buộc để build
         if (missingFields.length === 0) {
+            const dataSourcesText =
+                currentSpec.dataSources && currentSpec.dataSources.length > 0
+                    ? `- **Kho tài liệu tri thức:** ${currentSpec.dataSources.map((d) => d.name || d.id).join(', ')}\n`
+                    : ''
             return (
                 `Tuyệt vời! Tôi đã tổng hợp đầy đủ thông tin cho trợ lý **${currentSpec.name || 'mới'}**:\n\n` +
                 `- **Mục tiêu:** ${currentSpec.goal}\n` +
                 `- **Phong cách/Chỉ dẫn:** ${currentSpec.instructions ? currentSpec.instructions.slice(0, 120) + '...' : 'Đầy đủ'}\n` +
                 `- **Mô hình:** ${currentSpec.modelProfileRef || 'default-builder-model'}\n` +
+                dataSourcesText +
                 (currentSpec.tools && currentSpec.tools.length > 0
                     ? `- **Công cụ:** ${currentSpec.tools.map((t) => t.name).join(', ')}\n`
                     : '') +
@@ -195,7 +253,9 @@ export class CollectorService {
                 instructions: `hướng dẫn vận hành chi tiết`,
                 tools: `công cụ hỗ trợ`,
                 evaluationExamples: `kịch bản câu hỏi kiểm thử`,
-                language: `ngôn ngữ`
+                language: `ngôn ngữ`,
+                kind: `loại trợ lý tri thức (Knowledge Agent)`,
+                dataSources: `kho tài liệu tham chiếu`
             }
             const ackList = newlyExtracted.map((f) => labels[f] || f).join(', ')
             ackText = `Tôi đã ghi nhận ${ackList}. `
@@ -216,6 +276,10 @@ export class CollectorService {
                 question = `Bạn hãy cung cấp hướng dẫn hoặc phong cách trả lời cho **${
                     currentSpec.name || 'trợ lý'
                 }** (ví dụ: luôn xưng hô lịch sự, trả lời ngắn gọn theo bullet, không tư vấn ngoài phạm vi sản phẩm...).`
+                break
+            case 'dataSources':
+                question =
+                    'Bạn muốn kết nối Agent này với kho tài liệu nào? (Ví dụ: Bạn có thể chọn kho tài liệu mẫu *"Quy chế làm việc nội bộ công ty"* hoặc cung cấp tên/mã kho tài liệu của bạn).'
                 break
             case 'evaluationExamples':
                 question = 'Để đảm bảo chất lượng, bạn có thể cho tôi một câu hỏi mẫu hoặc tình huống thực tế để kiểm thử trợ lý không?'

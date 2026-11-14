@@ -75,6 +75,23 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
             expect(res.patch.goal).toBeUndefined()
             expect(res.patch.instructions).toContain('Không được cam kết giảm giá')
         })
+
+        it('trích xuất loại Agent knowledge và kho tài liệu dataSources từ tiếng Việt (PH4-T04 / B-017)', () => {
+            const text1 = 'Tạo bot tra cứu quy chế nội bộ công ty để giải đáp cho nhân viên'
+            const res1 = collector.extractPatch(text1)
+
+            expect(res1.patch.kind).toBe('knowledge')
+            expect(res1.patch.dataSources).toBeDefined()
+            expect(res1.patch.dataSources?.[0].id).toBe('fixture-docstore-company-policy')
+            expect(res1.patch.dataSources?.[0].name).toContain('Quy chế làm việc nội bộ')
+            expect(res1.extractedFields).toContain('dataSources')
+            expect(res1.extractedFields).toContain('kind')
+
+            const text2 = 'Kho tài liệu: Sổ tay nhân viên năm 2026'
+            const res2 = collector.extractPatch(text2)
+            expect(res2.patch.dataSources?.[0].name).toBe('Sổ tay nhân viên năm 2026')
+            expect(res2.patch.kind).toBe('knowledge')
+        })
     })
 
     describe('Anti-reask & Guided Collector Response (PH1-T09)', () => {
@@ -91,6 +108,15 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
             )
             expect(responseWithName).toContain('hướng dẫn hoặc phong cách trả lời')
             expect(responseWithName).not.toContain('Bạn muốn đặt tên cho Trợ lý')
+
+            // Khi thiếu dataSources cho Knowledge Agent
+            const responseNoDoc = collector.generateCollectorResponse(
+                ['dataSources'],
+                { kind: 'knowledge', name: 'Bot Quy Chế', goal: 'Tra cứu quy chế' },
+                ['kind']
+            )
+            expect(responseNoDoc).toContain('kho tài liệu')
+            expect(responseNoDoc).toContain('Quy chế làm việc nội bộ')
         })
 
         it('thông báo sẵn sàng và kích hoạt build khi không còn trường thiếu (buildReady)', () => {

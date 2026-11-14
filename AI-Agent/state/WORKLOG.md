@@ -1,5 +1,34 @@
 # Nhật ký bàn giao ngắn
 
+## 15/11/2026 — B-017 / PH4-T03–T04 (Knowledge Template Có Retrieval & Knowledge Spec Readiness)
+
+Hoàn thành B-017 (PH4-T03 Tạo Knowledge template có retrieval và PH4-T04 Bổ sung Knowledge spec và readiness):
+
+-   **Node Registry Allowlist (PH4-T03):** Bổ sung `documentStoreTool` (version 1.0, inputs: `selectedStore`, `storeName`, `description`, `topK`, `returnSourceDocuments`) và `retrieverTool` (version 3.0) vào allowlist whitelist chặt chẽ của `nodeRegistry.ts`.
+-   **Knowledge Flow Template V2 (PH4-T03):**
+    -   Tạo `knowledgeTemplate.v1.ts` (`knowledge-flow-template` v1.0) theo chuẩn Agentflow V2:
+        -   Start Node (version 1.4) kết nối trực tiếp sang Agent Node (version 3.2).
+        -   Model Node: Cấu hình ChatOpenAI (version 5.0) hoặc Gemini (version 2.0) với `temperature: 0.2` giúp kiểm soát tối đa hiện tượng ảo giác (hallucination).
+        -   Document Store Tool Node: Phiên bản 1.0 với `selectedStore` trỏ chính xác vào Document Store ID từ spec, tham số `topK: 4` và cờ `returnSourceDocuments: true`.
+        -   Agent Node: Đăng ký `documentStoreTool` vào danh mục `agentTools`, tự động gắn bộ nguyên tắc RAG tiếng Việt (ưu tiên tra cứu trước khi trả lời, trích dẫn rõ điều khoản/chương mục, từ chối bịa đặt nếu tài liệu không đề cập).
+    -   Đồ thị vượt qua cả `validateNodeMetadata` và `validateFlowGraph` của Flowise.
+-   **Knowledge Spec & Quy Tắc Readiness (PH4-T04):**
+    -   Nâng cấp `readiness.ts`: Khi `kind === 'knowledge'`, bắt buộc phải có ít nhất 1 nguồn tri thức hợp lệ trong `dataSources`. Nếu thiếu, ghi nhận `missingFields: ['dataSources']`, `reasonCodes: ['MISSING_KNOWLEDGE_STORE']` và chặn build (`buildReady: false`).
+    -   Tự động bổ sung assumption về trích dẫn tài liệu: `assumptions.push('Tự động áp dụng cơ chế trích dẫn nguồn tài liệu tham khảo (citation) khi trả lời')`.
+-   **Trích Xuất Hội Thoại Collector Tiếng Việt (PH4-T04):**
+    -   Nâng cấp `collectorService.ts`: Trích xuất `kind: 'knowledge'` và `dataSources` từ ngôn ngữ tự nhiên. Nhận diện kho tài liệu quy chế nội bộ (`fixture-docstore-company-policy`) hoặc tên kho tùy ý từ chat.
+    -   Cập nhật `generateCollectorResponse`: Khi thiếu `dataSources`, hỏi người dùng rõ ràng về kho tài liệu muốn kết nối và gợi ý kho tài liệu mẫu.
+-   **Mở Rộng AgentPlan & Compiler:**
+    -   Hỗ trợ `knowledge-flow-template` và ánh xạ datasource capability binding sang `documentStoreTool`.
+-   **Kiểm thử & Nghiệm thu:**
+    -   18 test suites server với 176 tests pass 100% (thêm `knowledgeTemplate.test.ts` 6 tests, mở rộng `agentSpec.test.ts`, `collectorService.test.ts`, `agentPlan.test.ts`, `compiler.test.ts`).
+    -   TypeScript typecheck (`tsc --noEmit`) exit 0.
+    -   91 UI tests pass 100%.
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   Lập task tiếp theo `B-018.md` (PH4-T05 và PH4-T06: Mở Rộng Planner/Compiler Cho Knowledge và Hiển Thị Nguồn Trích Dẫn).
+
+
 ## 15/11/2026 — B-016 / PH4-T01–T02 (Mở Đầu Phase 4: Tài Liệu Thử & Document Store Service)
 
 Hoàn thành B-016 (PH4-T01 Chuẩn bị bộ tài liệu thử có quyền sử dụng và PH4-T02 Tái sử dụng ingestion/document store phù hợp). Mở đầu Phase 4 (Knowledge Agent và MVP M1):

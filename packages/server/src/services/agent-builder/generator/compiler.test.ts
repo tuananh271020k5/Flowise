@@ -82,4 +82,58 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
 
         expect(() => compiler.compile(invalidPlan)).toThrow('AgentPlan không hợp lệ')
     })
+
+    it('biên dịch Knowledge AgentPlan sinh đầy đủ DocumentStoreTool và RAG guidelines (PH4-T03 / B-017)', () => {
+        const knowledgeSpec: AgentSpec = {
+            schemaVersion: '1.0',
+            kind: 'knowledge',
+            name: 'Trợ Lý Quy Chế Công Ty',
+            goal: 'Giải đáp thắc mắc về hợp đồng và phúc lợi',
+            language: 'vi',
+            instructions: 'Luôn lịch sự và cung cấp thông tin chính xác theo văn bản.',
+            outputExpectations: ['Trích dẫn điều khoản'],
+            modelProfileRef: 'chatOpenAI',
+            dataSources: [
+                {
+                    id: 'ds_policy_2026',
+                    name: 'Chính sách công ty 2026',
+                    type: 'documentStore'
+                }
+            ],
+            tools: [],
+            policy: {
+                visibility: 'private',
+                executionMode: 'controlled-test',
+                allowWrite: false
+            },
+            evaluationExamples: [
+                {
+                    input: 'Thời hạn thử việc là mấy tháng?',
+                    assertions: ['2 tháng theo quy định']
+                }
+            ]
+        }
+
+        const plan = createAgentPlan(knowledgeSpec, 'rev-k100')
+        const compiled = compiler.compile(plan)
+
+        expect(compiled.templateId).toBe('knowledge-flow-template')
+
+        // Kiểm tra DocumentStoreTool node
+        const dsNode = compiled.nodes.find((n) => n.data.name === 'documentStoreTool')
+        expect(dsNode).toBeDefined()
+        expect(dsNode?.data.inputs.selectedStore).toBe('ds_policy_2026')
+        expect(dsNode?.data.inputs.storeName).toBe('Chính sách công ty 2026')
+
+        // Kiểm tra Agent node kết nối documentStoreTool
+        const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
+        expect(agentNode).toBeDefined()
+        const agentTools = agentNode?.data.inputs.agentTools as any[]
+        expect(agentTools.some((t) => t.agentSelectedTool === 'documentStoreTool')).toBe(true)
+
+        // Kiểm tra RAG guideline trong system message
+        const messages = agentNode?.data.inputs.agentMessages as any[]
+        expect(messages[0].content).toContain('NGUYÊN TẮC HỎI ĐÁP THEO TÀI LIỆU')
+        expect(messages[0].content).toContain('documentStoreTool')
+    })
 })

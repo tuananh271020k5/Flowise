@@ -2,6 +2,7 @@ import { computeReadiness } from '../readiness'
 import { AgentSpec } from '../types'
 import { ALLOWED_AGENTFLOW_NODES, isNodeAllowed } from './nodeRegistry'
 import { ASSISTANT_TEMPLATE_ID, ASSISTANT_TEMPLATE_VERSION } from './templates/assistantTemplate.v1'
+import { KNOWLEDGE_TEMPLATE_ID, KNOWLEDGE_TEMPLATE_VERSION } from './templates/knowledgeTemplate.v1'
 import { createHash } from 'crypto'
 
 export interface CapabilityBinding {
@@ -37,25 +38,32 @@ export interface AgentPlanValidationResult {
 export const calculatePlanHash = (spec: AgentSpec, specRevisionId: string): string => {
     const raw = JSON.stringify({
         schemaVersion: spec.schemaVersion,
+        kind: spec.kind,
         name: spec.name,
         goal: spec.goal,
         modelProfileRef: spec.modelProfileRef,
         instructions: spec.instructions,
         tools: spec.tools,
+        dataSources: spec.dataSources,
         specRevisionId
     })
     return createHash('sha256').update(raw).digest('hex').slice(0, 16)
 }
 
 /**
- * Sinh AgentPlan từ AgentSpec v1 theo cấu trúc template và registry (PH2-T03).
+ * Sinh AgentPlan từ AgentSpec v1 theo cấu trúc template và registry (PH2-T03 / PH4-T03).
  * Chỉ ánh xạ capabilities từ allowlist, loại bỏ mọi trường injection tùy ý.
  */
 export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_initial'): AgentPlan => {
     const planHash = calculatePlanHash(spec, specRevisionId)
     const capabilityBindings: CapabilityBinding[] = []
     const connectionRefs: Record<string, string> = {}
+    const isKnowledge = spec.kind === 'knowledge' || (Array.isArray(spec.dataSources) && spec.dataSources.length > 0)
+
     const expectedChecks: string[] = ['specReady', 'buildReady', 'templateCompatible', 'capabilitiesAllowlisted']
+    if (isKnowledge) {
+        expectedChecks.push('knowledgeStoreReady', 'retrievalConfigured')
+    }
 
     // 1. Ánh xạ Model Capability
     const modelRef = spec.modelProfileRef || 'default-builder-model'
@@ -69,12 +77,33 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         type: 'model',
         config: {
             modelName: 'gpt-4o',
-            temperature: 0.7
+            temperature: isKnowledge ? 0.2 : 0.7
         }
     })
     connectionRefs.model = modelNodeName
 
-    // 2. Ánh xạ Tools Capabilities (chỉ từ registry allowlist)
+    // 2. Ánh xạ Data Source Capability (DocumentStoreTool) cho Knowledge Agent
+    if (isKnowledge) {
+        const store = spec.dataSources && spec.dataSources.length > 0 ? spec.dataSources[0] : undefined
+        const storeId = store?.id || 'fixture-docstore-company-policy'
+        const storeName = store?.name || 'Quy chế làm việc nội bộ'
+
+        capabilityBindings.push({
+            capabilityId: `cap_datasource_${storeId}`,
+            nodeName: 'documentStoreTool',
+            nodeVersion: 1.0,
+            type: 'datasource',
+            config: {
+                selectedStore: storeId,
+                storeName: storeName,
+                topK: 4,
+                returnSourceDocuments: true
+            }
+        })
+        connectionRefs.datasource = 'documentStoreTool'
+    }
+
+    // 3. Ánh xạ Tools Capabilities (chỉ từ registry allowlist)
     if (spec.tools && spec.tools.length > 0) {
         spec.tools.forEach((tool, idx) => {
             const toolType = tool.type || 'calculator'
@@ -96,8 +125,8 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     return {
         id: `plan_${planHash}`,
         specRevisionId,
-        templateId: ASSISTANT_TEMPLATE_ID,
-        templateVersion: ASSISTANT_TEMPLATE_VERSION,
+        templateId: isKnowledge ? KNOWLEDGE_TEMPLATE_ID : ASSISTANT_TEMPLATE_ID,
+        templateVersion: isKnowledge ? KNOWLEDGE_TEMPLATE_VERSION : ASSISTANT_TEMPLATE_VERSION,
         runtimeSha: 'flowise-v2-core-runtime',
         capabilityBindings,
         connectionRefs,
@@ -118,12 +147,14 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
         return { valid: false, planId, errors: ['AgentPlan không được để rỗng'] }
     }
 
-    // 1. Kiểm tra Template compatibility
-    if (plan.templateId !== ASSISTANT_TEMPLATE_ID) {
-        errors.push(`Template "${plan.templateId}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID})`)
-    }
-    if (plan.templateVersion !== ASSISTANT_TEMPLATE_VERSION) {
-        errors.push(`Template version "${plan.templateVersion}" không tương thích (yêu cầu: ${ASSISTANT_TEMPLATE_VERSION})`)
+    // 1. Kiểm tra Template compatibility (Hỗ trợ cả Assistant và Knowledge Templates)
+    const isAssistant = plan.templateId === ASSISTANT_TEMPLATE_ID && plan.templateVersion === ASSISTANT_TEMPLATE_VERSION
+    const isKnowledge = plan.templateId === KNOWLEDGE_TEMPLATE_ID && plan.templateVersion === KNOWLEDGE_TEMPLATE_VERSION
+
+    if (!isAssistant && !isKnowledge) {
+        errors.push(
+            `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID} v${ASSISTANT_TEMPLATE_VERSION} hoặc ${KNOWLEDGE_TEMPLATE_ID} v${KNOWLEDGE_TEMPLATE_VERSION})`
+        )
     }
 
     // 2. Kiểm tra Spec Readiness
@@ -141,6 +172,8 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
         errors.push('AgentPlan thiếu danh sách capabilityBindings')
     } else {
         let hasModel = false
+        let hasDataSource = false
+
         for (const binding of plan.capabilityBindings) {
             if (!binding.nodeName || !isNodeAllowed(binding.nodeName, binding.nodeVersion)) {
                 errors.push(
@@ -149,6 +182,9 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
             }
             if (binding.type === 'model') {
                 hasModel = true
+            }
+            if (binding.type === 'datasource') {
+                hasDataSource = true
             }
 
             // Chống code injection trong config
@@ -162,6 +198,10 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
 
         if (!hasModel) {
             errors.push('AgentPlan bắt buộc phải chứa ít nhất 1 model capability binding')
+        }
+
+        if (isKnowledge && !hasDataSource) {
+            errors.push('AgentPlan loại Knowledge bắt buộc phải chứa ít nhất 1 datasource capability binding')
         }
     }
 

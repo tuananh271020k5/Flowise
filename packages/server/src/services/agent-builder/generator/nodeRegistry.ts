@@ -178,6 +178,32 @@ export const ALLOWED_AGENTFLOW_NODES: Record<string, NodeMetadata> = {
         baseClasses: ['Tool'],
         allowedInputs: ['apiKey', 'maxResults'],
         description: 'Search the web for up-to-date information'
+    },
+    documentStoreTool: {
+        name: 'documentStoreTool',
+        label: 'Document Store Tool',
+        type: 'DocumentStoreTool',
+        category: 'Tools',
+        supportedVersions: [1.0],
+        recommendedVersion: 1.0,
+        color: '#0284C7',
+        baseClasses: ['Tool', 'DynamicTool'],
+        allowedInputs: ['selectedStore', 'storeName', 'description', 'topK', 'returnSourceDocuments'],
+        requiredInputs: ['selectedStore'],
+        description: 'Truy xuất tài liệu từ kho lưu trữ Document Store của Flowise để trả lời câu hỏi'
+    },
+    retrieverTool: {
+        name: 'retrieverTool',
+        label: 'Retriever Tool',
+        type: 'RetrieverTool',
+        category: 'Tools',
+        supportedVersions: [3.0],
+        recommendedVersion: 3.0,
+        color: '#0284C7',
+        baseClasses: ['RetrieverTool', 'DynamicTool', 'Tool'],
+        allowedInputs: ['name', 'description', 'retriever', 'returnSourceDocuments', 'retrieverToolMetadataFilter'],
+        requiredInputs: ['name', 'description'],
+        description: 'Use a retriever as allowed tool for agent'
     }
 }
 

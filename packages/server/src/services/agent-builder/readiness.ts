@@ -70,12 +70,37 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         reasonCodes.push('UNKNOWN_FIELDS')
     }
 
-    // 3. Check required business fields for Assistant
+    // 3. Check required business fields for Assistant / Knowledge
     for (const { field, minLength } of REQUIRED_ASSISTANT_FIELDS) {
         const val = raw[field]
         if (typeof val !== 'string' || val.trim().length < minLength) {
             missingFields.push(field)
         }
+    }
+
+    // 3b. Kiểm tra quy tắc bắt buộc riêng cho Knowledge Agent (PH4-T04 / B-017)
+    if (raw.kind === 'knowledge') {
+        const sources = raw.dataSources
+        if (!sources || !Array.isArray(sources) || sources.length === 0) {
+            missingFields.push('dataSources')
+            reasonCodes.push('MISSING_KNOWLEDGE_STORE')
+        } else {
+            const hasValidSource = sources.every(
+                (src) =>
+                    src &&
+                    typeof src === 'object' &&
+                    ((typeof (src as any).id === 'string' && (src as any).id.trim().length > 0) ||
+                        (typeof (src as any).name === 'string' && (src as any).name.trim().length > 0))
+            )
+            if (!hasValidSource) {
+                missingFields.push('dataSources')
+                reasonCodes.push('INVALID_DATA_SOURCE')
+            }
+        }
+
+        // Bổ sung assumption về trích dẫn tài liệu tham khảo
+        assumptions.push('Tự động áp dụng cơ chế trích dẫn nguồn tài liệu tham khảo (citation) khi trả lời')
+        reasonCodes.push('KNOWLEDGE_CITATION_ASSUMED')
     }
 
     // 4. Record default assumptions if fields are not explicitly set
@@ -103,7 +128,7 @@ export function computeReadiness(spec: unknown): ReadinessResult {
     if (missingFields.length === 0 && specReady) {
         const normalizedSpec: Partial<AgentSpec> = {
             schemaVersion: '1.0',
-            kind: 'assistant',
+            kind: (raw.kind as any) || 'assistant',
             language: 'vi',
             modelProfileRef: 'default-builder-model',
             outputExpectations: [],

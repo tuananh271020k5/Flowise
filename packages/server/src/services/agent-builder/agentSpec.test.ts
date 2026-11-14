@@ -230,5 +230,67 @@ describe('AgentSpec v1 & Readiness Service (B-003)', () => {
                 expect(JSON.stringify(results[i])).toBe(first)
             }
         })
+
+        it('Knowledge Agent: từ chối buildReady khi thiếu dataSources (PH4-T04 / B-017)', () => {
+            const knowledgeNoSource = {
+                kind: 'knowledge',
+                name: 'Trợ lý Quy chế',
+                goal: 'Hỗ trợ tra cứu quy chế nội bộ',
+                instructions: 'Giải đáp theo quy định công ty.',
+                dataSources: []
+            }
+            const readiness = computeReadiness(knowledgeNoSource)
+            expect(readiness.buildReady).toBe(false)
+            expect(readiness.missingFields).toContain('dataSources')
+            expect(readiness.reasonCodes).toContain('MISSING_KNOWLEDGE_STORE')
+            expect(readiness.reasonCodes).toContain('KNOWLEDGE_CITATION_ASSUMED')
+        })
+
+        it('Knowledge Agent: từ chối buildReady khi dataSources chứa phần tử không hợp lệ', () => {
+            const knowledgeInvalidSource = {
+                kind: 'knowledge',
+                name: 'Trợ lý Quy chế',
+                goal: 'Hỗ trợ tra cứu quy chế nội bộ',
+                instructions: 'Giải đáp theo quy định công ty.',
+                dataSources: [{ id: '', name: '  ' }]
+            }
+            const readiness = computeReadiness(knowledgeInvalidSource)
+            expect(readiness.buildReady).toBe(false)
+            expect(readiness.missingFields).toContain('dataSources')
+            expect(readiness.reasonCodes).toContain('INVALID_DATA_SOURCE')
+        })
+
+        it('Knowledge Agent: đạt buildReady: true khi có đủ name, goal, instructions và dataSources hợp lệ', () => {
+            const validKnowledgeSpec = {
+                schemaVersion: '1.0',
+                kind: 'knowledge',
+                name: 'Trợ lý Quy chế',
+                goal: 'Hỗ trợ tra cứu quy chế nội bộ',
+                language: 'vi',
+                instructions: 'Giải đáp theo quy định công ty và trích dẫn điều khoản.',
+                modelProfileRef: 'chatOpenAI',
+                dataSources: [
+                    {
+                        id: 'store_company_policy_01',
+                        name: 'Quy chế làm việc nội bộ',
+                        type: 'documentStore'
+                    }
+                ],
+                tools: [],
+                outputExpectations: ['Trích dẫn nguồn'],
+                policy: {
+                    visibility: 'private',
+                    executionMode: 'controlled-test',
+                    allowWrite: false
+                }
+            }
+            const readiness = computeReadiness(validKnowledgeSpec)
+            expect(readiness.specReady).toBe(true)
+            expect(readiness.buildReady).toBe(true)
+            expect(readiness.missingFields).toHaveLength(0)
+            expect(readiness.assumptions.some((a) => a.includes('trích dẫn nguồn tài liệu'))).toBe(true)
+            expect(readiness.reasonCodes).toContain('KNOWLEDGE_CITATION_ASSUMED')
+            expect(readiness.reasonCodes).toContain('READY_FOR_BUILD')
+        })
     })
 })

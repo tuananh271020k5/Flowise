@@ -1,45 +1,49 @@
 {
   "schemaVersion": 1,
-  "revision": 29,
-  "updatedAt": "2026-11-14T21:03:34.790Z",
+  "revision": 30,
+  "updatedAt": "2026-11-14T22:38:27.870Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-016",
+  "currentTask": "B-017",
   "status": "completed",
-  "productStage": "phase4_knowledge_store_ready",
-  "summary": "B-016/PH4-T01–T02 hoàn thành: Chuẩn Bị Bộ Tài Liệu Thử và Tái Sử Dụng Document Store. Mở đầu Phase 4 (Knowledge Agent). companyPolicyFixture cung cấp tài liệu tri thức nội bộ và golden QA pairs. knowledgeStoreService tích hợp DocumentStore Flowise với phân quyền workspace và Negative Auth 403. Thêm các routes /knowledge/* và client API. 17 server suites pass (163 tests), 4 UI suites pass (91 tests), vite build exit 0 (21,181 modules), harness pass. Lập task B-017.",
+  "productStage": "phase4_knowledge_template_ready",
+  "summary": "B-017/PH4-T03-T04 hoàn thành: Tạo Knowledge Template có retrieval và bổ sung Knowledge spec readiness. knowledgeTemplate.v1.ts sinh đồ thị Agentflow V2 kết nối DocumentStoreTool vào Agent Node với temperature 0.2 giảm hallucination và bộ nguyên tắc RAG. readiness.ts bắt buộc dataSources hợp lệ cho kind knowledge. collectorService trích xuất kho tài liệu tiếng Việt. 18 server suites pass (176 tests), 4 UI suites pass (91 tests), vite build exit 0, harness pass. Lập task B-018.",
   "decisions": [
-    "Tái sử dụng 100% thực thể DocumentStore và DocumentStoreFileChunk của Flowise cho RAG.",
-    "Đảm bảo cách ly phân quyền tuyệt đối: Chặn truy cập document store chéo workspace (403 Forbidden).",
-    "Cung cấp fixture quy chế nội bộ có sẵn để người dùng có thể seed và thử nghiệm Knowledge Agent tức thì."
+    "Bổ sung documentStoreTool (1.0) và retrieverTool (3.0) vào whitelist allowlist của nodeRegistry.",
+    "Đặt temperature 0.2 cho Knowledge Model Node để giảm thiểu tối đa hiện tượng ảo giác (hallucination).",
+    "Bắt buộc có ít nhất một data source hợp lệ khi kind là knowledge trong computeReadiness."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/knowledge/fixtures/companyPolicyFixture.ts",
-    "packages/server/src/services/agent-builder/knowledge/knowledgeStoreService.ts",
-    "packages/server/src/services/agent-builder/knowledge/knowledgeStoreService.test.ts",
-    "packages/server/src/controllers/agent-builder/index.ts",
-    "packages/server/src/routes/agent-builder/index.ts",
-    "packages/server/src/services/agent-builder/sessionService.test.ts",
-    "packages/ui/src/api/agentBuilder.js",
-    "packages/ui/src/api/agentBuilder.test.js",
-    "AI-Agent/tasks/B-016.md",
+    "packages/server/src/services/agent-builder/generator/nodeRegistry.ts",
+    "packages/server/src/services/agent-builder/generator/nodeRegistry.test.ts",
+    "packages/server/src/services/agent-builder/generator/templates/knowledgeTemplate.v1.ts",
+    "packages/server/src/services/agent-builder/generator/templates/knowledgeTemplate.test.ts",
+    "packages/server/src/services/agent-builder/readiness.ts",
+    "packages/server/src/services/agent-builder/agentSpec.test.ts",
+    "packages/server/src/services/agent-builder/collectorService.ts",
+    "packages/server/src/services/agent-builder/collectorService.test.ts",
+    "packages/server/src/services/agent-builder/generator/agentPlan.ts",
+    "packages/server/src/services/agent-builder/generator/agentPlan.test.ts",
+    "packages/server/src/services/agent-builder/generator/compiler.ts",
+    "packages/server/src/services/agent-builder/generator/compiler.test.ts",
     "AI-Agent/tasks/B-017.md",
+    "AI-Agent/tasks/B-018.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "163/163 tests pass trong packages/server (Jest 17/17 suites agent-builder bao gồm knowledgeStoreService.test.ts).",
+    "176/176 tests pass trong packages/server (Jest 18/18 suites agent-builder).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
-    "91/91 tests pass trong packages/ui (Jest 4/4 suites bao gồm knowledge stores API client).",
+    "91/91 tests pass trong packages/ui (Jest 4/4 suites).",
     "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-016 lên origin/main theo yêu cầu người dùng.",
-    "Bắt đầu triển khai task B-017 (PH4-T03 và PH4-T04): Tạo Knowledge template có retrieval và bổ sung Knowledge spec & readiness."
+    "Commit và push task B-017 lên origin/main theo yêu cầu người dùng.",
+    "Triển khai task B-018 (PH4-T05 và PH4-T06): Mở rộng planner/compiler cho Knowledge và hiển thị nguồn trích dẫn."
   ],
-  "nextTask": "B-017",
+  "nextTask": "B-018",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -67,8 +71,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "7ea0012d4e8547a6b12c0726e8b6e39c6adec274",
+    "head": "dd8bb6a09fef7798b59e38983087eb2833e0c098",
     "branch": "main",
-    "sourceFingerprint": "9c5153ed447c07668c1dee7ed4e9d99801f3968c568ee191d2d85d86fe27841a"
+    "sourceFingerprint": "632f877417d47c3bb8429a2ec6f2bae61859d7a8179907648b2c3d0734065681"
   }
 }

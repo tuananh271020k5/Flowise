@@ -110,5 +110,51 @@ describe('AgentPlan & Validation (PH2-T03 / B-008)', () => {
             expect(result.valid).toBe(false)
             expect(result.errors.some((e) => e.includes('chứa tham số nguy hiểm'))).toBe(true)
         })
+
+        it('Knowledge Agent Plan: ánh xạ templateId knowledge và datasource binding (PH4-T03 / B-017)', () => {
+            const knowledgeSpec: AgentSpec = {
+                schemaVersion: '1.0',
+                kind: 'knowledge',
+                name: 'Trợ Lý Quy Chế Nội Bộ',
+                goal: 'Tra cứu quy định và chính sách công ty',
+                language: 'vi',
+                instructions: 'Giải đáp theo quy chế và trích dẫn điều khoản.',
+                outputExpectations: ['Trích dẫn nguồn'],
+                modelProfileRef: 'chatOpenAI',
+                dataSources: [
+                    {
+                        id: 'store_company_policy_01',
+                        name: 'Quy chế làm việc nội bộ',
+                        type: 'documentStore'
+                    }
+                ],
+                tools: [],
+                policy: {
+                    visibility: 'private',
+                    executionMode: 'controlled-test',
+                    allowWrite: false
+                },
+                evaluationExamples: [
+                    {
+                        input: 'Nghỉ phép năm được bao nhiêu ngày?',
+                        assertions: ['12 ngày phép năm']
+                    }
+                ]
+            }
+
+            const plan = createAgentPlan(knowledgeSpec, 'rev-k1')
+            expect(plan.templateId).toBe('knowledge-flow-template')
+            expect(plan.expectedChecks).toContain('knowledgeStoreReady')
+            expect(plan.expectedChecks).toContain('retrievalConfigured')
+
+            const dsBinding = plan.capabilityBindings.find((c) => c.type === 'datasource')
+            expect(dsBinding).toBeDefined()
+            expect(dsBinding?.nodeName).toBe('documentStoreTool')
+            expect(dsBinding?.config?.selectedStore).toBe('store_company_policy_01')
+
+            const result = validateAgentPlan(plan)
+            expect(result.valid).toBe(true)
+            expect(result.errors).toHaveLength(0)
+        })
     })
 })

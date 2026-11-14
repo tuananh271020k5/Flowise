@@ -23,6 +23,19 @@ describe('Node Metadata Registry (PH2-T02 / B-007)', () => {
             expect(isNodeAllowed('chatGoogleGenerativeAI', 2.0)).toBe(true)
             expect(isNodeAllowed('calculator', 1.0)).toBe(true)
             expect(isNodeAllowed('webSearch', 1.0)).toBe(true)
+            expect(isNodeAllowed('documentStoreTool', 1.0)).toBe(true)
+            expect(isNodeAllowed('retrieverTool', 3.0)).toBe(true)
+        })
+
+        it('xác thực thông số metadata của documentStoreTool và retrieverTool', () => {
+            const docToolMeta = getNodeMetadata('documentStoreTool')
+            expect(docToolMeta).toBeDefined()
+            expect(docToolMeta?.requiredInputs).toContain('selectedStore')
+            expect(docToolMeta?.allowedInputs).toContain('topK')
+
+            const retToolMeta = getNodeMetadata('retrieverTool')
+            expect(retToolMeta).toBeDefined()
+            expect(retToolMeta?.recommendedVersion).toBe(3.0)
         })
 
         it('từ chối node không nằm trong allowlist (chống chèn mã độc/node lạ)', () => {

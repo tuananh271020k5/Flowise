@@ -1,4 +1,5 @@
 import { AgentflowEdge, AgentflowNode } from './templates/assistantTemplate.v1'
+import { KNOWLEDGE_TEMPLATE_ID } from './templates/knowledgeTemplate.v1'
 import { AgentPlan, validateAgentPlan } from './agentPlan'
 import { ALLOWED_AGENTFLOW_NODES, validateNodeMetadata } from './nodeRegistry'
 
@@ -110,18 +111,62 @@ export class AgentflowCompiler {
         }
         nodes.push(modelNode)
 
-        // 4. Sinh Tool Nodes từ capability bindings
+        // 4. Sinh Tool Nodes và DataSource Nodes từ capability bindings
         const toolBindings = plan.capabilityBindings.filter((c) => c.type === 'tool')
-        const boundToolsForAgent: Array<{ agentSelectedTool: string }> = []
+        const dsBindings = plan.capabilityBindings.filter((c) => c.type === 'datasource')
+        const boundToolsForAgent: Array<{ agentSelectedTool: string; selectedStore?: string }> = []
 
+        // 4a. Sinh Document Store Tool nodes (nếu có datasource capability)
+        dsBindings.forEach((dsBind, index) => {
+            const dsMeta = ALLOWED_AGENTFLOW_NODES[dsBind.nodeName] || ALLOWED_AGENTFLOW_NODES.documentStoreTool
+            const dsNodeId = `documentStoreTool_${index}`
+            const storeName = (dsBind.config?.storeName as string) || 'Kho tài liệu'
+            const selectedStore = (dsBind.config?.selectedStore as string) || 'default-docstore'
+
+            const dsNode: AgentflowNode = {
+                id: dsNodeId,
+                type: 'agentFlow',
+                position: { x: 880, y: 120 + index * 140 },
+                data: {
+                    id: dsNodeId,
+                    label: `Kho tri thức: ${storeName}`,
+                    name: dsMeta.name,
+                    version: dsMeta.recommendedVersion,
+                    type: dsMeta.type,
+                    category: dsMeta.category,
+                    color: dsMeta.color,
+                    baseClasses: [...dsMeta.baseClasses],
+                    description: `Truy xuất thông tin từ kho tài liệu ${storeName}`,
+                    inputs: {
+                        selectedStore,
+                        storeName,
+                        description: `Truy xuất các quy chế, điều khoản và tài liệu từ ${storeName}`,
+                        topK: (dsBind.config?.topK as number) || 4,
+                        returnSourceDocuments: true
+                    },
+                    outputAnchors: [
+                        {
+                            id: `${dsNodeId}-output-${dsMeta.name}`,
+                            label: dsMeta.label,
+                            name: dsMeta.name
+                        }
+                    ]
+                }
+            }
+            nodes.push(dsNode)
+            boundToolsForAgent.push({ agentSelectedTool: dsMeta.name, selectedStore })
+        })
+
+        // 4b. Sinh Extra Tool nodes
         toolBindings.forEach((toolBind, index) => {
             const toolMeta = ALLOWED_AGENTFLOW_NODES[toolBind.nodeName] || ALLOWED_AGENTFLOW_NODES.calculator
             const toolNodeId = `tool_${toolMeta.name}_${index}`
+            const yOffset = 120 + (dsBindings.length + index) * 140
 
             const toolNode: AgentflowNode = {
                 id: toolNodeId,
                 type: 'agentFlow',
-                position: { x: 880, y: 120 + index * 140 },
+                position: { x: 880, y: yOffset },
                 data: {
                     id: toolNodeId,
                     label: toolMeta.label,
@@ -141,7 +186,17 @@ export class AgentflowCompiler {
 
         // 5. Sinh Agent Node (Phiên bản 3.2 chuẩn)
         const agentMeta = ALLOWED_AGENTFLOW_NODES.agentAgentflow
-        const systemInstruction = plan.spec.instructions || 'Bạn là trợ lý AI thông minh, hỗ trợ người dùng bằng tiếng Việt chuẩn mực.'
+        let systemInstruction = plan.spec.instructions || 'Bạn là trợ lý AI thông minh, hỗ trợ người dùng bằng tiếng Việt chuẩn mực.'
+        if (plan.templateId === KNOWLEDGE_TEMPLATE_ID || dsBindings.length > 0) {
+            systemInstruction += [
+                '',
+                '',
+                '--- NGUYÊN TẮC HỎI ĐÁP THEO TÀI LIỆU (KNOWLEDGE RAG RULES) ---',
+                '1. Luôn tra cứu và tìm kiếm thông tin bằng công cụ truy xuất tài liệu (documentStoreTool) trước khi trả lời.',
+                '2. Mọi câu trả lời bắt buộc phải trích dẫn rõ nguồn gốc (tên tài liệu, điều khoản, chương mục cụ thể).',
+                '3. Nếu tài liệu không chứa đủ căn cứ hoặc câu hỏi nằm ngoài phạm vi tài liệu, hãy thông báo lịch sự rằng tài liệu hiện tại không đề cập, tuyệt đối không tự bịa đặt hay suy diễn sai lệch.'
+            ].join('\n')
+        }
         const agentNode: AgentflowNode = {
             id: agentNodeId,
             type: 'agentFlow',
