@@ -164,4 +164,33 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/knowledge/seed', payload)
         expect(res.data.id).toBe('ks-seeded')
     })
+
+    it('publishAgent gửi POST request tới /agent-builder/sessions/:id/publish', async () => {
+        const payload = { isPublic: true, minPassRate: 0.8 }
+        client.post.mockResolvedValueOnce({ data: { success: true, deployed: true } })
+
+        const res = await agentBuilderApi.publishAgent('s1', payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/publish', payload)
+        expect(res.data.deployed).toBe(true)
+    })
+
+    it('unpublishAgent gửi POST request tới /agent-builder/sessions/:id/unpublish', async () => {
+        client.post.mockResolvedValueOnce({ data: { success: true, deployed: false } })
+
+        const res = await agentBuilderApi.unpublishAgent('s1')
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/unpublish', undefined)
+        expect(res.data.deployed).toBe(false)
+    })
+
+    it('getAuditLogs gửi GET request tới /agent-builder/sessions/:id/audit-logs', async () => {
+        const params = { limit: 20 }
+        client.get.mockResolvedValueOnce({ data: [{ action: 'AGENT_PUBLISHED' }] })
+
+        const res = await agentBuilderApi.getAuditLogs('s1', params)
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/audit-logs', { params })
+        expect(res.data[0].action).toBe('AGENT_PUBLISHED')
+    })
 })

@@ -419,6 +419,7 @@ const AgentBuilderView = () => {
                     {activeTab === 'test' && (
                         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                             <TestChatPane
+                                sessionId={sessionId}
                                 flowId={currentFlowId}
                                 flowName={spec?.name || 'Trợ lý Agentflow'}
                                 revisionNo={revisionNumber}

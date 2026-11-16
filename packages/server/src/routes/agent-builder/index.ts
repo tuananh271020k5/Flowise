@@ -41,4 +41,11 @@ router.get('/knowledge/stores/:id', agentBuilderController.getKnowledgeStore)
 router.get('/knowledge/stores/:id/chunks', agentBuilderController.getKnowledgeStoreChunks)
 router.post('/knowledge/seed', agentBuilderController.seedKnowledgeStore)
 
+// PUBLISH & QUALITY GATE (PH5-T01)
+router.post('/sessions/:id/publish', agentBuilderController.publishAgent)
+router.post('/sessions/:id/unpublish', agentBuilderController.unpublishAgent)
+
+// AUDIT LOGGING & TRACEABILITY (PH5-T02)
+router.get('/sessions/:id/audit-logs', agentBuilderController.getAuditLogs)
+
 export default router

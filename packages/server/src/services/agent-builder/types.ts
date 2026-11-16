@@ -101,6 +101,8 @@ export type SSEEventType =
     | 'build_dispatched'
     | 'build_completed'
     | 'build_failed'
+    | 'agent_published'
+    | 'agent_unpublished'
     | 'error'
 
 export interface SSEPayload {

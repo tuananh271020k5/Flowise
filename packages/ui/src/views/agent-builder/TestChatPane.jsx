@@ -19,7 +19,9 @@ import {
     DialogContent,
     DialogActions,
     Card,
-    CardContent
+    CardContent,
+    FormControlLabel,
+    Checkbox
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import {
@@ -33,7 +35,8 @@ import {
     IconX,
     IconFileText,
     IconChevronDown,
-    IconChevronUp
+    IconChevronUp,
+    IconUpload
 } from '@tabler/icons-react'
 import agentBuilderApi from '@/api/agentBuilder'
 import { validateAssertions, formatTestMessage, extractPredictionText, extractSourceDocuments } from './testChatHelper'
@@ -58,7 +61,53 @@ const TestChatPane = ({
     const [suiteReport, setSuiteReport] = useState(null)
     const [isSuiteDialogOpen, setIsSuiteDialogOpen] = useState(false)
     const [expandedCitations, setExpandedCitations] = useState({})
+    const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
+    const [isPublishing, setIsPublishing] = useState(false)
+    const [isPublished, setIsPublished] = useState(false)
+    const [isPublicAgent, setIsPublicAgent] = useState(false)
+    const [publishStatusMessage, setPublishStatusMessage] = useState(null)
     const messagesEndRef = useRef(null)
+
+    const handleOpenPublishDialog = () => {
+        setIsPublishDialogOpen(true)
+        setPublishStatusMessage(null)
+    }
+
+    const handleConfirmPublish = async () => {
+        if (!sessionId) {
+            setTestError('Thiếu sessionId để thực hiện xuất bản.')
+            return
+        }
+        setIsPublishing(true)
+        try {
+            const res = await agentBuilderApi.publishAgent(sessionId, {
+                isPublic: isPublicAgent,
+                minPassRate: 0.8
+            })
+            setIsPublished(true)
+            setIsPublishDialogOpen(false)
+            setPublishStatusMessage(res.data?.message || 'Xuất bản thành công!')
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi xuất bản:', err)
+            setTestError(err?.response?.data?.message || err?.message || 'Xuất bản thất bại.')
+        } finally {
+            setIsPublishing(false)
+        }
+    }
+
+    const handleUnpublish = async () => {
+        if (!sessionId) return
+        try {
+            await agentBuilderApi.unpublishAgent(sessionId)
+            setIsPublished(false)
+            setPublishStatusMessage('Đã thu hồi xuất bản, trợ lý trở về trạng thái nháp.')
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Lỗi khi thu hồi xuất bản:', err)
+            setTestError(err?.response?.data?.message || 'Thu hồi xuất bản thất bại.')
+        }
+    }
 
     const toggleCitation = (msgId) => {
         setExpandedCitations((prev) => ({
@@ -265,13 +314,45 @@ const TestChatPane = ({
                 }}
             >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant='subtitle1' fontWeight={600} noWrap sx={{ maxWidth: 200 }}>
+                    <Typography variant='subtitle1' fontWeight={600} noWrap sx={{ maxWidth: 180 }}>
                         {flowName || 'Agent Draft'}
                     </Typography>
                     <Chip label={`Rev #${revisionNo || 1}`} size='small' color='primary' variant='outlined' />
-                    <Chip label='Draft' size='small' color='secondary' sx={{ height: 20, fontSize: '0.7rem' }} />
+                    {isPublished ? (
+                        <Chip
+                            label='Đã triển khai'
+                            size='small'
+                            color='success'
+                            sx={{ height: 22, fontSize: '0.75rem', fontWeight: 600 }}
+                        />
+                    ) : (
+                        <Chip label='Draft' size='small' color='secondary' sx={{ height: 20, fontSize: '0.7rem' }} />
+                    )}
                 </Box>
-                <Stack direction='row' spacing={0.5}>
+                <Stack direction='row' spacing={1} alignItems='center'>
+                    {sessionId && !isPublished && (
+                        <Button
+                            size='small'
+                            variant='contained'
+                            color='success'
+                            startIcon={<IconUpload size={16} />}
+                            onClick={handleOpenPublishDialog}
+                            sx={{ fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5 }}
+                        >
+                            Xuất Bản
+                        </Button>
+                    )}
+                    {sessionId && isPublished && (
+                        <Button
+                            size='small'
+                            variant='outlined'
+                            color='warning'
+                            onClick={handleUnpublish}
+                            sx={{ fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5 }}
+                        >
+                            Thu hồi
+                        </Button>
+                    )}
                     <Tooltip title='Xóa lịch sử chat thử'>
                         <IconButton size='small' onClick={handleClearChat} disabled={testMessages.length === 0}>
                             <IconTrash size={18} />
@@ -288,6 +369,13 @@ const TestChatPane = ({
                     </Tooltip>
                 </Stack>
             </Box>
+
+            {/* Thông báo xuất bản thành công nếu có */}
+            {publishStatusMessage && (
+                <Alert severity='success' onClose={() => setPublishStatusMessage(null)} sx={{ borderRadius: 0 }}>
+                    {publishStatusMessage}
+                </Alert>
+            )}
 
             {/* Thông báo lỗi nếu có */}
             {testError && (
@@ -596,6 +684,46 @@ const TestChatPane = ({
                     <Button onClick={() => setIsSuiteDialogOpen(false)}>Đóng</Button>
                     <Button variant='contained' color='primary' onClick={handleRunTestSuite} disabled={isRunningSuite}>
                         Chạy Lại Bộ Kiểm Thử
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Hộp thoại Phê Duyệt & Xuất Bản Trợ Lý (PH5-T01) */}
+            <Dialog open={isPublishDialogOpen} onClose={() => !isPublishing && setIsPublishDialogOpen(false)} maxWidth='sm' fullWidth>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconUpload size={22} color={theme.palette.success.main} />
+                        <Typography variant='h4'>Phê Duyệt & Xuất Bản Trợ Lý</Typography>
+                    </Box>
+                    <IconButton size='small' onClick={() => setIsPublishDialogOpen(false)} disabled={isPublishing}>
+                        <IconX size={18} />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant='body1' gutterBottom fontWeight={500}>
+                        Bạn đang chuẩn bị xuất bản chính thức trợ lý <strong>{flowName}</strong> (Phiên bản #{revisionNo}).
+                    </Typography>
+                    <Alert severity='info' sx={{ my: 2 }}>
+                        Cổng kiểm soát chất lượng (Quality Gate) sẽ tự động kiểm tra các kịch bản đánh giá để đảm bảo tỷ lệ vượt qua bài thử
+                        nghiệm đạt tối thiểu <strong>80%</strong> trước khi kích hoạt trạng thái triển khai.
+                    </Alert>
+                    <FormControlLabel
+                        control={<Checkbox checked={isPublicAgent} onChange={(e) => setIsPublicAgent(e.target.checked)} color='primary' />}
+                        label='Cho phép truy cập công khai trong tổ chức (isPublic)'
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setIsPublishDialogOpen(false)} disabled={isPublishing} color='inherit'>
+                        Hủy
+                    </Button>
+                    <Button
+                        onClick={handleConfirmPublish}
+                        disabled={isPublishing}
+                        variant='contained'
+                        color='success'
+                        startIcon={isPublishing ? <CircularProgress size={16} color='inherit' /> : <IconCheck size={18} />}
+                    >
+                        {isPublishing ? 'Đang Kiểm Tra & Xuất Bản...' : 'Xác Nhận Xuất Bản'}
                     </Button>
                 </DialogActions>
             </Dialog>

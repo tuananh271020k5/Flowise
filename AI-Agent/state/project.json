@@ -1,41 +1,51 @@
 {
   "schemaVersion": 1,
-  "revision": 32,
-  "updatedAt": "2026-11-14T23:34:54.336Z",
+  "revision": 33,
+  "updatedAt": "2026-11-16T16:20:14.435Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-019",
+  "currentTask": "B-020",
   "status": "completed",
-  "productStage": "phase4_knowledge_mvp_m1_ready",
-  "summary": "B-019/PH4-T07-T08 hoàn thành: Bộ 10 Golden Knowledge Cases và kiểm thử bảo mật thiếu bằng chứng / tài liệu độc hại. Chính thức hoàn tất 100% Phase 4 (Knowledge MVP M1). Mở rộng companyPolicyFixture đủ 10 chương mục quy chế thực tế, chạy trọn vẹn 10 Golden Cases đạt 100% Pass Rate kèm trích dẫn có căn cứ. evaluationRunnerService tích hợp Domain Concepts Scoring và Negative Citation Guard từ chối lịch sự khi ngoài phạm vi, cùng bộ lọc INJECTION_PATTERNS ngăn chặn prompt injection đòi in system prompt hoặc API key. 20 server suites pass (182 tests), 4 UI suites pass (94 tests), tsc exit 0, ESLint exit 0, harness pass 14/15. Lập task B-020.",
+  "productStage": "phase5_publishing_and_audit_ready",
+  "summary": "B-020/PH5-T01-T02 hoàn thành: Cổng phê duyệt xuất bản an toàn và audit logging cho release nội bộ. Mở đầu Phase 5. Xây dựng entity BuilderAuditLog và BuilderAuditService lưu vết toàn bộ hành vi trọng yếu cách ly theo workspace. PublishService thiết lập Quality Gate yêu cầu tỷ lệ test đạt tối thiểu 80% trước khi chuyển deployed: true và session state sang published, hỗ trợ unpublish thu hồi về draft. Bổ sung API endpoints publish, unpublish, audit-logs. Nâng cấp UI TestChatPane nút Xuất Bản, badge Đã triển khai và hộp thoại xác nhận. 21 server suites pass (194 tests), 4 UI suites pass (97 tests), tsc exit 0, vite build exit 0, ESLint exit 0, harness pass 14/15. Lập task B-021.",
   "decisions": [
-    "Mở rộng companyPolicyFixture với 10 chương mục nghiệp vụ thực tế phục vụ bộ 10 Golden Cases.",
-    "Tích hợp Domain Concepts Scoring trong evaluationRunnerService xếp hạng độ liên quan của chunk trước khi trích xuất.",
-    "Kích hoạt Negative Citation Guard trả về sourceDocuments rỗng khi câu hỏi nằm ngoài phạm vi tài liệu.",
-    "Bổ sung INJECTION_PATTERNS phát hiện và từ chối các chỉ thị ghi đè prompt hoặc cố tình đánh cắp secrets."
+    "Thiết lập Quality Gate bắt buộc tỷ lệ pass kiểm thử >= 80% trước khi cho phép xuất bản (deployed: true).",
+    "Entity BuilderAuditLog lưu vết toàn bộ hoạt động trọng yếu có phân quyền cách ly chặt chẽ theo workspaceId.",
+    "Bổ sung cơ chế thu hồi xuất bản (unpublish) đưa trạng thái trở lại nháp (draft) an toàn."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/knowledge/fixtures/companyPolicyFixture.ts",
-    "packages/server/src/services/agent-builder/pipeline/evaluationRunnerService.ts",
-    "packages/server/src/services/agent-builder/knowledge/knowledgeGoldenCases.test.ts",
-    "AI-Agent/tasks/B-019.md",
+    "packages/server/src/database/entities/BuilderAuditLog.ts",
+    "packages/server/src/database/entities/index.ts",
+    "packages/server/src/services/agent-builder/audit/builderAuditService.ts",
+    "packages/server/src/services/agent-builder/pipeline/publishService.ts",
+    "packages/server/src/services/agent-builder/pipeline/publishService.test.ts",
+    "packages/server/src/services/agent-builder/sessionService.test.ts",
+    "packages/server/src/controllers/agent-builder/index.ts",
+    "packages/server/src/routes/agent-builder/index.ts",
+    "packages/server/src/services/agent-builder/types.ts",
+    "packages/ui/src/api/agentBuilder.js",
+    "packages/ui/src/api/agentBuilder.test.js",
+    "packages/ui/src/views/agent-builder/index.jsx",
+    "packages/ui/src/views/agent-builder/TestChatPane.jsx",
     "AI-Agent/tasks/B-020.md",
+    "AI-Agent/tasks/B-021.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "182/182 tests pass trong packages/server (Jest 20/20 suites agent-builder).",
+    "194/194 tests pass trong packages/server (Jest 21/21 suites agent-builder).",
     "TypeScript typecheck (tsc --noEmit) trên packages/server exit code 0.",
-    "94/94 tests pass trong packages/ui (Jest 4/4 suites).",
+    "97/97 tests pass trong packages/ui (Jest 4/4 suites).",
+    "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
     "ESLint và Prettier trên toàn bộ file thay đổi exit code 0 (0 errors, 0 warnings).",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-019 lên origin/main và Flowise-Agent-Builder.",
-    "Triển khai task B-020 (PH5-T01 và PH5-T02): Cổng Phê Duyệt Xuất Bản An Toàn và Audit Logging Cho Release Nội Bộ."
+    "Commit và push task B-020 lên origin/main và Flowise-Agent-Builder.",
+    "Triển khai task B-021 (PH5-T03 và PH5-T04): Giới Hạn Quota Budget Vận Hành & Runbook Nghiệm Thu Release Nội Bộ."
   ],
-  "nextTask": "B-020",
+  "nextTask": "B-021",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -63,8 +73,8 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "849177759708f439b501f6066e80dfb9481d1ec6",
+    "head": "563cd64889ec9a2e6551e44edbb596d7a813e65e",
     "branch": "main",
-    "sourceFingerprint": "15c21a3861f66837f5f4c79573f84e64cd37c7d0a2669cf2ae2a4169ec33c6d7"
+    "sourceFingerprint": "22e39acb6ee4ccf6942023f41487c13c7d677289eb6a5ffe7929738010f83e91"
   }
 }

@@ -5,6 +5,8 @@ import sessionService from '../../services/agent-builder/sessionService'
 import buildPipelineService from '../../services/agent-builder/pipeline/buildPipelineService'
 import evaluationRunnerService from '../../services/agent-builder/pipeline/evaluationRunnerService'
 import knowledgeStoreService from '../../services/agent-builder/knowledge/knowledgeStoreService'
+import publishService from '../../services/agent-builder/pipeline/publishService'
+import builderAuditService from '../../services/agent-builder/audit/builderAuditService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -265,6 +267,64 @@ const seedKnowledgeStore = async (req: Request, res: Response, next: NextFunctio
     }
 }
 
+const publishAgent = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const { isPublic, minPassRate, notes } = req.body || {}
+
+        const result = await publishService.publishAgent({
+            sessionId: req.params.id,
+            workspaceId,
+            userId,
+            isPublic,
+            minPassRate,
+            notes
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const unpublishAgent = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+
+        const result = await publishService.unpublishAgent({
+            sessionId: req.params.id,
+            workspaceId,
+            userId
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getAuditLogs = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const limit = req.query?.limit ? parseInt(req.query.limit as string, 10) : undefined
+        const offset = req.query?.offset ? parseInt(req.query.offset as string, 10) : undefined
+
+        const logs = await builderAuditService.getSessionAuditLogs(req.params.id, workspaceId, { limit, offset })
+        return res.status(StatusCodes.OK).json(logs)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -281,5 +341,8 @@ export default {
     listKnowledgeStores,
     getKnowledgeStore,
     getKnowledgeStoreChunks,
-    seedKnowledgeStore
+    seedKnowledgeStore,
+    publishAgent,
+    unpublishAgent,
+    getAuditLogs
 }

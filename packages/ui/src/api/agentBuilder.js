@@ -32,6 +32,12 @@ const getKnowledgeStoreChunks = (id, params) => client.get(`/agent-builder/knowl
 
 const seedKnowledgeStore = (body) => client.post('/agent-builder/knowledge/seed', body)
 
+const publishAgent = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/publish`, body)
+
+const unpublishAgent = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/unpublish`, body)
+
+const getAuditLogs = (sessionId, params) => client.get(`/agent-builder/sessions/${sessionId}/audit-logs`, { params })
+
 export default {
     createSession,
     getSession,
@@ -48,5 +54,8 @@ export default {
     getKnowledgeStores,
     getKnowledgeStore,
     getKnowledgeStoreChunks,
-    seedKnowledgeStore
+    seedKnowledgeStore,
+    publishAgent,
+    unpublishAgent,
+    getAuditLogs
 }

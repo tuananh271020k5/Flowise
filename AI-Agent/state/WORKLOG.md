@@ -1,5 +1,35 @@
 # Nhật ký bàn giao ngắn
 
+## 16/11/2026 — B-020 / PH5-T01–T02 (Cổng Phê Duyệt Xuất Bản & Audit Logging Cho Release Nội Bộ)
+
+Hoàn thành B-020 (PH5-T01 Cổng phê duyệt xuất bản an toàn và PH5-T02 Hệ thống ghi nhận kiểm toán & số liệu hoạt động). Mở đầu Phase 5 (Release nội bộ):
+
+-   **Entity Kiểm Toán BuilderAuditLog (PH5-T02):**
+    -   Tạo `BuilderAuditLog.ts` lưu vết toàn bộ hoạt động trọng yếu: `sessionId`, `workspaceId`, `userId`, `action` (`SESSION_CREATED`, `REVISION_CREATED`, `BUILD_EXECUTED`, `EVALUATION_RUN`, `ROLLBACK_EXECUTED`, `AGENT_PUBLISHED`, `AGENT_UNPUBLISHED`), `status` (`SUCCESS`, `FAILED`, `REJECTED`), `targetRevisionNo`, `flowId`, `metadata`, `createdDate`.
+    -   Đăng ký vào danh mục entities hệ thống trong `packages/server/src/database/entities/index.ts`.
+-   **Dịch Vụ Kiểm Toán BuilderAuditService (PH5-T02):**
+    -   Xây dựng `builderAuditService.ts` cung cấp các hàm `logAction` và `getSessionAuditLogs`.
+    -   Negative Auth: Cách ly kiểm toán chặt chẽ theo `workspaceId`, từ chối truy cập chéo workspace (403 Forbidden).
+-   **Cổng Phê Duyệt & Xuất Bản PublishService (PH5-T01):**
+    -   Xây dựng `publishService.ts` kiểm soát quy trình triển khai:
+        -   Thẩm định điều kiện xuất bản: `session` hợp lệ, bản đặc tả `buildReady: true`, đã biên dịch bản draft `ChatFlow`.
+        -   **Quality Gate**: Tự động kiểm tra kịch bản đánh giá (`evaluationExamples`), yêu cầu tỷ lệ đạt kiểm thử (Pass Rate) tối thiểu 80%. Nếu không đạt ngưỡng, từ chối xuất bản và ghi nhận Audit log `REJECTED`.
+        -   Khi đạt chuẩn, chuyển đổi trạng thái: `chatflow.deployed = true`, `chatflow.isPublic = isPublic`, `session.state = 'published'`.
+        -   Ghi nhận Audit log `SUCCESS` và phát sự kiện realtime SSE `agent_published`.
+    -   Hỗ trợ hàm `unpublishAgent` thu hồi xuất bản an toàn, đưa trợ lý trở về trạng thái nháp (draft).
+-   **API Endpoints & UI Client (PH5-T01 & PH5-T02):**
+    -   Bổ sung routes: `POST /api/v1/agent-builder/sessions/:id/publish`, `POST /api/v1/agent-builder/sessions/:id/unpublish`, `GET /api/v1/agent-builder/sessions/:id/audit-logs`.
+    -   Cập nhật `packages/ui/src/api/agentBuilder.js` và bổ sung unit tests trong `agentBuilder.test.js` (19 tests pass).
+    -   Nâng cấp `TestChatPane.jsx`: Thêm nút "Xuất Bản", badge trạng thái "Đã triển khai" (Deployed), nút "Thu hồi" và hộp thoại xác nhận xuất bản kèm thông báo Quality Gate trực quan.
+-   **Kiểm thử & Nghiệm thu:**
+    -   21 test suites server với 194 tests pass 100% (thêm `publishService.test.ts` 9 tests, mở rộng `sessionService.test.ts` 30 tests).
+    -   TypeScript typecheck (`tsc --noEmit`) trên server exit 0 không có lỗi.
+    -   97 UI tests pass 100% (4/4 suites).
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   ESLint & Prettier pass 0 errors, 0 warnings.
+    -   Lập task tiếp theo `B-021.md` (PH5-T03 và PH5-T04: Giới Hạn Quota Budget Vận Hành & Runbook Nghiệm Thu Release Nội Bộ).
+
 ## 15/11/2026 — B-019 / PH4-T07–T08 (Bộ 10 Golden Cases, Missing Evidence & Security Defense)
 
 Hoàn thành B-019 (PH4-T07 Tạo và chạy 10 golden Knowledge cases và PH4-T08 Kiểm tra thiếu bằng chứng và tài liệu độc hại). **Chính thức hoàn thành 100% Phase 4 (Knowledge MVP M1)**:

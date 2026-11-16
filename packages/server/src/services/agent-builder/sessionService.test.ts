@@ -14,6 +14,8 @@ import { BuilderSessionService } from './sessionService'
 import agentBuilderController from '../../controllers/agent-builder'
 import sessionService from './sessionService'
 import knowledgeStoreService from './knowledge/knowledgeStoreService'
+import publishService from './pipeline/publishService'
+import builderAuditService from './audit/builderAuditService'
 import { Request, Response, NextFunction } from 'express'
 
 function createMockRepository<T extends { id?: string }>() {
@@ -516,6 +518,55 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
 
             await agentBuilderController.seedKnowledgeStore(req, res, next)
             expect(res.status).toHaveBeenCalledWith(StatusCodes.CREATED)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('publishAgent trả về HTTP 200 OK (PH5-T01)', async () => {
+            const req = makeReq({ params: { id: 'sess-1' }, body: { isPublic: true } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(publishService, 'publishAgent').mockResolvedValue({
+                success: true,
+                flowId: 'f1',
+                flowName: 'Test Bot',
+                deployed: true,
+                isPublic: true,
+                revisionNo: 1,
+                publishedAt: new Date().toISOString(),
+                message: 'Published'
+            })
+
+            await agentBuilderController.publishAgent(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('unpublishAgent trả về HTTP 200 OK (PH5-T01)', async () => {
+            const req = makeReq({ params: { id: 'sess-1' } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(publishService, 'unpublishAgent').mockResolvedValue({
+                success: true,
+                flowId: 'f1',
+                flowName: 'Test Bot',
+                deployed: false,
+                isPublic: false,
+                message: 'Unpublished'
+            })
+
+            await agentBuilderController.unpublishAgent(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
+            expect(res.json).toHaveBeenCalled()
+        })
+
+        it('getAuditLogs trả về HTTP 200 OK (PH5-T02)', async () => {
+            const req = makeReq({ params: { id: 'sess-1' }, query: { limit: '20' } })
+            const res = makeRes()
+            const next = makeNext()
+            jest.spyOn(builderAuditService, 'getSessionAuditLogs').mockResolvedValue([] as any)
+
+            await agentBuilderController.getAuditLogs(req, res, next)
+            expect(res.status).toHaveBeenCalledWith(StatusCodes.OK)
             expect(res.json).toHaveBeenCalled()
         })
     })
