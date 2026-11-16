@@ -1,5 +1,37 @@
 # Nhật ký bàn giao ngắn
 
+## 16/11/2026 — B-021 / PH5-T03–T04 (Giới Hạn Quota Budget Vận Hành & Runbook Nghiệm Thu Release Nội Bộ)
+
+Hoàn thành B-021 (kết hợp PH5-T03 Credential Redaction & Data Retention, PH5-T04 Structured Observability & Runbook, PH5-T05 / PH5-T06 Quota & Rate Limiting). Tiến độ Phase 5 đạt 4/10 task con:
+
+-   **Credential & Secret Redaction Service (PH5-T03):**
+    -   Xây dựng `redactionService.ts`: Làm sạch tự động các API keys (OpenAI `sk-...`, Anthropic `sk-ant-...`, Gemini `AIza...`, Hugging Face `hf_...`), Bearer authorization headers, JWT tokens, connection strings database (`postgresql://`, `mongodb://`), passwords khỏi toàn bộ structured logs, audit trails, response payloads và error details.
+    -   Bộ test `redactionService.test.ts` đạt 100% (8/8 tests pass).
+-   **Chính Sách Lưu Trữ Dữ Liệu Data Retention Service (PH5-T03):**
+    -   Xây dựng `retentionService.ts`: Hỗ trợ dọn dẹp các session nháp hết hạn lưu trữ (`defaultRetentionDays`, mặc định 30 ngày) và audit log cũ (`auditLogRetentionDays`, mặc định 90 ngày).
+    -   Quy tắc an toàn cốt lõi: Tuyệt đối không xóa các Agent đang ở trạng thái xuất bản (`published`) trừ khi được chỉ định rõ.
+    -   Ghi nhận nhật ký kiểm toán hành động `DATA_RETENTION_PURGE` sau mỗi chu kỳ quét dọn.
+    -   Bộ test `retentionService.test.ts` đạt 100% (3/3 tests pass).
+-   **Giám Sát Có Cấu Trúc & Quota Bảo Vệ Vận Hành (PH5-T04 & PH5-T06):**
+    -   Xây dựng `builderLogger.ts`: Ghi log có cấu trúc chuẩn JSON gồm `timestamp`, `level`, `stage`, `traceId`, `sessionId`, `workspaceId`, `action`, `durationMs`, tự động redact toàn bộ dữ liệu nhạy cảm.
+    -   Xây dựng `metricsService.ts`: Theo dõi thời gian thực số lượng session, tỷ lệ build thành công (`builds.successRate`), điểm kiểm thử trung bình (`evaluations.passRate`), số lượng xuất bản/thu hồi và số vi phạm rate limit.
+    -   Xây dựng `rateLimiter.ts`: Sliding Window rate limiter theo workspaceId trên các endpoint tạo session (30/giờ), chat (60/phút), build (15/phút), test (10/phút), publish (10/phút). Ném `BuilderError` HTTP 429 kèm header `Retry-After`.
+    -   Các bộ test `rateLimiter.test.ts` (5/5 tests pass), `builderLogger.test.ts` (7/7 tests pass).
+-   **Sổ Tay Vận Hành Chuẩn Nghiệm Thu & Kịch Bản E2E Acceptance (PH5-T04 / PH5-T09/T10):**
+    -   Soạn thảo tài liệu chuẩn `RUNBOOK_RELEASE_NOI_BO.md` hướng dẫn cấu hình môi trường, kiểm soát an ninh, SOP phê duyệt xuất bản, thu hồi khẩn cấp, dọn dẹp dữ liệu và xử lý sự cố.
+    -   Viết kịch bản nghiệm thu toàn diện `phase5ReleaseAcceptance.test.ts` (1 test suite 8 bước nghiệm thu) kiểm chứng toàn bộ chu trình sống đạt 100% pass.
+-   **API Endpoints & UI Client:**
+    -   Bổ sung routes: `GET /api/v1/agent-builder/metrics`, `GET /api/v1/agent-builder/logs`, `POST /api/v1/agent-builder/retention/sweep`.
+    -   Cập nhật `packages/ui/src/api/agentBuilder.js` và unit tests `agentBuilder.test.js` (22/22 tests pass).
+-   **Kiểm thử & Nghiệm thu:**
+    -   26/26 test suites server với 218 tests pass 100%.
+    -   TypeScript typecheck (`tsc -p packages/server/tsconfig.json --noEmit`) exit 0 không lỗi.
+    -   4/4 UI test suites với 100 tests pass 100%.
+    -   Vite build biên dịch 21,181 modules exit 0.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   ESLint & Prettier pass 0 errors, 0 warnings.
+    -   Lập task tiếp theo `B-022.md` (PH5-T05 và PH5-T07: Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart).
+
 ## 16/11/2026 — B-020 / PH5-T01–T02 (Cổng Phê Duyệt Xuất Bản & Audit Logging Cho Release Nội Bộ)
 
 Hoàn thành B-020 (PH5-T01 Cổng phê duyệt xuất bản an toàn và PH5-T02 Hệ thống ghi nhận kiểm toán & số liệu hoạt động). Mở đầu Phase 5 (Release nội bộ):

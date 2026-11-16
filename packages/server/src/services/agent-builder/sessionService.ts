@@ -620,6 +620,44 @@ export class BuilderSessionService {
         })
         res.write(`data: ${initialPayload}\n\n`)
     }
+
+    /**
+     * Danh sách tất cả các phiên theo workspaceId.
+     */
+    async listSessions(workspaceId?: string, options?: { limit?: number; offset?: number }): Promise<BuilderSession[]> {
+        const queryWhere: Record<string, unknown> = {}
+        if (workspaceId && workspaceId !== 'default') {
+            queryWhere.workspaceId = workspaceId
+        }
+
+        return this.sessionRepo.find({
+            where: queryWhere,
+            order: { updatedDate: 'DESC' },
+            take: options?.limit || 50,
+            skip: options?.offset || 0
+        })
+    }
+
+    /**
+     * Xóa một phiên và toàn bộ dữ liệu phụ thuộc (messages, revisions, drafts).
+     */
+    async deleteSession(sessionId: string, workspaceId: string): Promise<boolean> {
+        const session = await this.sessionRepo.findOneBy({ id: sessionId })
+        if (!session) {
+            return false
+        }
+        if (workspaceId !== 'default' && session.workspaceId !== workspaceId) {
+            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Access denied: Workspace mismatch')
+        }
+
+        // Xóa cascade các bản ghi con
+        await this.messageRepo.delete({ sessionId })
+        await this.revisionRepo.delete({ sessionId })
+        await this.draftRevisionRepo.delete({ sessionId })
+        await this.sessionRepo.delete({ id: sessionId })
+
+        return true
+    }
 }
 
 export default new BuilderSessionService()

@@ -9,6 +9,7 @@ export type AuditActionType =
     | 'ROLLBACK_EXECUTED'
     | 'AGENT_PUBLISHED'
     | 'AGENT_UNPUBLISHED'
+    | 'DATA_RETENTION_PURGE'
 
 export type AuditStatusType = 'SUCCESS' | 'FAILED' | 'REJECTED'
 

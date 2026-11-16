@@ -193,4 +193,33 @@ describe('agentBuilder API client', () => {
         expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/audit-logs', { params })
         expect(res.data[0].action).toBe('AGENT_PUBLISHED')
     })
+
+    it('getMetrics gửi GET request tới /agent-builder/metrics', async () => {
+        client.get.mockResolvedValueOnce({ data: { sessionsCreated: 5 } })
+
+        const res = await agentBuilderApi.getMetrics()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/metrics')
+        expect(res.data.sessionsCreated).toBe(5)
+    })
+
+    it('getRecentLogs gửi GET request tới /agent-builder/logs', async () => {
+        const params = { limit: 10 }
+        client.get.mockResolvedValueOnce({ data: [{ action: 'BUILD_SUCCESS' }] })
+
+        const res = await agentBuilderApi.getRecentLogs(params)
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/logs', { params })
+        expect(res.data[0].action).toBe('BUILD_SUCCESS')
+    })
+
+    it('triggerRetentionSweep gửi POST request tới /agent-builder/retention/sweep', async () => {
+        const payload = { sessionDays: 30 }
+        client.post.mockResolvedValueOnce({ data: { purgedSessionsCount: 2 } })
+
+        const res = await agentBuilderApi.triggerRetentionSweep(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/retention/sweep', payload)
+        expect(res.data.purgedSessionsCount).toBe(2)
+    })
 })

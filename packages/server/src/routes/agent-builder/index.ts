@@ -48,4 +48,11 @@ router.post('/sessions/:id/unpublish', agentBuilderController.unpublishAgent)
 // AUDIT LOGGING & TRACEABILITY (PH5-T02)
 router.get('/sessions/:id/audit-logs', agentBuilderController.getAuditLogs)
 
+// OBSERVABILITY METRICS & LOGS (PH5-T04 & PH5-T05)
+router.get('/metrics', agentBuilderController.getMetrics)
+router.get('/logs', agentBuilderController.getRecentLogs)
+
+// DATA RETENTION & PURGE (PH5-T03)
+router.post('/retention/sweep', agentBuilderController.triggerRetentionSweep)
+
 export default router

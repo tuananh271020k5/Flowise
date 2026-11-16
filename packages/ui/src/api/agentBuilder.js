@@ -38,6 +38,12 @@ const unpublishAgent = (sessionId, body) => client.post(`/agent-builder/sessions
 
 const getAuditLogs = (sessionId, params) => client.get(`/agent-builder/sessions/${sessionId}/audit-logs`, { params })
 
+const getMetrics = () => client.get('/agent-builder/metrics')
+
+const getRecentLogs = (params) => client.get('/agent-builder/logs', { params })
+
+const triggerRetentionSweep = (body) => client.post('/agent-builder/retention/sweep', body)
+
 export default {
     createSession,
     getSession,
@@ -57,5 +63,8 @@ export default {
     seedKnowledgeStore,
     publishAgent,
     unpublishAgent,
-    getAuditLogs
+    getAuditLogs,
+    getMetrics,
+    getRecentLogs,
+    triggerRetentionSweep
 }

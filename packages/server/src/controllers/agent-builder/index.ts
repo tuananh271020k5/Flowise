@@ -7,6 +7,10 @@ import evaluationRunnerService from '../../services/agent-builder/pipeline/evalu
 import knowledgeStoreService from '../../services/agent-builder/knowledge/knowledgeStoreService'
 import publishService from '../../services/agent-builder/pipeline/publishService'
 import builderAuditService from '../../services/agent-builder/audit/builderAuditService'
+import rateLimiter from '../../services/agent-builder/security/rateLimiter'
+import retentionService from '../../services/agent-builder/security/retentionService'
+import builderLogger from '../../services/agent-builder/observability/builderLogger'
+import metricsService from '../../services/agent-builder/observability/metricsService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -28,6 +32,13 @@ const createSession = async (req: Request, res: Response, next: NextFunction) =>
         const userId = getUserId(req)
         const { title, initialGoal } = req.body || {}
 
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'session_create')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('session_create')
+            throw rateLimitErr
+        }
+
         const snapshot = await sessionService.createSession({
             workspaceId,
             organizationId,
@@ -35,6 +46,17 @@ const createSession = async (req: Request, res: Response, next: NextFunction) =>
             title,
             initialGoal
         })
+
+        metricsService.recordSessionCreated()
+        builderLogger.info(
+            'conversation',
+            'SESSION_CREATED',
+            { sessionId: snapshot.session.id },
+            {
+                sessionId: snapshot.session.id,
+                workspaceId
+            }
+        )
 
         return res.status(StatusCodes.CREATED).json(snapshot)
     } catch (error) {
@@ -64,7 +86,26 @@ const addMessage = async (req: Request, res: Response, next: NextFunction) => {
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Request body is required')
         }
         const workspaceId = getWorkspaceId(req)
+
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'message')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('message')
+            throw rateLimitErr
+        }
+
         const response = await sessionService.addMessage(req.params.id, workspaceId, req.body)
+
+        builderLogger.info(
+            'conversation',
+            'MESSAGE_PROCESSED',
+            { role: req.body?.role || 'user' },
+            {
+                sessionId: req.params.id,
+                workspaceId
+            }
+        )
+
         return res.status(StatusCodes.OK).json(response)
     } catch (error) {
         next(error)
@@ -97,12 +138,20 @@ const subscribeEvents = async (req: Request, res: Response, next: NextFunction) 
 }
 
 const buildSession = async (req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now()
     try {
         if (!req.params?.id) {
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
         }
         const workspaceId = getWorkspaceId(req)
         const { specRevisionId, customBuildKey } = req.body || {}
+
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'build')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('build')
+            throw rateLimitErr
+        }
 
         const result = await buildPipelineService.executeBuild({
             sessionId: req.params.id,
@@ -111,8 +160,22 @@ const buildSession = async (req: Request, res: Response, next: NextFunction) => 
             customBuildKey
         })
 
+        const durationMs = Date.now() - startTime
+        metricsService.recordBuild(true, durationMs)
+        builderLogger.info(
+            'compilation',
+            'BUILD_SUCCESS',
+            { isExisting: result.isExisting },
+            {
+                sessionId: req.params.id,
+                workspaceId,
+                durationMs
+            }
+        )
+
         return res.status(result.isExisting ? StatusCodes.OK : StatusCodes.CREATED).json(result)
     } catch (error) {
+        metricsService.recordBuild(false, Date.now() - startTime)
         next(error)
     }
 }
@@ -163,6 +226,14 @@ const runTestSuite = async (req: Request, res: Response, next: NextFunction) => 
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
         }
         const workspaceId = getWorkspaceId(req)
+
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'test_suite')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('test_suite')
+            throw rateLimitErr
+        }
+
         const snapshot = await sessionService.getSessionById(req.params.id, workspaceId)
         if (!snapshot.currentSpecRevision) {
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session does not have a valid spec revision')
@@ -181,6 +252,22 @@ const runTestSuite = async (req: Request, res: Response, next: NextFunction) => 
             examples: spec.evaluationExamples || [],
             maxExamples: req.body?.maxExamples || 10
         })
+
+        const passRate = result.totalCount > 0 ? Math.round((result.passedCount / result.totalCount) * 100) : 100
+        metricsService.recordEvaluation(result.passedCount, result.failedCount)
+        builderLogger.info(
+            'testing',
+            'TEST_SUITE_EXECUTED',
+            {
+                passRate,
+                passed: result.passedCount,
+                total: result.totalCount
+            },
+            {
+                sessionId: req.params.id,
+                workspaceId
+            }
+        )
 
         return res.status(StatusCodes.OK).json(result)
     } catch (error) {
@@ -276,6 +363,13 @@ const publishAgent = async (req: Request, res: Response, next: NextFunction) => 
         const userId = getUserId(req)
         const { isPublic, minPassRate, notes } = req.body || {}
 
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'publish')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('publish')
+            throw rateLimitErr
+        }
+
         const result = await publishService.publishAgent({
             sessionId: req.params.id,
             workspaceId,
@@ -284,6 +378,18 @@ const publishAgent = async (req: Request, res: Response, next: NextFunction) => 
             minPassRate,
             notes
         })
+
+        metricsService.recordPublish('publish')
+        builderLogger.info(
+            'publishing',
+            'AGENT_PUBLISHED',
+            { isPublic: result.isPublic },
+            {
+                sessionId: req.params.id,
+                workspaceId
+            }
+        )
+
         return res.status(StatusCodes.OK).json(result)
     } catch (error) {
         next(error)
@@ -298,11 +404,25 @@ const unpublishAgent = async (req: Request, res: Response, next: NextFunction) =
         const workspaceId = getWorkspaceId(req)
         const userId = getUserId(req)
 
+        try {
+            rateLimiter.enforceLimit(workspaceId, 'publish')
+        } catch (rateLimitErr) {
+            metricsService.recordRateLimitViolation('publish')
+            throw rateLimitErr
+        }
+
         const result = await publishService.unpublishAgent({
             sessionId: req.params.id,
             workspaceId,
             userId
         })
+
+        metricsService.recordPublish('unpublish')
+        builderLogger.info('publishing', 'AGENT_UNPUBLISHED', undefined, {
+            sessionId: req.params.id,
+            workspaceId
+        })
+
         return res.status(StatusCodes.OK).json(result)
     } catch (error) {
         next(error)
@@ -319,6 +439,60 @@ const getAuditLogs = async (req: Request, res: Response, next: NextFunction) => 
         const offset = req.query?.offset ? parseInt(req.query.offset as string, 10) : undefined
 
         const logs = await builderAuditService.getSessionAuditLogs(req.params.id, workspaceId, { limit, offset })
+        return res.status(StatusCodes.OK).json(logs)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getMetrics = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const snapshot = metricsService.getMetricsSnapshot()
+        return res.status(StatusCodes.OK).json(snapshot)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const triggerRetentionSweep = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const { sessionDays, auditDays } = req.body || {}
+
+        const result = await retentionService.executeRetentionSweep(workspaceId, {
+            sessionDays: sessionDays ? parseInt(sessionDays, 10) : undefined,
+            auditDays: auditDays ? parseInt(auditDays, 10) : undefined,
+            actorId: userId
+        })
+
+        metricsService.recordRetentionPurge(result.purgedSessionsCount)
+        builderLogger.info(
+            'retention',
+            'RETENTION_SWEEP_EXECUTED',
+            {
+                purgedSessionsCount: result.purgedSessionsCount,
+                purgedAuditLogsCount: result.purgedAuditLogsCount
+            },
+            {
+                workspaceId
+            }
+        )
+
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getRecentLogs = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const limit = req.query?.limit ? parseInt(req.query.limit as string, 10) : 50
+        const stage = req.query?.stage as any
+        const sessionId = req.query?.sessionId as string
+
+        const logs = builderLogger.getRecentLogs(limit, { stage, sessionId, workspaceId })
         return res.status(StatusCodes.OK).json(logs)
     } catch (error) {
         next(error)
@@ -344,5 +518,8 @@ export default {
     seedKnowledgeStore,
     publishAgent,
     unpublishAgent,
-    getAuditLogs
+    getAuditLogs,
+    getMetrics,
+    triggerRetentionSweep,
+    getRecentLogs
 }
