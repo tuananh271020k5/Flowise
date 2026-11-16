@@ -393,4 +393,71 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/sql/execute-query', payload)
         expect(res.data.rowCount).toBe(5)
     })
+
+    it('listCustomTools gửi GET request tới /agent-builder/custom-tools', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'ct-1', name: 'Calc' }] })
+
+        const res = await agentBuilderApi.listCustomTools()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/custom-tools')
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('registerCustomTool gửi POST request tới /agent-builder/custom-tools', async () => {
+        const payload = { name: 'Calc', code: 'return 1;' }
+        client.post.mockResolvedValueOnce({ data: { id: 'ct-1', ...payload } })
+
+        const res = await agentBuilderApi.registerCustomTool(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/custom-tools', payload)
+        expect(res.data.id).toBe('ct-1')
+    })
+
+    it('executeCustomTool gửi POST request tới /agent-builder/custom-tools/:id/execute', async () => {
+        const params = { a: 1, b: 2 }
+        client.post.mockResolvedValueOnce({ data: { success: true, output: 3 } })
+
+        const res = await agentBuilderApi.executeCustomTool('ct-1', params)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/custom-tools/ct-1/execute', { params })
+        expect(res.data.output).toBe(3)
+    })
+
+    it('listWebhooks gửi GET request tới /agent-builder/webhooks', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'wh-1' }] })
+
+        const res = await agentBuilderApi.listWebhooks()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/webhooks')
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('registerWebhook gửi POST request tới /agent-builder/webhooks', async () => {
+        const payload = { name: 'WH', targetAgentId: 'ag-1' }
+        client.post.mockResolvedValueOnce({ data: { id: 'wh-1', ...payload } })
+
+        const res = await agentBuilderApi.registerWebhook(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/webhooks', payload)
+        expect(res.data.id).toBe('wh-1')
+    })
+
+    it('listMcpTools gửi GET request tới /agent-builder/mcp/tools', async () => {
+        client.get.mockResolvedValueOnce({ data: { tools: [] } })
+
+        const res = await agentBuilderApi.listMcpTools()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/mcp/tools')
+        expect(res.data.tools).toBeDefined()
+    })
+
+    it('callMcpTool gửi POST request tới /agent-builder/mcp/call', async () => {
+        const payload = { toolName: 'builder_list_templates' }
+        client.post.mockResolvedValueOnce({ data: { content: [] } })
+
+        const res = await agentBuilderApi.callMcpTool(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/mcp/call', payload)
+        expect(res.data.content).toBeDefined()
+    })
 })

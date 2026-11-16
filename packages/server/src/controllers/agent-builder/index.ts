@@ -17,6 +17,9 @@ import backupRestoreService from '../../services/agent-builder/backup/backupRest
 import zeroDowntimeService from '../../services/agent-builder/deployment/zeroDowntimeService'
 import apiConnectorService from '../../services/agent-builder/api-connectors/apiConnectorService'
 import sqlExecutorService from '../../services/agent-builder/sql/sqlExecutorService'
+import customToolSandboxService from '../../services/agent-builder/custom-tools/customToolSandboxService'
+import builderWebhookService from '../../services/agent-builder/webhooks/builderWebhookService'
+import builderMcpService from '../../services/agent-builder/mcp/builderMcpService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -758,6 +761,114 @@ const executeSqlQuery = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+// Custom Tools (PH6-T09)
+const listCustomTools = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const tools = await customToolSandboxService.listCustomTools(workspaceId)
+        return res.status(StatusCodes.OK).json(tools)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const registerCustomTool = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const tool = await customToolSandboxService.registerCustomTool({
+            ...req.body,
+            workspaceId
+        })
+        return res.status(StatusCodes.CREATED).json(tool)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const executeCustomTool = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const toolId = req.params?.id
+        if (!toolId) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Tool ID is required')
+        }
+        const result = await customToolSandboxService.executeTool(workspaceId, toolId, req.body?.params || {})
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+// Webhooks (PH6-T10)
+const listWebhooks = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const webhooks = await builderWebhookService.listEndpoints(workspaceId)
+        return res.status(StatusCodes.OK).json(webhooks)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const registerWebhook = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const webhook = await builderWebhookService.registerEndpoint({
+            ...req.body,
+            workspaceId
+        })
+        return res.status(StatusCodes.CREATED).json(webhook)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const receiveWebhook = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const endpointId = req.params?.id
+        const signature = (req.headers['x-flowise-signature'] || req.headers['x-webhook-signature'] || '') as string
+        const eventName = (req.headers['x-flowise-event'] || req.body?.event || 'generic.event') as string
+
+        const result = await builderWebhookService.processWebhookEvent(
+            endpointId,
+            signature,
+            eventName,
+            req.body
+        )
+        return res.status(result.statusCode).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+// MCP Tools (PH6-T12)
+const listMcpTools = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const tools = builderMcpService.listTools()
+        return res.status(StatusCodes.OK).json({ tools })
+    } catch (error) {
+        next(error)
+    }
+}
+
+const callMcpTool = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const { toolName, arguments: args } = req.body || {}
+        if (!toolName) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'toolName là bắt buộc')
+        }
+        const result = await builderMcpService.callTool({
+            workspaceId,
+            toolName,
+            arguments: args
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -798,5 +909,13 @@ export default {
     registerSqlDatabase,
     getSqlDatabase,
     validateSqlQuery,
-    executeSqlQuery
+    executeSqlQuery,
+    listCustomTools,
+    registerCustomTool,
+    executeCustomTool,
+    listWebhooks,
+    registerWebhook,
+    receiveWebhook,
+    listMcpTools,
+    callMcpTool
 }

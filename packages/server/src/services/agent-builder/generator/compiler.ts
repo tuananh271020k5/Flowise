@@ -284,6 +284,28 @@ export class AgentflowCompiler {
             }
         })
 
+        // Nối Model -> Agent
+        edges.push({
+            id: `${modelNodeId}-${agentNodeId}`,
+            source: modelNodeId,
+            sourceHandle: `${modelNodeId}-output-${modelMeta.name}`,
+            target: agentNodeId,
+            targetHandle: agentNodeId,
+            type: 'agentFlow'
+        })
+
+        // Nối các Tools/DataSources -> Agent
+        nodes.filter((n) => n.id.startsWith('tool_') || n.id.startsWith('documentStoreTool_')).forEach((toolNode) => {
+            edges.push({
+                id: `${toolNode.id}-${agentNodeId}`,
+                source: toolNode.id,
+                sourceHandle: `${toolNode.id}-output-${toolNode.data.name}`,
+                target: agentNodeId,
+                targetHandle: agentNodeId,
+                type: 'agentFlow'
+            })
+        })
+
         // 7. Thẩm định toàn bộ nodes sinh ra qua Node Registry Whitelist
         for (const node of nodes) {
             const validation = validateNodeMetadata({

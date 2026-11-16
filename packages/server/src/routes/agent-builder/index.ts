@@ -85,4 +85,18 @@ router.get('/sql/databases/:id', agentBuilderController.getSqlDatabase)
 router.post('/sql/validate-query', agentBuilderController.validateSqlQuery)
 router.post('/sql/execute-query', agentBuilderController.executeSqlQuery)
 
+// CUSTOM TOOLS SANDBOX (PH6-T09)
+router.get('/custom-tools', agentBuilderController.listCustomTools)
+router.post('/custom-tools', agentBuilderController.registerCustomTool)
+router.post('/custom-tools/:id/execute', agentBuilderController.executeCustomTool)
+
+// WEBHOOK INGESTION & EVENT LISTENER (PH6-T10)
+router.get('/webhooks', agentBuilderController.listWebhooks)
+router.post('/webhooks', agentBuilderController.registerWebhook)
+router.post('/webhooks/:id/receive', agentBuilderController.receiveWebhook)
+
+// MODEL CONTEXT PROTOCOL TOOLS (PH6-T12)
+router.get('/mcp/tools', agentBuilderController.listMcpTools)
+router.post('/mcp/call', agentBuilderController.callMcpTool)
+
 export default router

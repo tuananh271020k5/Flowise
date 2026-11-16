@@ -160,7 +160,12 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     if (spec.tools && spec.tools.length > 0) {
         spec.tools.forEach((tool, idx) => {
             const toolType = tool.type || 'calculator'
-            const toolNodeName = toolType === 'webSearch' ? 'webSearch' : 'calculator'
+            let toolNodeName = 'calculator'
+            if (toolType === 'webSearch') {
+                toolNodeName = 'webSearch'
+            } else if (toolType === 'customTool') {
+                toolNodeName = 'customTool'
+            }
             const toolMeta = ALLOWED_AGENTFLOW_NODES[toolNodeName]
 
             if (toolMeta) {

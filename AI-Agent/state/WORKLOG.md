@@ -1,5 +1,36 @@
 # Nhật ký bàn giao ngắn
 
+## 17/11/2026 — B-026 / PH6-T09 đến PH6-T12 (Custom Tools Sandbox, Webhooks, MCP Packaging & Đa Nguồn — Hoàn Thành 100% Phase 6)
+
+Hoàn thành B-026 (PH6-T09 Custom Tools Sandbox VM an toàn; PH6-T10 Webhook Ingestion & HMAC Verification; PH6-T11 Bộ Eval E2E Đa Nguồn API + SQL + Custom Tools; PH6-T12 Đóng gói MCP Server Tools). Hoàn tất toàn bộ **68 / 68 tasks sản phẩm** (đạt **72 / 76 tasks toàn dự án - 94.7%**):
+
+-   **Custom Tools Sandbox VM & Phân Tích AST/Regex (PH6-T09):**
+    -   Xây dựng `customToolSandboxService.ts`: Quản lý danh mục Custom Tools theo workspace (Negative Auth: 403 Forbidden).
+    -   Bộ lọc AST/Regex chặn 100% các APIs độc hại và nguy hiểm: `child_process`, `fs`, `eval`, dynamic `Function`, `process.exit`, `process.env`, `cluster`, `worker_threads`, prototype pollution.
+    -   Thực thi mã an toàn trong môi trường sandbox cô lập của Node.js `vm.createContext` với cơ chế timeout bảo vệ chống infinite loops.
+    -   Bộ kiểm thử `customToolSandboxService.test.ts` (10/10 tests pass 100%).
+-   **Webhook Ingestion & HMAC-SHA256 Verification (PH6-T10):**
+    -   Xây dựng `builderWebhookService.ts`: Đăng ký endpoint webhook theo workspace, tự động sinh khóa bí mật an toàn `whsec_...`.
+    -   Xác thực chữ ký số HMAC-SHA256 truyền qua header `x-flowise-signature`.
+    -   Kiểm soát danh sách sự kiện được phép (`allowedEvents`), từ chối các sự kiện ngoài danh mục.
+    -   Bộ kiểm thử `builderWebhookService.test.ts` (5/5 tests pass 100%).
+-   **Bộ Eval E2E Kết Hợp Đa Nguồn API + SQL + Custom Tools (PH6-T11):**
+    -   Xây dựng `multiSourceAgentIntegration.test.ts`: Kịch bản E2E kết hợp cả 3 nguồn (API Connector + CSDL SQL Readonly + Custom Tool Sandbox) trên 1 Agent duy nhất.
+    -   Mở rộng `AgentflowCompiler.compile` tự động duyệt và sinh edges kết nối từ Model và các Tools/Datasources vào Agent Node (`startAgentflow -> agentAgentflow`, `chatOpenAI -> agentAgentflow`, `requestsGet -> agentAgentflow`, `customTool -> agentAgentflow`).
+    -   Xác minh tính hợp lệ và an toàn tuyệt đối của toàn bộ đồ thị Agentflow V2.
+-   **Đóng Gói Builder Operations Thành Chuẩn MCP Server Tools (PH6-T12):**
+    -   Xây dựng `builderMcpService.ts`: Cung cấp 5 công cụ chuẩn MCP: `builder_list_templates`, `builder_get_session`, `builder_send_message`, `builder_compile_draft`, `builder_run_tests`.
+    -   Tích hợp phân quyền workspace, schema metadata JSON-Schema chuẩn và cơ chế che giấu dữ liệu nhạy cảm tự động (`redactionService`).
+    -   Bộ kiểm thử `builderMcpService.test.ts` (5/5 tests pass 100%).
+-   **API Endpoints & UI Client SDK:**
+    -   Bổ sung 8 HTTP handlers mới trong `controllers/agent-builder/index.ts` và `routes/agent-builder/index.ts`: `GET /custom-tools`, `POST /custom-tools`, `POST /custom-tools/:id/execute`, `GET /webhooks`, `POST /webhooks`, `POST /webhooks/:id/events`, `GET /mcp/tools`, `POST /mcp/call`.
+    -   Mở rộng UI client `packages/ui/src/api/agentBuilder.js` và `agentBuilder.test.js` (47/47 tests pass 100%).
+-   **Kiểm thử & Nghiệm thu:**
+    -   42/42 Jest test suites server agent-builder pass 100% (312/312 unit/integration tests).
+    -   TypeScript typecheck (`tsc --noEmit`) exit code 0 không lỗi.
+    -   Harness test suite 14/14 tests pass.
+    -   Lập task kế tiếp `B-027.md` (Tổng nghiệm thu toàn diện toàn dự án & Bàn giao).
+
 ## 17/11/2026 — B-025 / PH6-T04 đến PH6-T08 (API Error Eval, SQL Readonly Executor, SQL Agent Spec & Compiler — Phase 6)
 
 Hoàn thành B-025 (PH6-T04 API eval & xử lý lỗi connector; PH6-T05 Thiết kế SQL executor & tài khoản readonly; PH6-T06 SQL Agent spec, dataset scope & row limit; PH6-T07 SQL template & compiler sinh Agentflow V2; PH6-T08 Bộ eval SQL & negative security cases). Tiến độ dự án đạt **71 / 76 task** (**93.4%**):

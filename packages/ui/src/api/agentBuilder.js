@@ -81,6 +81,20 @@ const validateSqlQuery = (params) => client.post('/agent-builder/sql/validate-qu
 
 const executeSqlQuery = (params) => client.post('/agent-builder/sql/execute-query', params)
 
+const listCustomTools = () => client.get('/agent-builder/custom-tools')
+
+const registerCustomTool = (data) => client.post('/agent-builder/custom-tools', data)
+
+const executeCustomTool = (id, params) => client.post(`/agent-builder/custom-tools/${id}/execute`, { params })
+
+const listWebhooks = () => client.get('/agent-builder/webhooks')
+
+const registerWebhook = (data) => client.post('/agent-builder/webhooks', data)
+
+const listMcpTools = () => client.get('/agent-builder/mcp/tools')
+
+const callMcpTool = (params) => client.post('/agent-builder/mcp/call', params)
+
 export default {
     createSession,
     getSession,
@@ -121,5 +135,12 @@ export default {
     registerSqlDatabase,
     getSqlDatabase,
     validateSqlQuery,
-    executeSqlQuery
+    executeSqlQuery,
+    listCustomTools,
+    registerCustomTool,
+    executeCustomTool,
+    listWebhooks,
+    registerWebhook,
+    listMcpTools,
+    callMcpTool
 }
