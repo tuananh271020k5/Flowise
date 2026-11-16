@@ -3,7 +3,7 @@
  * Aligns with CONTRACTS.md and B-002/B-003/B-006 specifications.
  */
 
-export type AgentSpecKind = 'assistant' | 'knowledge' | 'api-readonly' | 'data-readonly'
+export type AgentSpecKind = 'assistant' | 'knowledge' | 'api-readonly' | 'data-readonly' | 'sql-readonly'
 
 export type VisibilityPolicy = 'private' | 'public'
 export type ExecutionModePolicy = 'controlled-test' | 'standard'
@@ -40,6 +40,15 @@ export interface ApiConnectorRef {
     allowedOperations?: string[]
 }
 
+export interface SqlAgentConfig {
+    databaseType: 'sqlite' | 'postgres' | 'mysql'
+    databaseName?: string
+    credentialRef?: string
+    allowedTables: string[]
+    rowLimit?: number
+    schemaOverview?: Record<string, string[]>
+}
+
 export interface AgentSpec {
     schemaVersion: '1.0'
     kind: AgentSpecKind
@@ -52,15 +61,18 @@ export interface AgentSpec {
     dataSources: DataSourceRef[]
     tools: ToolRef[]
     apiConnectors?: ApiConnectorRef[]
+    sqlConfig?: SqlAgentConfig
     policy: AgentPolicy
     evaluationExamples: EvaluationExample[]
 }
 
-export type PartialAgentSpec = Partial<Omit<AgentSpec, 'policy' | 'evaluationExamples' | 'dataSources' | 'tools'>> & {
+export type PartialAgentSpec = Partial<Omit<AgentSpec, 'policy' | 'evaluationExamples' | 'dataSources' | 'tools' | 'sqlConfig'>> & {
     policy?: Partial<AgentPolicy>
     evaluationExamples?: EvaluationExample[]
     dataSources?: DataSourceRef[]
     tools?: ToolRef[]
+    apiConnectors?: ApiConnectorRef[]
+    sqlConfig?: Partial<SqlAgentConfig>
     schemaVersion?: string
     kind?: string
 }

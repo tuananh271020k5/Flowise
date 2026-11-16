@@ -149,4 +149,61 @@ describe('ApiConnectorService (PH6-T01)', () => {
             expect(check.reason).toContain('Khác workspace')
         })
     })
+
+    describe('PH6-T04: evaluateApiError & Schema Validation', () => {
+        it('should classify 401 Unauthorized correctly with friendly Vietnamese message', () => {
+            const result = service.evaluateApiError({ status: 401, message: 'Invalid token' })
+            expect(result.errorCode).toBe('API_UNAUTHORIZED')
+            expect(result.isRecoverable).toBe(false)
+            expect(result.userMessageVi).toContain('Khóa API (API Key) hoặc Token xác thực không hợp lệ')
+            expect(result.suggestedActionVi).toContain('Credential')
+        })
+
+        it('should classify 403 Forbidden correctly', () => {
+            const result = service.evaluateApiError({ status: 403, message: 'Forbidden access' })
+            expect(result.errorCode).toBe('API_FORBIDDEN')
+            expect(result.isRecoverable).toBe(false)
+            expect(result.userMessageVi).toContain('không có quyền truy cập')
+        })
+
+        it('should classify 429 Rate Limit as recoverable', () => {
+            const result = service.evaluateApiError({ status: 429, message: 'Too many requests' })
+            expect(result.errorCode).toBe('API_RATE_LIMIT_EXCEEDED')
+            expect(result.isRecoverable).toBe(true)
+            expect(result.userMessageVi).toContain('giới hạn tần suất gọi')
+        })
+
+        it('should classify timeout and ECONNABORTED as recoverable', () => {
+            const result = service.evaluateApiError(new Error('Connection timeout of 5000ms exceeded'))
+            expect(result.errorCode).toBe('API_TIMEOUT')
+            expect(result.isRecoverable).toBe(true)
+            expect(result.userMessageVi).toContain('vượt quá thời gian chờ')
+        })
+
+        it('should classify 500 server errors as recoverable', () => {
+            const result = service.evaluateApiError({ status: 502, message: 'Bad Gateway' })
+            expect(result.errorCode).toBe('API_SERVER_ERROR')
+            expect(result.isRecoverable).toBe(true)
+            expect(result.userMessageVi).toContain('Máy chủ API đích đang gặp sự cố nội bộ')
+        })
+
+        it('should validate response schema and detect missing required fields', () => {
+            const validData = { id: 123, status: 'delivered', amount: 500 }
+            const validCheck = service.validateResponseSchema(validData, ['id', 'status'])
+            expect(validCheck.valid).toBe(true)
+            expect(validCheck.missingFields.length).toBe(0)
+
+            const invalidData = { id: 123 }
+            const invalidCheck = service.validateResponseSchema(invalidData, ['id', 'status', 'amount'])
+            expect(invalidCheck.valid).toBe(false)
+            expect(invalidCheck.missingFields).toEqual(['status', 'amount'])
+            expect(invalidCheck.extraDetails).toContain('Thiếu các trường bắt buộc')
+        })
+
+        it('should reject non-object responses during schema validation', () => {
+            const check = service.validateResponseSchema('not-a-json', ['id'])
+            expect(check.valid).toBe(false)
+            expect(check.extraDetails).toContain('không phải là một đối tượng JSON hợp lệ')
+        })
+    })
 })

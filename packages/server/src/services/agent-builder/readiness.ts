@@ -61,6 +61,7 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         'dataSources',
         'tools',
         'apiConnectors',
+        'sqlConfig',
         'policy',
         'evaluationExamples'
     ])
@@ -125,6 +126,17 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         }
         assumptions.push('Áp dụng cơ chế an toàn API Readonly: Chặn mọi thao tác sửa/xóa dữ liệu bên ngoài')
         reasonCodes.push('API_READONLY_ENFORCED')
+    }
+
+    // 3d. Kiểm tra quy tắc bắt buộc riêng cho SQL Readonly Agent (PH6-T06)
+    if (raw.kind === 'sql-readonly') {
+        const sqlCfg = raw.sqlConfig as any
+        if (!sqlCfg || typeof sqlCfg !== 'object' || !sqlCfg.allowedTables || !Array.isArray(sqlCfg.allowedTables) || sqlCfg.allowedTables.length === 0) {
+            missingFields.push('sqlConfig.allowedTables')
+            reasonCodes.push('MISSING_ALLOWED_TABLES')
+        }
+        assumptions.push('Áp dụng cơ chế an toàn SQL Readonly: Chặn mọi câu lệnh DDL/DML gây hại và giới hạn số dòng (row limit)')
+        reasonCodes.push('SQL_READONLY_ENFORCED')
     }
 
     // 4. Record default assumptions if fields are not explicitly set

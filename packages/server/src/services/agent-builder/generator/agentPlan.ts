@@ -4,6 +4,7 @@ import { ALLOWED_AGENTFLOW_NODES, isNodeAllowed } from './nodeRegistry'
 import { ASSISTANT_TEMPLATE_ID, ASSISTANT_TEMPLATE_VERSION } from './templates/assistantTemplate.v1'
 import { KNOWLEDGE_TEMPLATE_ID, KNOWLEDGE_TEMPLATE_VERSION } from './templates/knowledgeTemplate.v1'
 import { API_TEMPLATE_ID, API_TEMPLATE_VERSION } from './templates/apiTemplate.v1'
+import { SQL_TEMPLATE_ID, SQL_TEMPLATE_VERSION } from './templates/sqlTemplate.v1'
 import { createHash } from 'crypto'
 
 export interface CapabilityBinding {
@@ -59,8 +60,9 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     const planHash = calculatePlanHash(spec, specRevisionId)
     const capabilityBindings: CapabilityBinding[] = []
     const connectionRefs: Record<string, string> = {}
-    const isApi = spec.kind === 'api-readonly' || (Array.isArray(spec.apiConnectors) && spec.apiConnectors.length > 0)
-    const isKnowledge = !isApi && (spec.kind === 'knowledge' || (Array.isArray(spec.dataSources) && spec.dataSources.length > 0))
+    const isSql = spec.kind === 'sql-readonly' || Boolean(spec.sqlConfig)
+    const isApi = !isSql && (spec.kind === 'api-readonly' || (Array.isArray(spec.apiConnectors) && spec.apiConnectors.length > 0))
+    const isKnowledge = !isSql && !isApi && (spec.kind === 'knowledge' || (Array.isArray(spec.dataSources) && spec.dataSources.length > 0))
 
     const expectedChecks: string[] = ['specReady', 'buildReady', 'templateCompatible', 'capabilitiesAllowlisted']
     if (isKnowledge) {
@@ -68,6 +70,9 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     }
     if (isApi) {
         expectedChecks.push('apiConnectorAllowlisted', 'readonlyPolicyEnforced')
+    }
+    if (isSql) {
+        expectedChecks.push('databaseConnected', 'sqlReadonlyPolicyEnforced', 'rowLimitEnforced')
     }
 
     // 1. Ánh xạ Model Capability
@@ -129,6 +134,28 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         connectionRefs.api = 'requestsGet'
     }
 
+    // 2c. Ánh xạ SQL Capability (CustomTool: sql_executor_readonly) cho SQL Agent (PH6-T07)
+    if (isSql) {
+        const sqlCfg = spec.sqlConfig
+        const dbName = sqlCfg?.databaseName || 'sales_mart'
+        const allowedTables = sqlCfg?.allowedTables || ['orders', 'customers']
+        const rowLimit = sqlCfg?.rowLimit || 50
+
+        capabilityBindings.push({
+            capabilityId: `cap_sql_${dbName}`,
+            nodeName: 'customTool',
+            nodeVersion: 3.0,
+            type: 'tool',
+            config: {
+                selectedTool: 'sql_executor_readonly',
+                databaseName: dbName,
+                allowedTables,
+                rowLimit
+            }
+        })
+        connectionRefs.sql = 'customTool'
+    }
+
     // 3. Ánh xạ Tools Capabilities (chỉ từ registry allowlist)
     if (spec.tools && spec.tools.length > 0) {
         spec.tools.forEach((tool, idx) => {
@@ -151,7 +178,10 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     let templateId = ASSISTANT_TEMPLATE_ID
     let templateVersion = ASSISTANT_TEMPLATE_VERSION
 
-    if (isApi) {
+    if (isSql) {
+        templateId = SQL_TEMPLATE_ID
+        templateVersion = SQL_TEMPLATE_VERSION
+    } else if (isApi) {
         templateId = API_TEMPLATE_ID
         templateVersion = API_TEMPLATE_VERSION
     } else if (isKnowledge) {
@@ -184,14 +214,15 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
         return { valid: false, planId, errors: ['AgentPlan không được để rỗng'] }
     }
 
-    // 1. Kiểm tra Template compatibility (Hỗ trợ Assistant, Knowledge và API Templates)
+    // 1. Kiểm tra Template compatibility (Hỗ trợ Assistant, Knowledge, API và SQL Templates)
     const isAssistant = plan.templateId === ASSISTANT_TEMPLATE_ID && plan.templateVersion === ASSISTANT_TEMPLATE_VERSION
     const isKnowledge = plan.templateId === KNOWLEDGE_TEMPLATE_ID && plan.templateVersion === KNOWLEDGE_TEMPLATE_VERSION
     const isApi = plan.templateId === API_TEMPLATE_ID && plan.templateVersion === API_TEMPLATE_VERSION
+    const isSql = plan.templateId === SQL_TEMPLATE_ID && plan.templateVersion === SQL_TEMPLATE_VERSION
 
-    if (!isAssistant && !isKnowledge && !isApi) {
+    if (!isAssistant && !isKnowledge && !isApi && !isSql) {
         errors.push(
-            `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID}, ${KNOWLEDGE_TEMPLATE_ID} hoặc ${API_TEMPLATE_ID})`
+            `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID}, ${KNOWLEDGE_TEMPLATE_ID}, ${API_TEMPLATE_ID} hoặc ${SQL_TEMPLATE_ID})`
         )
     }
 

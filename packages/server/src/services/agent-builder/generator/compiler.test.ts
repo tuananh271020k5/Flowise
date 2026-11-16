@@ -191,4 +191,59 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(messages[0].content).toContain('NGUYÊN TẮC AN TOÀN TRUY VẤN API (API READONLY RULES)')
         expect(messages[0].content).toContain('READONLY')
     })
+
+    it('biên dịch SQL Readonly AgentPlan sinh CustomTool node và SQL safety guidelines (PH6-T07)', () => {
+        const sqlSpec: AgentSpec = {
+            schemaVersion: '1.0',
+            kind: 'sql-readonly',
+            name: 'Trợ Lý Phân Tích Dữ Liệu SQL',
+            goal: 'Truy vấn số liệu đơn hàng và doanh số',
+            language: 'vi',
+            instructions: 'Báo cáo số liệu chính xác theo bảng',
+            outputExpectations: ['Bảng Markdown'],
+            modelProfileRef: 'chatOpenAI',
+            dataSources: [],
+            tools: [],
+            sqlConfig: {
+                databaseType: 'sqlite',
+                databaseName: 'sales_mart',
+                allowedTables: ['orders', 'customers'],
+                rowLimit: 30
+            },
+            policy: {
+                visibility: 'private',
+                executionMode: 'controlled-test',
+                allowWrite: false
+            },
+            evaluationExamples: [
+                {
+                    input: 'Có bao nhiêu đơn hàng thành công?',
+                    assertions: ['Số lượng đơn completed']
+                }
+            ]
+        }
+
+        const plan = createAgentPlan(sqlSpec, 'rev-sql-101')
+        const compiled = compiler.compile(plan)
+
+        expect(compiled.templateId).toBe('sql-flow-template')
+
+        // Kiểm tra CustomTool node
+        const toolNode = compiled.nodes.find((n) => n.data.name === 'customTool')
+        expect(toolNode).toBeDefined()
+        expect(toolNode?.data.inputs.selectedTool).toBe('sql_executor_readonly')
+
+        // Kiểm tra Agent node kết nối customTool
+        const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
+        expect(agentNode).toBeDefined()
+        const agentTools = agentNode?.data.inputs.agentTools as any[]
+        expect(agentTools.some((t) => t.agentSelectedTool === 'customTool')).toBe(true)
+
+        // Kiểm tra SQL Readonly guidelines
+        const messages = agentNode?.data.inputs.agentMessages as any[]
+        expect(messages[0].content).toContain('NGUYÊN TẮC AN TOÀN TRUY VẤN CƠ SỞ DỮ LIỆU (SQL READONLY RULES)')
+        expect(messages[0].content).toContain('SELECT')
+        expect(messages[0].content).toContain('orders, customers')
+        expect(messages[0].content).toContain('30 dòng')
+    })
 })

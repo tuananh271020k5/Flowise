@@ -103,6 +103,19 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
             expect(res.extractedFields).toContain('apiConnectors')
             expect(res.extractedFields).toContain('kind')
         })
+
+        it('trích xuất loại Agent sql-readonly và sqlConfig từ tiếng Việt (PH6-T06)', () => {
+            const text = 'Tôi cần một trợ lý truy vấn SQL phân tích dữ liệu bảng orders và bảng customers giới hạn 25 dòng'
+            const res = collector.extractPatch(text)
+
+            expect(res.patch.kind).toBe('sql-readonly')
+            expect(res.patch.sqlConfig).toBeDefined()
+            expect(res.patch.sqlConfig?.allowedTables).toContain('orders')
+            expect(res.patch.sqlConfig?.allowedTables).toContain('customers')
+            expect(res.patch.sqlConfig?.rowLimit).toBe(25)
+            expect(res.extractedFields).toContain('sqlConfig')
+            expect(res.extractedFields).toContain('kind')
+        })
     })
 
     describe('Anti-reask & Guided Collector Response (PH1-T09)', () => {

@@ -71,6 +71,16 @@ const getApiConnector = (id) => client.get(`/agent-builder/api-connectors/${id}`
 
 const validateApiCall = (params) => client.post('/agent-builder/api-connectors/validate-call', params)
 
+const listSqlDatabases = () => client.get('/agent-builder/sql/databases')
+
+const registerSqlDatabase = (data) => client.post('/agent-builder/sql/databases', data)
+
+const getSqlDatabase = (id) => client.get(`/agent-builder/sql/databases/${id}`)
+
+const validateSqlQuery = (params) => client.post('/agent-builder/sql/validate-query', params)
+
+const executeSqlQuery = (params) => client.post('/agent-builder/sql/execute-query', params)
+
 export default {
     createSession,
     getSession,
@@ -106,5 +116,10 @@ export default {
     listApiConnectors,
     registerApiConnector,
     getApiConnector,
-    validateApiCall
+    validateApiCall,
+    listSqlDatabases,
+    registerSqlDatabase,
+    getSqlDatabase,
+    validateSqlQuery,
+    executeSqlQuery
 }

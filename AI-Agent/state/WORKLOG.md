@@ -1,5 +1,40 @@
 # Nhật ký bàn giao ngắn
 
+## 17/11/2026 — B-025 / PH6-T04 đến PH6-T08 (API Error Eval, SQL Readonly Executor, SQL Agent Spec & Compiler — Phase 6)
+
+Hoàn thành B-025 (PH6-T04 API eval & xử lý lỗi connector; PH6-T05 Thiết kế SQL executor & tài khoản readonly; PH6-T06 SQL Agent spec, dataset scope & row limit; PH6-T07 SQL template & compiler sinh Agentflow V2; PH6-T08 Bộ eval SQL & negative security cases). Tiến độ dự án đạt **71 / 76 task** (**93.4%**):
+
+-   **API Eval & Xử Lý Lỗi Connector (PH6-T04):**
+    -   Mở rộng `apiConnectorService.ts` với hàm `evaluateApiError`: Bắt và phân loại các lỗi mạng 401 Unauthorized, 403 Forbidden, 429 Rate Limit, timeout (ECONNABORTED, 504), 5xx server error.
+    -   Tự động sinh thông điệp hướng dẫn khắc phục tiếng Việt thân thiện, che giấu hoàn toàn API keys / secrets.
+    -   Hàm `validateResponseSchema` thẩm định schema dữ liệu phản hồi, phát hiện thiếu trường bắt buộc.
+    -   Bộ kiểm thử `apiConnectorService.test.ts` (14/14 tests pass 100%).
+-   **Thiết Kế SQL Executor & Tài Khoản CSDL Readonly (PH6-T05):**
+    -   Xây dựng `sqlExecutorService.ts`: Quản lý cấu hình database (SQLite, Postgres, MySQL) cách ly theo workspace (Negative Auth: 403 Forbidden).
+    -   AST / Regex Safety Filter: Chặn 100% câu lệnh DDL/DML gây hại (`DROP`, `TRUNCATE`, `ALTER`, `CREATE`, `INSERT`, `UPDATE`, `DELETE`, `GRANT`, `REVOKE`, multi-statement injection `;`, comment tricks phá vỡ cú pháp).
+    -   Table Allowlist: Kiểm soát nghiêm ngặt danh sách bảng được phép truy vấn (`allowedTables`); chặn truy cập bảng hệ thống (`sqlite_master`, `pg_catalog`).
+    -   Row Limit Enforcement: Tự động gán hoặc ép giới hạn số dòng (mặc định 50, tối đa 100 dòng).
+    -   Bộ kiểm thử `sqlExecutorService.test.ts` (18/18 tests pass 100%).
+-   **SQL Agent Spec, Dataset Scope & Thu Thập Yêu Cầu (PH6-T06):**
+    -   Mở rộng `types.ts`, `schema.ts`, `readiness.ts` hỗ trợ loại agent `kind: 'sql-readonly'` và cấu hình `sqlConfig`.
+    -   Mở rộng `collectorService.ts`: Tự động nhận diện nhu cầu phân tích cơ sở dữ liệu qua hội thoại tiếng Việt ("truy vấn SQL bảng orders và customers", "giới hạn 20 dòng"), trích xuất bảng và giới hạn dòng, hỏi bổ sung các trường thiếu mà không hỏi lặp lại.
+    -   Bộ kiểm thử `collectorService.test.ts` (13/13 tests pass 100%).
+-   **SQL Template & Deterministic Compiler (PH6-T07):**
+    -   Xây dựng `sqlTemplate.v1.ts` (`sql-flow-template` v1.0): Tạo đồ thị Flowise Agentflow V2 gồm: `startAgentflow` (1.4), `chatOpenAI` (5.0), `customTool` (3.0 - SQL Readonly Query Tool) và `agentAgentflow` (3.2).
+    -   Tự động nhúng chỉ dẫn an toàn `SQL READONLY RULES` vào System Prompt.
+    -   Mở rộng `agentPlan.ts` và `compiler.ts` hỗ trợ biên dịch tất định cho SQL Agent.
+    -   Bộ kiểm thử `sqlTemplate.test.ts` (1/1 test pass), `compiler.test.ts` (6/6 tests pass).
+-   **Bộ 10 Kịch Bản SQL An Toàn & Negative Security Cases (PH6-T08):**
+    -   Xây dựng `sqlAgentIntegration.test.ts`: Kiểm thử toàn bộ chu trình 5 bước và 10 kịch bản kiểm thử bảo mật: SELECT đơn giản, COUNT/GROUP BY, JOIN nhiều bảng allowlist, Cap max limit, WITH CTE, chặn DROP, chặn DELETE, chặn UPDATE/INSERT, chặn multi-statement injection, chặn bảng ngoài allowlist và bảng hệ thống (11/11 tests pass 100%).
+-   **API Endpoints & UI Client:**
+    -   Bổ sung 5 API routes mới: `GET /sql/databases`, `POST /sql/databases`, `GET /sql/databases/:id`, `POST /sql/validate-query`, `POST /sql/execute-query`.
+    -   Nâng cấp UI client `packages/ui/src/api/agentBuilder.js` và `agentBuilder.test.js` (40/40 tests pass 100%).
+-   **Kiểm thử & Nghiệm thu:**
+    -   37/37 test suites server agent-builder pass 100% (250+ unit tests).
+    -   4/4 UI test suites pass 100% (118 tests).
+    -   TypeScript typecheck exit 0 không lỗi.
+    -   Lập task kế tiếp `B-026.md` (PH6-T09 đến PH6-T12).
+
 ## 17/11/2026 — B-024 / PH6-T01, PH6-T02 & PH6-T03 (API Connector Registry, API Spec & Readonly Compiler — Mở Đầu Phase 6)
 
 Hoàn thành B-024 (PH6-T01 API Connector Registry & Operation Allowlist; PH6-T02 API Agent Spec & Thu Thập Yêu Cầu; PH6-T03 API Readonly Template & Compiler):

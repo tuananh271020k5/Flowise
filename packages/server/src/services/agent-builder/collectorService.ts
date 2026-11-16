@@ -241,6 +241,63 @@ export class CollectorService {
             }
         }
 
+        // 10. Trích xuất SQL Agent & Cấu hình CSDL (sqlConfig) (PH6-T06)
+        const isSqlIntent =
+            /(?:truy\s+vấn\s+sql|phân\s+tích\s+(?:cơ\s+sở\s+dữ\s+liệu|csdl|database)|sql\s+agent|tra\s+cứu\s+bảng|database\s+readonly|kết\s+nối\s+database|thực\s+thi\s+sql)/i.test(
+                lowerText
+            )
+        if (isSqlIntent && existingSpec?.kind !== 'sql-readonly') {
+            patch.kind = 'sql-readonly'
+            extractedFields.push('kind')
+        }
+
+        if (isSqlIntent || lowerText.includes('bảng orders') || lowerText.includes('bảng customers') || lowerText.includes('bảng hóa đơn')) {
+            const detectedTables: string[] = []
+            if (lowerText.includes('orders') || lowerText.includes('hóa đơn') || lowerText.includes('đơn hàng')) {
+                detectedTables.push('orders')
+            }
+            if (lowerText.includes('customers') || lowerText.includes('khách hàng')) {
+                detectedTables.push('customers')
+            }
+            if (lowerText.includes('products') || lowerText.includes('sản phẩm')) {
+                detectedTables.push('products')
+            }
+
+            // Tìm pattern bảng cụ thể nếu chưa phát hiện bảng nào
+            if (detectedTables.length === 0) {
+                const tablePattern = /(?:bảng|table)\s*[:=]?\s*([a-zA-Z0-9_]+)/i
+                const match = text.match(tablePattern)
+                if (match && match[1]) {
+                    detectedTables.push(match[1].toLowerCase())
+                } else {
+                    // Mặc định cho phép orders và customers
+                    detectedTables.push('orders', 'customers')
+                }
+            }
+
+            // Trích xuất rowLimit nếu người dùng chỉ định
+            let detectedLimit = 50
+            const limitMatch = text.match(/(?:giới\s+hạn|tối\s+đa|limit)\s*[:=]?\s*(\d+)\s*(?:dòng|bản\s+ghi|records)?/i)
+            if (limitMatch && limitMatch[1]) {
+                const parsed = parseInt(limitMatch[1], 10)
+                if (parsed > 0 && parsed <= 100) {
+                    detectedLimit = parsed
+                }
+            }
+
+            patch.sqlConfig = {
+                databaseType: 'sqlite',
+                databaseName: 'sales_mart',
+                allowedTables: detectedTables,
+                rowLimit: detectedLimit
+            }
+            if (patch.kind !== 'sql-readonly') {
+                patch.kind = 'sql-readonly'
+                extractedFields.push('kind')
+            }
+            extractedFields.push('sqlConfig')
+        }
+
         // Tạo summary thay đổi
         let changeSummary = 'Cập nhật cấu hình Agent Spec'
         if (extractedFields.length > 0) {
@@ -253,7 +310,8 @@ export class CollectorService {
                 language: 'ngôn ngữ',
                 kind: 'loại trợ lý',
                 dataSources: 'kho tài liệu tri thức',
-                apiConnectors: 'kết nối API'
+                apiConnectors: 'kết nối API',
+                sqlConfig: 'cấu hình cơ sở dữ liệu SQL'
             }
             const updatedNames = extractedFields.map((f) => labels[f] || f).join(', ')
             changeSummary = `Bổ sung: ${updatedNames}`
@@ -281,6 +339,10 @@ export class CollectorService {
                 currentSpec.apiConnectors && currentSpec.apiConnectors.length > 0
                     ? `- **Kết nối API:** ${currentSpec.apiConnectors.map((c) => c.name || c.connectorId).join(', ')}\n`
                     : ''
+            const sqlConfigText =
+                currentSpec.sqlConfig && currentSpec.sqlConfig.allowedTables && currentSpec.sqlConfig.allowedTables.length > 0
+                    ? `- **Truy vấn SQL Readonly:** Bảng [${currentSpec.sqlConfig.allowedTables.join(', ')}], giới hạn ${currentSpec.sqlConfig.rowLimit || 50} dòng/truy vấn\n`
+                    : ''
             return (
                 `Tuyệt vời! Tôi đã tổng hợp đầy đủ thông tin cho trợ lý **${currentSpec.name || 'mới'}**:\n\n` +
                 `- **Mục tiêu:** ${currentSpec.goal}\n` +
@@ -288,6 +350,7 @@ export class CollectorService {
                 `- **Mô hình:** ${currentSpec.modelProfileRef || 'default-builder-model'}\n` +
                 dataSourcesText +
                 apiConnectorsText +
+                sqlConfigText +
                 (currentSpec.tools && currentSpec.tools.length > 0
                     ? `- **Công cụ:** ${currentSpec.tools.map((t) => t.name).join(', ')}\n`
                     : '') +
@@ -305,8 +368,10 @@ export class CollectorService {
                 tools: `công cụ hỗ trợ`,
                 evaluationExamples: `kịch bản câu hỏi kiểm thử`,
                 language: `ngôn ngữ`,
-                kind: `loại trợ lý tri thức (Knowledge Agent)`,
-                dataSources: `kho tài liệu tham chiếu`
+                kind: `loại trợ lý SQL (SQL Readonly Agent)`,
+                dataSources: `kho tài liệu tham chiếu`,
+                apiConnectors: `kết nối API`,
+                sqlConfig: `cấu hình bảng CSDL truy vấn`
             }
             const ackList = newlyExtracted.map((f) => labels[f] || f).join(', ')
             ackText = `Tôi đã ghi nhận ${ackList}. `
@@ -335,6 +400,10 @@ export class CollectorService {
             case 'apiConnectors':
                 question =
                     'Bạn muốn trợ lý kết nối với API nào? (Ví dụ: Bạn có thể chọn dịch vụ thời tiết OpenWeather hoặc cung cấp tên/đường dẫn API bạn muốn tích hợp).'
+                break
+            case 'sqlConfig.allowedTables':
+                question =
+                    'Bạn muốn trợ lý SQL được phép truy vấn những bảng dữ liệu nào? (Ví dụ: bảng orders, customers, products...).'
                 break
             case 'evaluationExamples':
                 question = 'Để đảm bảo chất lượng, bạn có thể cho tôi một câu hỏi mẫu hoặc tình huống thực tế để kiểm thử trợ lý không?'

@@ -1,6 +1,7 @@
 import { AgentflowEdge, AgentflowNode } from './templates/assistantTemplate.v1'
 import { KNOWLEDGE_TEMPLATE_ID } from './templates/knowledgeTemplate.v1'
 import { API_TEMPLATE_ID } from './templates/apiTemplate.v1'
+import { SQL_TEMPLATE_ID } from './templates/sqlTemplate.v1'
 import { AgentPlan, validateAgentPlan } from './agentPlan'
 import { ALLOWED_AGENTFLOW_NODES, validateNodeMetadata } from './nodeRegistry'
 
@@ -171,6 +172,9 @@ export class AgentflowCompiler {
                 toolInputs.requestsGetDescription = toolBind.config?.requestsGetDescription || 'Thực thi truy vấn HTTP GET'
             } else if (toolMeta.name === 'customTool') {
                 toolInputs.selectedTool = toolBind.config?.selectedTool || 'default-tool'
+                delete toolInputs.databaseName
+                delete toolInputs.allowedTables
+                delete toolInputs.rowLimit
             }
 
             const toolNode: AgentflowNode = {
@@ -214,6 +218,20 @@ export class AgentflowCompiler {
                 '1. Chỉ sử dụng công cụ requestsGet để lấy dữ liệu từ các endpoints được cấp quyền; không tự bịa đặt tham số hay dữ liệu trả về.',
                 '2. Chế độ hoạt động là READONLY: Tuyệt đối từ chối và cảnh báo nếu người dùng yêu cầu thực hiện thao tác xóa, cập nhật hoặc thay đổi dữ liệu.',
                 '3. Nếu dịch vụ API bên ngoài trả về lỗi hoặc timeout, hãy thông báo lịch sự cho người dùng về trạng thái dịch vụ.'
+            ].join('\n')
+        } else if (plan.templateId === SQL_TEMPLATE_ID) {
+            const sqlCfg = plan.spec.sqlConfig
+            const allowedTables = sqlCfg?.allowedTables || ['orders', 'customers']
+            const rowLimit = sqlCfg?.rowLimit || 50
+            systemInstruction += [
+                '',
+                '',
+                '--- NGUYÊN TẮC AN TOÀN TRUY VẤN CƠ SỞ DỮ LIỆU (SQL READONLY RULES) ---',
+                '1. BẮT BUỘC CHỈ SỬ DỤNG câu lệnh truy vấn đọc: SELECT hoặc WITH ... SELECT.',
+                '2. NGHIÊM CẤM TUYỆT ĐỐI các thao tác thay đổi hoặc phá hủy dữ liệu/cấu trúc: DROP, TRUNCATE, ALTER, CREATE, INSERT, UPDATE, DELETE, GRANT, REVOKE.',
+                `3. DANH SÁCH BẢNG ĐƯỢC PHÉP TRUY VẤN: [${allowedTables.join(', ')}]. Tuyệt đối không truy vấn các bảng khác hoặc bảng hệ thống.`,
+                `4. GIỚI HẠN SỐ DÒNG: Mọi truy vấn phải có mệnh đề LIMIT tối đa ${rowLimit} dòng để tránh quá tải tài nguyên.`,
+                '5. Khi trình bày kết quả, hãy giải thích ý nghĩa các chỉ số và định dạng dữ liệu dưới dạng bảng Markdown tiếng Việt rõ ràng, mạch lạc.'
             ].join('\n')
         }
         const agentNode: AgentflowNode = {

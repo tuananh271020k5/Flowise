@@ -16,6 +16,7 @@ import recoveryService from '../../services/agent-builder/recovery/recoveryServi
 import backupRestoreService from '../../services/agent-builder/backup/backupRestoreService'
 import zeroDowntimeService from '../../services/agent-builder/deployment/zeroDowntimeService'
 import apiConnectorService from '../../services/agent-builder/api-connectors/apiConnectorService'
+import sqlExecutorService from '../../services/agent-builder/sql/sqlExecutorService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -686,6 +687,77 @@ const validateApiCall = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+const listSqlDatabases = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const databases = await sqlExecutorService.listDatabases(workspaceId)
+        return res.status(StatusCodes.OK).json(databases)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const registerSqlDatabase = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const database = await sqlExecutorService.registerDatabase({
+            ...req.body,
+            workspaceId
+        })
+        return res.status(StatusCodes.CREATED).json(database)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getSqlDatabase = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Database ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const database = await sqlExecutorService.getDatabase(req.params.id, workspaceId)
+        if (!database) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Database config not found' })
+        }
+        return res.status(StatusCodes.OK).json(database)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const validateSqlQuery = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const { databaseId, query } = req.body || {}
+        if (!databaseId || !query) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'databaseId và query là bắt buộc')
+        }
+        const dbConfig = await sqlExecutorService.getDatabase(databaseId, workspaceId)
+        if (!dbConfig) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Database config not found' })
+        }
+        const result = sqlExecutorService.validateSqlQuery(query, dbConfig)
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const executeSqlQuery = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const { databaseId, query } = req.body || {}
+        if (!databaseId || !query) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'databaseId và query là bắt buộc')
+        }
+        const result = await sqlExecutorService.executeQuery(workspaceId, databaseId, query)
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -721,5 +793,10 @@ export default {
     listApiConnectors,
     registerApiConnector,
     getApiConnector,
-    validateApiCall
+    validateApiCall,
+    listSqlDatabases,
+    registerSqlDatabase,
+    getSqlDatabase,
+    validateSqlQuery,
+    executeSqlQuery
 }

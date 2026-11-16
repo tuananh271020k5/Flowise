@@ -78,4 +78,11 @@ router.post('/api-connectors', agentBuilderController.registerApiConnector)
 router.get('/api-connectors/:id', agentBuilderController.getApiConnector)
 router.post('/api-connectors/validate-call', agentBuilderController.validateApiCall)
 
+// SQL DATABASE REGISTRY & READONLY EXECUTOR (PH6-T05, PH6-T06, PH6-T07)
+router.get('/sql/databases', agentBuilderController.listSqlDatabases)
+router.post('/sql/databases', agentBuilderController.registerSqlDatabase)
+router.get('/sql/databases/:id', agentBuilderController.getSqlDatabase)
+router.post('/sql/validate-query', agentBuilderController.validateSqlQuery)
+router.post('/sql/execute-query', agentBuilderController.executeSqlQuery)
+
 export default router

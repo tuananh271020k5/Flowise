@@ -52,6 +52,20 @@ export interface ValidateCallResult {
     operation?: ApiOperation
 }
 
+export interface ApiErrorEvalResult {
+    status?: number
+    errorCode: string
+    isRecoverable: boolean
+    userMessageVi: string
+    suggestedActionVi: string
+}
+
+export interface ApiResponseSchemaValidationResult {
+    valid: boolean
+    missingFields: string[]
+    extraDetails?: string
+}
+
 /**
  * Service Quản Lý API Connector Registry & Enforce Allowlist (PH6-T01).
  * Quản lý các endpoint API được phép, ngăn chặn LLM tự ý gọi URL ngoài danh mục cho phép.
@@ -215,6 +229,114 @@ export class ApiConnectorService {
             allowed: true,
             connector,
             operation
+        }
+    }
+
+    /**
+     * PH6-T04: Đánh giá và xử lý lỗi kết nối API Connector (API Eval).
+     * Phân loại lỗi mạng, timeout, 401, 403, 429, 500 và trả về thông điệp tiếng Việt thân thiện, không lộ secrets.
+     */
+    evaluateApiError(error: any): ApiErrorEvalResult {
+        const status = error?.status || error?.response?.status || error?.statusCode
+        const message = String(error?.message || error || '').toLowerCase()
+
+        // Kiểm tra timeout / connection drop
+        if (message.includes('timeout') || message.includes('econnaborted') || status === 504 || status === 408) {
+            return {
+                status: status || 504,
+                errorCode: 'API_TIMEOUT',
+                isRecoverable: true,
+                userMessageVi: 'Yêu cầu kết nối đến API vượt quá thời gian chờ (Timeout). Vui lòng thử lại.',
+                suggestedActionVi: 'Tăng timeout hoặc kiểm tra lại kết nối mạng của hệ thống API đích.'
+            }
+        }
+
+        // 401 Unauthorized
+        if (status === 401 || message.includes('unauthorized')) {
+            return {
+                status: 401,
+                errorCode: 'API_UNAUTHORIZED',
+                isRecoverable: false,
+                userMessageVi: 'Khóa API (API Key) hoặc Token xác thực không hợp lệ hoặc đã hết hạn.',
+                suggestedActionVi: 'Vui lòng kiểm tra lại Credential đã cấu hình cho API Connector.'
+            }
+        }
+
+        // 403 Forbidden
+        if (status === 403 || message.includes('forbidden')) {
+            return {
+                status: 403,
+                errorCode: 'API_FORBIDDEN',
+                isRecoverable: false,
+                userMessageVi: 'Tài khoản kết nối không có quyền truy cập tài nguyên hoặc thực thi thao tác này.',
+                suggestedActionVi: 'Kiểm tra phân quyền tài khoản (scopes/permissions) trên hệ thống bên ngoài.'
+            }
+        }
+
+        // 429 Too Many Requests
+        if (status === 429 || message.includes('rate limit') || message.includes('too many requests')) {
+            return {
+                status: 429,
+                errorCode: 'API_RATE_LIMIT_EXCEEDED',
+                isRecoverable: true,
+                userMessageVi: 'Hệ thống API đích đang bị giới hạn tần suất gọi (Rate Limit).',
+                suggestedActionVi: 'Vui lòng giảm tần suất gọi hoặc chờ ít phút trước khi thử lại.'
+            }
+        }
+
+        // 404 Not Found
+        if (status === 404) {
+            return {
+                status: 404,
+                errorCode: 'API_ENDPOINT_NOT_FOUND',
+                isRecoverable: false,
+                userMessageVi: 'Đường dẫn endpoint hoặc tài nguyên yêu cầu không tồn tại trên máy chủ API.',
+                suggestedActionVi: 'Kiểm tra lại đường dẫn path hoặc tham số id truyền vào.'
+            }
+        }
+
+        // 500, 502, 503 Server Error
+        if (status >= 500 && status < 600) {
+            return {
+                status,
+                errorCode: 'API_SERVER_ERROR',
+                isRecoverable: true,
+                userMessageVi: 'Máy chủ API đích đang gặp sự cố nội bộ (Lỗi 5xx).',
+                suggestedActionVi: 'Chờ máy chủ phía đối tác khắc phục hoặc kiểm tra trạng thái dịch vụ (Service Health).'
+            }
+        }
+
+        // Mặc định: Lỗi chung
+        return {
+            status: status || 500,
+            errorCode: 'API_UNKNOWN_ERROR',
+            isRecoverable: false,
+            userMessageVi: 'Gặp lỗi không xác định khi giao tiếp với API bên ngoài.',
+            suggestedActionVi: 'Kiểm tra log chi tiết hoặc liên hệ quản trị viên hệ thống API.'
+        }
+    }
+
+    /**
+     * PH6-T04: Thẩm định cấu trúc dữ liệu phản hồi so với schema mong đợi (Schema Mismatch Guard).
+     */
+    validateResponseSchema(data: any, expectedFields?: string[]): ApiResponseSchemaValidationResult {
+        if (!data || typeof data !== 'object') {
+            return {
+                valid: false,
+                missingFields: expectedFields || [],
+                extraDetails: 'Dữ liệu phản hồi không phải là một đối tượng JSON hợp lệ'
+            }
+        }
+
+        if (!expectedFields || expectedFields.length === 0) {
+            return { valid: true, missingFields: [] }
+        }
+
+        const missing = expectedFields.filter((field) => !(field in data))
+        return {
+            valid: missing.length === 0,
+            missingFields: missing,
+            extraDetails: missing.length > 0 ? `Thiếu các trường bắt buộc: ${missing.join(', ')}` : undefined
         }
     }
 }

@@ -94,6 +94,23 @@ export const ApiConnectorRefSchema = z
     .strict()
 
 /**
+ * SQL agent configuration schema (PH6-T06).
+ */
+export const SqlAgentConfigSchema = z
+    .object({
+        databaseType: z.enum(['sqlite', 'postgres', 'mysql']).default('sqlite'),
+        databaseName: safeString(1, 100, 'Database Name').optional(),
+        credentialRef: safeString(1, 100, 'Credential Ref').optional(),
+        allowedTables: z
+            .array(safeString(1, 100, 'Tên bảng (Table)'))
+            .min(1, 'Cần ít nhất 1 bảng được phép truy vấn trong allowedTables')
+            .max(50, 'Tối đa 50 bảng'),
+        rowLimit: z.number().int().min(1).max(100).default(50),
+        schemaOverview: z.record(z.string(), z.array(z.string())).optional()
+    })
+    .strict()
+
+/**
  * Execution and visibility policy schema.
  */
 export const PolicySchema = z
@@ -111,7 +128,7 @@ export const PolicySchema = z
 export const AgentSpecSchema = z
     .object({
         schemaVersion: z.literal('1.0'),
-        kind: z.enum(['assistant', 'knowledge', 'api-readonly', 'data-readonly']).default('assistant'),
+        kind: z.enum(['assistant', 'knowledge', 'api-readonly', 'data-readonly', 'sql-readonly']).default('assistant'),
         name: safeString(1, 100, 'Tên trợ lý (name)'),
         goal: safeString(5, 1000, 'Mục tiêu trợ lý (goal)'),
         language: z.string().trim().min(2, 'Mã ngôn ngữ tối thiểu 2 ký tự').max(10, 'Mã ngôn ngữ tối đa 10 ký tự').default('vi'),
@@ -132,6 +149,7 @@ export const AgentSpecSchema = z
         dataSources: z.array(DataSourceRefSchema).max(10, 'Tối đa 10 data sources').default([]),
         tools: z.array(ToolRefSchema).max(20, 'Tối đa 20 tools').default([]),
         apiConnectors: z.array(ApiConnectorRefSchema).max(10, 'Tối đa 10 API connectors').optional(),
+        sqlConfig: SqlAgentConfigSchema.optional(),
         policy: PolicySchema.default({
             visibility: 'private',
             executionMode: 'controlled-test',

@@ -345,4 +345,52 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/api-connectors/validate-call', payload)
         expect(res.data.allowed).toBe(true)
     })
+
+    it('listSqlDatabases gửi GET request tới /agent-builder/sql/databases', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'db-1', name: 'Sales DB' }] })
+
+        const res = await agentBuilderApi.listSqlDatabases()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sql/databases')
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('registerSqlDatabase gửi POST request tới /agent-builder/sql/databases', async () => {
+        const payload = { name: 'Sales DB', databaseType: 'sqlite', allowedTables: ['orders'] }
+        client.post.mockResolvedValueOnce({ data: { id: 'db-1', ...payload } })
+
+        const res = await agentBuilderApi.registerSqlDatabase(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sql/databases', payload)
+        expect(res.data.id).toBe('db-1')
+    })
+
+    it('getSqlDatabase gửi GET request tới /agent-builder/sql/databases/:id', async () => {
+        client.get.mockResolvedValueOnce({ data: { id: 'db-1', name: 'Sales DB' } })
+
+        const res = await agentBuilderApi.getSqlDatabase('db-1')
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sql/databases/db-1')
+        expect(res.data.name).toBe('Sales DB')
+    })
+
+    it('validateSqlQuery gửi POST request tới /agent-builder/sql/validate-query', async () => {
+        const payload = { databaseId: 'db-1', query: 'SELECT * FROM orders' }
+        client.post.mockResolvedValueOnce({ data: { valid: true } })
+
+        const res = await agentBuilderApi.validateSqlQuery(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sql/validate-query', payload)
+        expect(res.data.valid).toBe(true)
+    })
+
+    it('executeSqlQuery gửi POST request tới /agent-builder/sql/execute-query', async () => {
+        const payload = { databaseId: 'db-1', query: 'SELECT * FROM orders' }
+        client.post.mockResolvedValueOnce({ data: { rowCount: 5, rows: [] } })
+
+        const res = await agentBuilderApi.executeSqlQuery(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sql/execute-query', payload)
+        expect(res.data.rowCount).toBe(5)
+    })
 })

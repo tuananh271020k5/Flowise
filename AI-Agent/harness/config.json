@@ -5,7 +5,7 @@
     "maxSourceBytes": 131072,
     "maxLogBytes": 2097152,
     "maxLogLines": 80,
-    "defaultTask": "AI-Agent/tasks/B-025.md",
+    "defaultTask": "AI-Agent/tasks/B-026.md",
     "baseFiles": ["AI-Agent/state/project.json", "AI-Agent/context/PROJECT_MAP.md"],
     "allowedContextFiles": [
         "PLAN_TONG_HOP.md",
