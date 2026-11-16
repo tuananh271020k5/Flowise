@@ -1,20 +1,22 @@
 {
   "schemaVersion": 1,
-  "revision": 35,
-  "updatedAt": "2026-11-16T16:42:00.000Z",
+  "revision": 37,
+  "updatedAt": "2026-11-16T16:58:00.000Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-021",
+  "currentTask": "B-022",
   "status": "completed",
-  "productStage": "phase5_quota_observability_runbook_ready",
-  "summary": "B-021/PH5-T03-T04 hoàn thành: Giới Hạn Quota Budget Vận Hành & Runbook Nghiệm Thu Release Nội Bộ (Phase 5). Xây dựng RedactionService làm sạch toàn bộ credentials/secrets (OpenAI, Anthropic, Gemini, HF, JWT, DB URLs). Xây dựng RetentionService dọn dẹp an toàn các session nháp hết hạn, bảo vệ tuyệt đối agent đã xuất bản. Xây dựng RateLimiter sliding window kiểm soát tần suất request theo workspaceId chống spam. Xây dựng BuilderLogger chuẩn JSON có traceId và MetricsService theo dõi chỉ số builds/evaluations/publishes. Soạn thảo RUNBOOK_RELEASE_NOI_BO.md và xây dựng kịch bản nghiệm thu toàn diện phase5ReleaseAcceptance.test.ts đạt 100%. 26 server suites pass (218 tests), 4 UI suites pass (100 tests), tsc exit 0, vite build exit 0, ESLint exit 0, harness pass 14/15. Lập task B-022.",
+  "productStage": "phase5_usage_and_recovery_ready",
+  "summary": "B-022/PH5-T05-T07 hoàn thành: Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart (Phase 5). Xây dựng tokenUsageService thu thập token (prompt/completion/total) theo provider/model (OpenAI, Anthropic, Gemini, Groq, Ollama), phân biệt usage đàm thoại/build/test/dự đoán thực tế và ước tính chi phí USD. Xây dựng recoveryService đối soát (reconcile) tự động khi server khởi động lại hoặc timeout, phục hồi các build/test jobs bị kẹt trạng thái 'running' thành 'failed' và chuyển session về 'ready' mà tuyệt đối không làm mất hay duplicate revisions. 29 server suites pass (228 tests), 4 UI suites pass (104 tests), tsc exit 0, ESLint exit 0, harness pass 14/15. Lập task B-023.",
   "decisions": [
     "Thiết lập Quality Gate bắt buộc tỷ lệ pass kiểm thử >= 80% trước khi cho phép xuất bản (deployed: true).",
     "Entity BuilderAuditLog lưu vết toàn bộ hoạt động trọng yếu có phân quyền cách ly chặt chẽ theo workspaceId.",
     "Bổ sung cơ chế thu hồi xuất bản (unpublish) đưa trạng thái trở lại nháp (draft) an toàn.",
     "Áp dụng Credential Redaction tự động lên toàn bộ structured log, audit log và response của Agent Builder.",
     "Bảo vệ hệ thống bằng Rate Limiter trượt (sliding window) theo workspaceId trên các thao tác tạo phiên, gửi tin nhắn, build, test và publish.",
-    "Chính sách Data Retention bảo vệ tuyệt đối các agent đang ở trạng thái xuất bản, chỉ dọn dẹp phiên nháp và nhật ký cũ."
+    "Chính sách Data Retention bảo vệ tuyệt đối các agent đang ở trạng thái xuất bản, chỉ dọn dẹp phiên nháp và nhật ký cũ.",
+    "Theo dõi Token Usage chuẩn hóa theo từng provider/model và phân loại theo mục đích (conversation, build, evaluation, prediction).",
+    "Cơ chế Crash Recovery tự động phát hiện và reconcile các job treo quá thời hạn khi server khởi động lại mà không làm mất revisions."
   ],
   "changedFiles": [
     "packages/server/src/database/entities/BuilderAuditLog.ts",
@@ -22,39 +24,33 @@
     "packages/server/src/services/agent-builder/index.ts",
     "packages/server/src/controllers/agent-builder/index.ts",
     "packages/server/src/routes/agent-builder/index.ts",
-    "packages/server/src/services/agent-builder/security/redactionService.ts",
-    "packages/server/src/services/agent-builder/security/redactionService.test.ts",
-    "packages/server/src/services/agent-builder/security/rateLimiter.ts",
-    "packages/server/src/services/agent-builder/security/rateLimiter.test.ts",
-    "packages/server/src/services/agent-builder/security/retentionService.ts",
-    "packages/server/src/services/agent-builder/security/retentionService.test.ts",
-    "packages/server/src/services/agent-builder/observability/builderLogger.ts",
-    "packages/server/src/services/agent-builder/observability/builderLogger.test.ts",
-    "packages/server/src/services/agent-builder/observability/metricsService.ts",
-    "packages/server/src/services/agent-builder/pipeline/phase5ReleaseAcceptance.test.ts",
+    "packages/server/src/services/agent-builder/cost/tokenUsageService.ts",
+    "packages/server/src/services/agent-builder/cost/tokenUsageService.test.ts",
+    "packages/server/src/services/agent-builder/recovery/recoveryService.ts",
+    "packages/server/src/services/agent-builder/recovery/recoveryService.test.ts",
+    "packages/server/src/services/agent-builder/recovery/recoveryIntegration.test.ts",
     "packages/ui/src/api/agentBuilder.js",
     "packages/ui/src/api/agentBuilder.test.js",
     "AI-Agent/docs/RUNBOOK_RELEASE_NOI_BO.md",
-    "AI-Agent/tasks/B-021.md",
     "AI-Agent/tasks/B-022.md",
+    "AI-Agent/tasks/B-023.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md",
     "AI-Agent/state/project.json"
   ],
   "checks": [
-    "218/218 tests pass trong packages/server (Jest 26/26 suites agent-builder).",
+    "228/228 tests pass trong packages/server (Jest 29/29 suites agent-builder).",
     "TypeScript typecheck (tsc -p packages/server/tsconfig.json --noEmit) exit code 0.",
-    "100/100 tests pass trong packages/ui (Jest 4/4 suites).",
-    "Vite build trên packages/ui hoàn thành exit code 0 với 21,181 modules.",
+    "104/104 tests pass trong packages/ui (Jest 4/4 suites).",
     "ESLint và Prettier trên toàn bộ file thay đổi exit code 0 (0 errors, 0 warnings).",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-021 lên origin/main và Flowise-Agent-Builder.",
-    "Triển khai task B-022 (PH5-T05 và PH5-T07): Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart."
+    "Commit và push task B-022 lên origin/main và Flowise-Agent-Builder.",
+    "Triển khai task B-023 (PH5-T08, PH5-T09, PH5-T10): Kiểm Tra Migration Database, Zero-Downtime Draft Switch & Nghiệm Thu Tổng Thể Release Nội Bộ."
   ],
-  "nextTask": "B-022",
+  "nextTask": "B-023",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -82,7 +78,7 @@
     "newCommitCreatedDuringSetup": false
   },
   "snapshot": {
-    "head": "563cd64889ec9a2e6551e44edbb596d7a813e65e",
+    "head": "6d6c1c249a5b6d51d457630733ba6fc7db9621e2",
     "branch": "main",
     "sourceFingerprint": "22e39acb6ee4ccf6942023f41487c13c7d677289eb6a5ffe7929738010f83e91"
   }

@@ -55,4 +55,12 @@ router.get('/logs', agentBuilderController.getRecentLogs)
 // DATA RETENTION & PURGE (PH5-T03)
 router.post('/retention/sweep', agentBuilderController.triggerRetentionSweep)
 
+// TOKEN USAGE & COST TRACKING (PH5-T05)
+router.get('/sessions/:id/usage', agentBuilderController.getSessionUsage)
+router.get('/usage', agentBuilderController.getWorkspaceUsage)
+
+// CRASH RECOVERY & RECONCILIATION (PH5-T07)
+router.post('/recovery/reconcile', agentBuilderController.reconcileStaleJobs)
+router.post('/sessions/:id/reconcile', agentBuilderController.reconcileSession)
+
 export default router

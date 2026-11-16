@@ -98,6 +98,31 @@ Toàn bộ API key (OpenAI `sk-...`, Anthropic `sk-ant-...`, Gemini `AIza...`, H
    - **Tuyệt đối KHÔNG xóa các Agent đang ở trạng thái xuất bản (`published`)**.
    - Ghi nhận bản ghi `DATA_RETENTION_PURGE` vào bảng kiểm toán.
 
+### SOP-04: Giám Sát Token Usage & Hạch Toán Chi Phí Thực (PH5-T05)
+1. **Kiểm tra theo phiên cụ thể:**
+   - Gọi API: `GET /api/v1/agent-builder/sessions/:id/usage`
+   - Phân tích chi tiết token và chi phí USD theo từng nguồn (`conversation`, `compilation`, `evaluation`, `prediction`) và theo nhà cung cấp (`openai`, `anthropic`, `google`, `ollama`).
+2. **Kiểm tra theo Workspace:**
+   - Gọi API: `GET /api/v1/agent-builder/usage`
+   - Dùng để theo dõi ngân sách tài nguyên và cảnh báo vượt hạn mức tiêu thụ token.
+
+### SOP-05: Khôi Phục & Đối Soát Sau Khi Server Restart / Crash (PH5-T07)
+1. **Tình huống áp dụng:**
+   - Server Flowise bị khởi động lại đột ngột, container bị kill, hoặc tiến trình build bị mất kết nối khiến session bị kẹt ở trạng thái `building`.
+2. **Thao tác:**
+   - Gọi API: `POST /api/v1/agent-builder/recovery/reconcile`
+   - Payload:
+     ```json
+     {
+       "maxStaleMs": 30000
+     }
+     ```
+3. **Kết quả kỳ vọng:**
+   - Các job treo được tự động đánh dấu `failed` kèm lỗi rõ ràng.
+   - Session được unblock chuyển từ `building` về `ready`.
+   - **Toàn bộ lịch sử Revision và Draft Revision được giữ nguyên vẹn 100% (không duplicate hay mất mát).**
+   - Ghi nhận nhật ký `RECOVERY_EXECUTED`.
+
 ---
 
 ## 5. Giám Sát & Xử Lý Sự Cố (Observability & Troubleshooting)

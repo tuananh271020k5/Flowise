@@ -10,6 +10,7 @@ import collectorService, { CollectorService } from './collectorService'
 import { BuildPipelineService } from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
 import { computeSpecDiff, SpecDiffResult } from './specDiffService'
+import tokenUsageService from './cost/tokenUsageService'
 import { AgentSpec, BuildIntent, ReadinessResult } from './types'
 import { Response } from 'express'
 
@@ -413,6 +414,19 @@ export class BuilderSessionService {
                 timestamp: new Date().toISOString()
             })
         }
+
+        // Ghi nhận Token Usage (PH5-T05)
+        const promptTokens = Math.max(1, Math.ceil(savedUserMsg.content.length / 3.5))
+        const completionTokens = assistantMsg ? Math.max(1, Math.ceil(assistantMsg.content.length / 3.5)) : 0
+        tokenUsageService.recordUsage({
+            sessionId,
+            workspaceId,
+            source: 'conversation',
+            provider: 'default',
+            model: 'gpt-4o-mini',
+            promptTokens,
+            completionTokens
+        })
 
         return {
             userMessage: savedUserMsg,

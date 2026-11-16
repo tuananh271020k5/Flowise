@@ -11,6 +11,8 @@ import rateLimiter from '../../services/agent-builder/security/rateLimiter'
 import retentionService from '../../services/agent-builder/security/retentionService'
 import builderLogger from '../../services/agent-builder/observability/builderLogger'
 import metricsService from '../../services/agent-builder/observability/metricsService'
+import tokenUsageService from '../../services/agent-builder/cost/tokenUsageService'
+import recoveryService from '../../services/agent-builder/recovery/recoveryService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -499,6 +501,60 @@ const getRecentLogs = async (req: Request, res: Response, next: NextFunction) =>
     }
 }
 
+const getSessionUsage = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const summary = tokenUsageService.getSessionSummary(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(summary)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getWorkspaceUsage = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const summary = tokenUsageService.getWorkspaceSummary(workspaceId)
+        return res.status(StatusCodes.OK).json(summary)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const reconcileStaleJobs = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const maxStaleMs = req.body?.maxStaleMs ? parseInt(req.body.maxStaleMs, 10) : undefined
+
+        const result = await recoveryService.reconcileStaleJobs({
+            maxStaleMs,
+            workspaceId,
+            actorId: userId
+        })
+
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const reconcileSession = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const result = await recoveryService.reconcileSession(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -521,5 +577,9 @@ export default {
     getAuditLogs,
     getMetrics,
     triggerRetentionSweep,
-    getRecentLogs
+    getRecentLogs,
+    getSessionUsage,
+    getWorkspaceUsage,
+    reconcileStaleJobs,
+    reconcileSession
 }

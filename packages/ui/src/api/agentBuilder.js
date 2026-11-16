@@ -44,6 +44,14 @@ const getRecentLogs = (params) => client.get('/agent-builder/logs', { params })
 
 const triggerRetentionSweep = (body) => client.post('/agent-builder/retention/sweep', body)
 
+const getSessionUsage = (sessionId) => client.get(`/agent-builder/sessions/${sessionId}/usage`)
+
+const getWorkspaceUsage = () => client.get('/agent-builder/usage')
+
+const reconcileStaleJobs = (body) => client.post('/agent-builder/recovery/reconcile', body)
+
+const reconcileSession = (sessionId) => client.post(`/agent-builder/sessions/${sessionId}/reconcile`)
+
 export default {
     createSession,
     getSession,
@@ -66,5 +74,9 @@ export default {
     getAuditLogs,
     getMetrics,
     getRecentLogs,
-    triggerRetentionSweep
+    triggerRetentionSweep,
+    getSessionUsage,
+    getWorkspaceUsage,
+    reconcileStaleJobs,
+    reconcileSession
 }

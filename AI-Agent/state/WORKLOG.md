@@ -1,5 +1,34 @@
 # Nhật ký bàn giao ngắn
 
+## 16/11/2026 — B-022 / PH5-T05 & PH5-T07 (Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart)
+
+Hoàn thành B-022 (PH5-T05 Thu usage và theo dõi chi phí thực; PH5-T07 Kiểm tra recovery khi crash/restart). Tiến độ Phase 5 đạt 6/10 task con:
+
+-   **Thu Thập Token Usage & Hạch Toán Chi Phí Thực (PH5-T05):**
+    -   Xây dựng `tokenUsageService.ts`: Bảng giá tham chiếu chuẩn xác cho các dòng mô hình phổ biến (GPT-4o, GPT-4o-mini, Claude 3.5 Sonnet, Haiku, Gemini 1.5 Pro, Flash, Ollama, Groq, local models).
+    -   Theo dõi chi tiết số token `promptTokens`, `completionTokens`, `totalTokens` và chi phí USD tương ứng.
+    -   Phân loại minh bạch theo mục đích sử dụng (`conversation`, `compilation`, `evaluation`, `prediction`) và phân nhóm theo provider.
+    -   Tích hợp tự động ghi nhận token usage sau mỗi lượt đàm thoại trong `sessionService.ts`.
+    -   Bộ test `tokenUsageService.test.ts` đạt 100% (5/5 tests pass).
+-   **Cơ Chế Đối Soát & Tự Phục Hồi Sau Crash / Restart (PH5-T07):**
+    -   Xây dựng `recoveryService.ts`: Tự động quét và phát hiện các `BuildJob` bị treo trạng thái `running` hoặc `pending` quá thời gian timeout (stale jobs) khi server Flowise bị crash hoặc khởi động lại.
+    -   Đánh dấu job thành `failed` kèm lỗi rõ ràng `RECOVERY_CRASH_OR_TIMEOUT`.
+    -   Unblock phiên làm việc: Tự động chuyển session từ `building` về `ready` để người dùng tiếp tục thao tác mà không bị khóa.
+    -   **Bảo đảm tính toàn vẹn 100%:** Tuyệt đối không làm mất hay ghi đè lịch sử `AgentSpecRevision` và `AgentDraftRevision` đã tạo trước đó.
+    -   Ghi nhận nhật ký kiểm toán hành động `RECOVERY_EXECUTED`.
+    -   Các bộ test `recoveryService.test.ts` (3/3 tests pass) và `recoveryIntegration.test.ts` (2/2 tests pass).
+-   **API Endpoints & UI Client:**
+    -   Bổ sung routes: `GET /api/v1/agent-builder/sessions/:id/usage`, `GET /api/v1/agent-builder/usage`, `POST /api/v1/agent-builder/recovery/reconcile`, `POST /api/v1/agent-builder/sessions/:id/reconcile`.
+    -   Cập nhật `packages/ui/src/api/agentBuilder.js` và unit tests `agentBuilder.test.js` (26/26 tests pass).
+    -   Cập nhật sổ tay vận hành `RUNBOOK_RELEASE_NOI_BO.md` với SOP-04 (Theo dõi token usage & chi phí) và SOP-05 (Quy trình phục hồi đối soát sau crash).
+-   **Kiểm thử & Nghiệm thu:**
+    -   29/29 test suites server với 228 tests pass 100%.
+    -   TypeScript typecheck (`tsc -p packages/server/tsconfig.json --noEmit`) exit 0 không lỗi.
+    -   4/4 UI test suites với 104 tests pass 100%.
+    -   Harness tests pass 14/15 (1 skipped host symlink).
+    -   ESLint & Prettier pass 0 errors, 0 warnings.
+    -   Lập task tiếp theo `B-023.md` (PH5-T08, PH5-T09 và PH5-T10: Kiểm Tra Migration Database, Zero-Downtime Draft Switch & Nghiệm Thu Tổng Thể Release Nội Bộ).
+
 ## 16/11/2026 — B-021 / PH5-T03–T04 (Giới Hạn Quota Budget Vận Hành & Runbook Nghiệm Thu Release Nội Bộ)
 
 Hoàn thành B-021 (kết hợp PH5-T03 Credential Redaction & Data Retention, PH5-T04 Structured Observability & Runbook, PH5-T05 / PH5-T06 Quota & Rate Limiting). Tiến độ Phase 5 đạt 4/10 task con:

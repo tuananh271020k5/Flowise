@@ -10,6 +10,7 @@ export type AuditActionType =
     | 'AGENT_PUBLISHED'
     | 'AGENT_UNPUBLISHED'
     | 'DATA_RETENTION_PURGE'
+    | 'RECOVERY_EXECUTED'
 
 export type AuditStatusType = 'SUCCESS' | 'FAILED' | 'REJECTED'
 

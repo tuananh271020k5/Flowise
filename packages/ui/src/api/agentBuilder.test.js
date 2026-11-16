@@ -222,4 +222,41 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/retention/sweep', payload)
         expect(res.data.purgedSessionsCount).toBe(2)
     })
+
+    it('getSessionUsage gửi GET request tới /agent-builder/sessions/:id/usage', async () => {
+        client.get.mockResolvedValueOnce({ data: { totalTokens: 1200 } })
+
+        const res = await agentBuilderApi.getSessionUsage('s1')
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/usage')
+        expect(res.data.totalTokens).toBe(1200)
+    })
+
+    it('getWorkspaceUsage gửi GET request tới /agent-builder/usage', async () => {
+        client.get.mockResolvedValueOnce({ data: { totalTokens: 5000 } })
+
+        const res = await agentBuilderApi.getWorkspaceUsage()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/usage')
+        expect(res.data.totalTokens).toBe(5000)
+    })
+
+    it('reconcileStaleJobs gửi POST request tới /agent-builder/recovery/reconcile', async () => {
+        const payload = { maxStaleMs: 30000 }
+        client.post.mockResolvedValueOnce({ data: { reconciledJobsCount: 1 } })
+
+        const res = await agentBuilderApi.reconcileStaleJobs(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/recovery/reconcile', payload)
+        expect(res.data.reconciledJobsCount).toBe(1)
+    })
+
+    it('reconcileSession gửi POST request tới /agent-builder/sessions/:id/reconcile', async () => {
+        client.post.mockResolvedValueOnce({ data: { success: true, sessionState: 'ready' } })
+
+        const res = await agentBuilderApi.reconcileSession('s1')
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/reconcile')
+        expect(res.data.sessionState).toBe('ready')
+    })
 })
