@@ -13,6 +13,8 @@ import builderLogger from '../../services/agent-builder/observability/builderLog
 import metricsService from '../../services/agent-builder/observability/metricsService'
 import tokenUsageService from '../../services/agent-builder/cost/tokenUsageService'
 import recoveryService from '../../services/agent-builder/recovery/recoveryService'
+import backupRestoreService from '../../services/agent-builder/backup/backupRestoreService'
+import zeroDowntimeService from '../../services/agent-builder/deployment/zeroDowntimeService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -555,6 +557,82 @@ const reconcileSession = async (req: Request, res: Response, next: NextFunction)
     }
 }
 
+const exportSessionBackup = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const bundle = await backupRestoreService.exportSessionBackup(req.params.id, workspaceId)
+        return res.status(StatusCodes.OK).json(bundle)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const importSessionBackup = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const { bundle, options } = req.body || {}
+        const result = await backupRestoreService.importSessionBackup(bundle || req.body, workspaceId, userId, options)
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const validateSchemaInvariants = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await backupRestoreService.validateSchemaInvariants()
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const switchDraftRevision = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const { draftRevisionId } = req.body || {}
+        const result = await zeroDowntimeService.switchDraftRevision({
+            sessionId: req.params.id,
+            workspaceId,
+            userId,
+            targetDraftRevisionId: draftRevisionId
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const instantRollback = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const userId = getUserId(req)
+        const { revisionId, draftRevisionId, toLastStable } = req.body || {}
+        const result = await zeroDowntimeService.instantRollback({
+            sessionId: req.params.id,
+            workspaceId,
+            userId,
+            targetRevisionId: revisionId,
+            targetDraftRevisionId: draftRevisionId,
+            toLastStablePublished: toLastStable
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -581,5 +659,10 @@ export default {
     getSessionUsage,
     getWorkspaceUsage,
     reconcileStaleJobs,
-    reconcileSession
+    reconcileSession,
+    exportSessionBackup,
+    importSessionBackup,
+    validateSchemaInvariants,
+    switchDraftRevision,
+    instantRollback
 }

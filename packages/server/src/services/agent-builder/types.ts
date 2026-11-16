@@ -103,6 +103,8 @@ export type SSEEventType =
     | 'build_failed'
     | 'agent_published'
     | 'agent_unpublished'
+    | 'draft_switched'
+    | 'agent_rollback'
     | 'error'
 
 export interface SSEPayload {

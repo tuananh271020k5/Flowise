@@ -149,3 +149,90 @@ Toàn bộ API key (OpenAI `sk-...`, Anthropic `sk-ant-...`, Gemini `AIza...`, H
 3. **Không tìm thấy bản ghi Audit Log:**
    - *Nguyên nhân:* `workspaceId` của người gọi không khớp với `workspaceId` của phiên làm việc.
    - *Khắc phục:* Kiểm tra quyền workspace của user trên Flowise header/token.
+
+---
+
+## 6. SOP-06: Database Migration Đa Hệ Quản Trị (PH5-T08)
+
+Hệ thống Agent Builder đã chuẩn bị đầy đủ bộ TypeORM Migrations đồng bộ trên cả 4 hệ quản trị cơ sở dữ liệu:
+- **SQLite**: `packages/server/src/database/migrations/sqlite/` (1781000000000 -> 1784000000000).
+- **PostgreSQL**: `packages/server/src/database/migrations/postgres/1781000000000-AddAgentBuilderEntities.ts`.
+- **MySQL**: `packages/server/src/database/migrations/mysql/1781000000000-AddAgentBuilderEntities.ts`.
+- **MariaDB**: `packages/server/src/database/migrations/mariadb/1781000000000-AddAgentBuilderEntities.ts`.
+
+### Các Bảng Mới Được Quản Lý:
+1. `builder_session`: Lưu trữ thông tin phiên làm việc, phân quyền workspace và trạng thái hiện tại.
+2. `builder_message`: Lịch sử trao đổi giữa người dùng và Agent Builder (hỗ trợ clientMessageId idempotent).
+3. `agent_spec_revision`: Quản lý đặc tả JSON bất biến qua từng lượt hiệu chỉnh.
+4. `agent_draft_revision`: Lưu vết các bản biên dịch Agentflow V2 được sinh ra.
+5. `build_job`: Quản lý vòng đời tiến trình build tự động, có timeout và theo dõi lỗi.
+6. `builder_audit_log`: Truy vết kiểm toán toàn bộ hoạt động trọng yếu có phân quyền workspace.
+
+---
+
+## 7. SOP-07: Sao Lưu (Backup), Phục Hồi (Restore) & Kiểm Tra Toàn Vẹn Schema (PH5-T08)
+
+### 7.1. Xuất Bản Sao Lưu Phiên Làm Việc
+- **Mục đích:** Lưu trữ dự phòng toàn bộ phiên làm việc của người dùng bao gồm lịch sử tin nhắn, bản đặc tả và các bản draft flow.
+- **Thao tác API:**
+  ```http
+  GET /api/v1/agent-builder/sessions/:id/backup
+  ```
+- **Dữ liệu trả về:** JSON bundle có mã băm SHA-256 (`checksum`) đảm bảo tính toàn vẹn khi lưu trữ và truyền tải.
+
+### 7.2. Phục Hồi Phiên Làm Việc Từ Bản Sao Lưu
+- **Thao tác API:**
+  ```http
+  POST /api/v1/agent-builder/sessions/restore
+  Content-Type: application/json
+
+  {
+    "bundle": { ... },
+    "options": { "overwrite": true }
+  }
+  ```
+- Hệ thống tự động xác thực mã kiểm tra `checksum` trước khi phục hồi, bảo toàn các ID thực thể và ghi nhận nhật ký `SESSION_CREATED`.
+
+### 7.3. Kiểm Tra Toàn Vẹn Schema Invariants
+- **Mục đích:** Phát hiện các bản ghi mồ côi (orphaned records) hoặc vi phạm liên kết khóa ngoại.
+- **Thao tác API:**
+  ```http
+  GET /api/v1/agent-builder/schema/validate
+  ```
+
+---
+
+## 8. SOP-08: Zero-Downtime Draft Switch & Instant Rollback (PH5-T09)
+
+### 8.1. Nguyên Lý Chuyển Đổi Không Gián Đoạn (Zero-Downtime)
+- Khi chuyển đổi bản draft (`switchDraftRevision`) hoặc hoàn tác khẩn cấp (`instantRollback`), hệ thống **giữ nguyên định danh `chatflow.id`** của Agentflow đang phục vụ.
+- Đồ thị thực thi (`flowData`) được cập nhật nguyên tử (atomic update). Các kết nối dự đoán của người dùng cuối `/api/v1/prediction/:flowId` đang chạy không bị ngắt kết nối (zero socket/SSE drops), và các request kế tiếp lập tức áp dụng đồ thị mới.
+
+### 8.2. Chuyển Đổi Bản Draft Tức Thì (Draft Switch)
+- **Thao tác API:**
+  ```http
+  POST /api/v1/agent-builder/sessions/:id/switch-draft
+  Content-Type: application/json
+
+  {
+    "draftRevisionId": "draft-xxx"
+  }
+  ```
+
+### 8.3. Khôi Phục Tức Thì Khẩn Cấp (Instant Rollback)
+- **Thao tác API:**
+  ```http
+  POST /api/v1/agent-builder/sessions/:id/instant-rollback
+  Content-Type: application/json
+
+  {
+    "toLastStable": true
+  }
+  ```
+  Hoặc chỉ định cụ thể:
+  ```json
+  {
+    "revisionId": "spec-rev-xxx"
+  }
+  ```
+- **Cơ chế an toàn:** Tự động sinh `AgentSpecRevision` số hiệu mới kế thừa cấu hình ổn định, không ghi đè bất kỳ bản ghi cũ nào, và ghi nhận audit log `ROLLBACK_EXECUTED`.

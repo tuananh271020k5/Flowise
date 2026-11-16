@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "revision": 37,
-  "updatedAt": "2026-11-16T16:58:00.000Z",
+  "revision": 38,
+  "updatedAt": "2026-11-17T00:16:00.000Z",
   "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-022",
+  "currentTask": "B-023",
   "status": "completed",
-  "productStage": "phase5_usage_and_recovery_ready",
-  "summary": "B-022/PH5-T05-T07 hoàn thành: Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart (Phase 5). Xây dựng tokenUsageService thu thập token (prompt/completion/total) theo provider/model (OpenAI, Anthropic, Gemini, Groq, Ollama), phân biệt usage đàm thoại/build/test/dự đoán thực tế và ước tính chi phí USD. Xây dựng recoveryService đối soát (reconcile) tự động khi server khởi động lại hoặc timeout, phục hồi các build/test jobs bị kẹt trạng thái 'running' thành 'failed' và chuyển session về 'ready' mà tuyệt đối không làm mất hay duplicate revisions. 29 server suites pass (228 tests), 4 UI suites pass (104 tests), tsc exit 0, ESLint exit 0, harness pass 14/15. Lập task B-023.",
+  "productStage": "phase5_release_gate_approved",
+  "summary": "B-023/PH5-T08-T10 hoàn thành: Kiểm Tra Migration Database, Zero-Downtime Draft Switch & Nghiệm Thu Tổng Thể Release Nội Bộ (Hoàn tất 100% Phase 5 — Đạt mốc Gate Release Nội Bộ). Đồng bộ TypeORM migrations trên cả 4 hệ CSDL (SQLite, PostgreSQL, MySQL, MariaDB). Xây dựng backupRestoreService hỗ trợ sao lưu toàn vẹn có checksum SHA-256 và kiểm tra schema invariants. Xây dựng zeroDowntimeService hỗ trợ chuyển đổi draft và instant rollback tức thì giữ nguyên flowId không gây ngắt kết nối. Hoàn thành bộ nghiệm thu 10 bước phase5FinalReleaseGate.test.ts. Cập nhật RUNBOOK_RELEASE_NOI_BO.md và lập PHASE5_RELEASE_REPORT.md. 32 server suites pass (241 tests), 4 UI suites pass (109 tests), tsc exit 0, ESLint exit 0, harness pass 14/15. Lập task B-024 mở đầu Phase 6.",
   "decisions": [
     "Thiết lập Quality Gate bắt buộc tỷ lệ pass kiểm thử >= 80% trước khi cho phép xuất bản (deployed: true).",
     "Entity BuilderAuditLog lưu vết toàn bộ hoạt động trọng yếu có phân quyền cách ly chặt chẽ theo workspaceId.",
@@ -16,41 +16,51 @@
     "Bảo vệ hệ thống bằng Rate Limiter trượt (sliding window) theo workspaceId trên các thao tác tạo phiên, gửi tin nhắn, build, test và publish.",
     "Chính sách Data Retention bảo vệ tuyệt đối các agent đang ở trạng thái xuất bản, chỉ dọn dẹp phiên nháp và nhật ký cũ.",
     "Theo dõi Token Usage chuẩn hóa theo từng provider/model và phân loại theo mục đích (conversation, build, evaluation, prediction).",
-    "Cơ chế Crash Recovery tự động phát hiện và reconcile các job treo quá thời hạn khi server khởi động lại mà không làm mất revisions."
+    "Cơ chế Crash Recovery tự động phát hiện và reconcile các job treo quá thời hạn khi server khởi động lại mà không làm mất revisions.",
+    "Đồng bộ TypeORM migrations trên cả 4 hệ CSDL (SQLite, PostgreSQL, MySQL, MariaDB) để tương thích 100% môi trường triển khai doanh nghiệp.",
+    "Zero-downtime draft switch và instant rollback giữ nguyên flowId, cập nhật atomic flowData để bảo đảm không đứt kết nối người dùng cuối."
   ],
   "changedFiles": [
-    "packages/server/src/database/entities/BuilderAuditLog.ts",
-    "packages/server/src/services/agent-builder/sessionService.ts",
+    "packages/server/src/database/migrations/sqlite/1784000000000-AddBuilderAuditLog.ts",
+    "packages/server/src/database/migrations/sqlite/index.ts",
+    "packages/server/src/database/migrations/postgres/1781000000000-AddAgentBuilderEntities.ts",
+    "packages/server/src/database/migrations/postgres/index.ts",
+    "packages/server/src/database/migrations/mysql/1781000000000-AddAgentBuilderEntities.ts",
+    "packages/server/src/database/migrations/mysql/index.ts",
+    "packages/server/src/database/migrations/mariadb/1781000000000-AddAgentBuilderEntities.ts",
+    "packages/server/src/database/migrations/mariadb/index.ts",
+    "packages/server/src/services/agent-builder/backup/backupRestoreService.ts",
+    "packages/server/src/services/agent-builder/backup/backupRestoreService.test.ts",
+    "packages/server/src/services/agent-builder/deployment/zeroDowntimeService.ts",
+    "packages/server/src/services/agent-builder/deployment/zeroDowntimeService.test.ts",
+    "packages/server/src/services/agent-builder/pipeline/phase5FinalReleaseGate.test.ts",
+    "packages/server/src/services/agent-builder/types.ts",
     "packages/server/src/services/agent-builder/index.ts",
     "packages/server/src/controllers/agent-builder/index.ts",
     "packages/server/src/routes/agent-builder/index.ts",
-    "packages/server/src/services/agent-builder/cost/tokenUsageService.ts",
-    "packages/server/src/services/agent-builder/cost/tokenUsageService.test.ts",
-    "packages/server/src/services/agent-builder/recovery/recoveryService.ts",
-    "packages/server/src/services/agent-builder/recovery/recoveryService.test.ts",
-    "packages/server/src/services/agent-builder/recovery/recoveryIntegration.test.ts",
     "packages/ui/src/api/agentBuilder.js",
     "packages/ui/src/api/agentBuilder.test.js",
     "AI-Agent/docs/RUNBOOK_RELEASE_NOI_BO.md",
-    "AI-Agent/tasks/B-022.md",
+    "AI-Agent/docs/PHASE5_RELEASE_REPORT.md",
     "AI-Agent/tasks/B-023.md",
+    "AI-Agent/tasks/B-024.md",
     "AI-Agent/harness/config.json",
     "AI-Agent/state/WORKLOG.md",
     "AI-Agent/state/project.json"
   ],
   "checks": [
-    "228/228 tests pass trong packages/server (Jest 29/29 suites agent-builder).",
+    "241/241 tests pass trong packages/server (Jest 32/32 suites agent-builder).",
     "TypeScript typecheck (tsc -p packages/server/tsconfig.json --noEmit) exit code 0.",
-    "104/104 tests pass trong packages/ui (Jest 4/4 suites).",
+    "109/109 tests pass trong packages/ui (Jest 4/4 suites).",
     "ESLint và Prettier trên toàn bộ file thay đổi exit code 0 (0 errors, 0 warnings).",
     "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push task B-022 lên origin/main và Flowise-Agent-Builder.",
-    "Triển khai task B-023 (PH5-T08, PH5-T09, PH5-T10): Kiểm Tra Migration Database, Zero-Downtime Draft Switch & Nghiệm Thu Tổng Thể Release Nội Bộ."
+    "Commit và push task B-023 lên origin/main và Flowise-Agent-Builder.",
+    "Triển khai task B-024 (PH6-T01, PH6-T02, PH6-T03): API Connector Registry, API Agent Spec & Readonly API Compiler."
   ],
-  "nextTask": "B-023",
+  "nextTask": "B-024",
   "references": [
     "AI-Agent/harness/GIT_WORKFLOW.md",
     "AI-Agent/harness/HANDOFF.md",
@@ -67,19 +77,5 @@
     "actualInputTokens": null,
     "actualOutputTokens": null,
     "verifiedSavings": false
-  },
-  "repository": {
-    "origin": "https://github.com/tuananh271020k5/Flowise.git",
-    "upstream": "https://github.com/FlowiseAI/Flowise",
-    "trackingBranch": "origin/main",
-    "fetchVerified": true,
-    "pushVerified": true,
-    "baselinePatchCommit": "8f3e3946c3cf0b9e60f912c7ea97f59784db1441",
-    "newCommitCreatedDuringSetup": false
-  },
-  "snapshot": {
-    "head": "6d6c1c249a5b6d51d457630733ba6fc7db9621e2",
-    "branch": "main",
-    "sourceFingerprint": "22e39acb6ee4ccf6942023f41487c13c7d677289eb6a5ffe7929738010f83e91"
   }
 }

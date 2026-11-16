@@ -259,4 +259,52 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/reconcile')
         expect(res.data.sessionState).toBe('ready')
     })
+
+    it('exportSessionBackup gửi GET request tới /agent-builder/sessions/:id/backup', async () => {
+        client.get.mockResolvedValueOnce({ data: { sessionId: 's1', version: '1.0.0' } })
+
+        const res = await agentBuilderApi.exportSessionBackup('s1')
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/sessions/s1/backup')
+        expect(res.data.sessionId).toBe('s1')
+    })
+
+    it('importSessionBackup gửi POST request tới /agent-builder/sessions/restore', async () => {
+        const bundle = { sessionId: 's1', session: {} }
+        const options = { overwrite: true }
+        client.post.mockResolvedValueOnce({ data: { success: true, sessionId: 's1' } })
+
+        const res = await agentBuilderApi.importSessionBackup(bundle, options)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/restore', { bundle, options })
+        expect(res.data.success).toBe(true)
+    })
+
+    it('validateSchema gửi GET request tới /agent-builder/schema/validate', async () => {
+        client.get.mockResolvedValueOnce({ data: { valid: true, totalOrphaned: 0 } })
+
+        const res = await agentBuilderApi.validateSchema()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/schema/validate')
+        expect(res.data.valid).toBe(true)
+    })
+
+    it('switchDraftRevision gửi POST request tới /agent-builder/sessions/:id/switch-draft', async () => {
+        client.post.mockResolvedValueOnce({ data: { success: true, flowId: 'f1' } })
+
+        const res = await agentBuilderApi.switchDraftRevision('s1', 'd1')
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/switch-draft', { draftRevisionId: 'd1' })
+        expect(res.data.success).toBe(true)
+    })
+
+    it('instantRollback gửi POST request tới /agent-builder/sessions/:id/instant-rollback', async () => {
+        const payload = { toLastStable: true }
+        client.post.mockResolvedValueOnce({ data: { success: true, revisionNo: 3 } })
+
+        const res = await agentBuilderApi.instantRollback('s1', payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/instant-rollback', payload)
+        expect(res.data.revisionNo).toBe(3)
+    })
 })

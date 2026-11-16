@@ -1,5 +1,35 @@
 # Nhật ký bàn giao ngắn
 
+## 17/11/2026 — B-023 / PH5-T08, PH5-T09 & PH5-T10 (Hoàn Tất 100% Phase 5 — Gate Release Nội Bộ)
+
+Hoàn thành B-023 (PH5-T08 Kiểm tra migration database & backup/restore; PH5-T09 Zero-downtime draft switch & instant rollback; PH5-T10 Nghiệm thu toàn diện release nội bộ). **Chính thức hoàn thành 100% Phase 5 (10/10 tasks). Đạt mốc Gate Release Nội Bộ**:
+
+-   **Kiểm Tra Migration Database & Đa Hệ Quản Trị CSDL (PH5-T08):**
+    -   Đồng bộ và hoàn thiện toàn bộ TypeORM Migrations trên cả 4 hệ CSDL: SQLite, PostgreSQL, MySQL, MariaDB.
+    -   Bảo đảm quản lý đầy đủ 6 bảng mới của Agent Builder: `builder_session`, `builder_message`, `agent_spec_revision`, `agent_draft_revision`, `build_job`, `builder_audit_log`.
+    -   Đảm bảo cấu trúc index, khóa chính UUID, timestamp, default values và quan hệ workspace tương thích 100% không xung đột với schema gốc Flowise.
+-   **Dịch Vụ Sao Lưu (Backup), Phục Hồi (Restore) & Schema Invariants (PH5-T08):**
+    -   Xây dựng `backupRestoreService.ts`: Hỗ trợ trích xuất toàn bộ dữ liệu một phiên thành bản sao lưu có mã băm toàn vẹn SHA-256 (`checksum`), phục hồi phiên làm việc nguyên vẹn vào bất kỳ workspace nào.
+    -   Hàm `validateSchemaInvariants()` phát hiện các bản ghi mồ côi (orphaned records) hoặc vi phạm liên kết khóa ngoại.
+    -   Bộ kiểm thử `backupRestoreService.test.ts` (7/7 tests pass 100%).
+-   **Triển Khai Không Gián Đoạn (Zero-Downtime Draft Switch) & Khôi Phục Tức Thì (Instant Rollback) (PH5-T09):**
+    -   Xây dựng `zeroDowntimeService.ts`: Giữ nguyên định danh `chatflow.id`, cập nhật `flowData` nguyên tử (atomic update).
+    -   Các kết nối chat / prediction của người dùng cuối không bị ngắt kết nối WebSocket/SSE khi đổi draft hoặc rollback.
+    -   Instant Rollback tự động tạo `AgentSpecRevision` mới mang cấu hình lịch sử (bảo toàn tính bất biến), phát sự kiện SSE `agent_rollback` và ghi audit log `ROLLBACK_EXECUTED`.
+    -   Bộ kiểm thử `zeroDowntimeService.test.ts` (5/5 tests pass 100%).
+-   **Nghiệm Thu Toàn Diện Release Nội Bộ Phase 5 (PH5-T10):**
+    -   Xây dựng bộ kịch bản kiểm thử nghiệm thu 10 bước trọn vẹn: `phase5FinalReleaseGate.test.ts` (Pass 100%).
+    -   Cập nhật sổ tay vận hành `RUNBOOK_RELEASE_NOI_BO.md` với SOP-06 (Database migration), SOP-07 (Backup & restore), SOP-08 (Zero-downtime switch & Instant rollback).
+    -   Lập báo cáo nghiệm thu phát hành chính thức: `AI-Agent/docs/PHASE5_RELEASE_REPORT.md`.
+-   **API Endpoints & UI Client:**
+    -   Bổ sung routes: `GET /sessions/:id/backup`, `POST /sessions/restore`, `GET /schema/validate`, `POST /sessions/:id/switch-draft`, `POST /sessions/:id/instant-rollback`.
+    -   Mở rộng UI client `packages/ui/src/api/agentBuilder.js` và cập nhật `agentBuilder.test.js` (31/31 tests pass).
+-   **Kiểm thử & Nghiệm thu:**
+    -   32/32 test suites server agent-builder với **241 tests pass 100%**.
+    -   4/4 UI test suites với **109 tests pass 100%**.
+    -   TypeScript typecheck (`tsc -p packages/server/tsconfig.json --noEmit`) exit code 0 không lỗi.
+    -   Lập task mở đầu Phase 6: `B-024.md` (PH6-T01, PH6-T02 & PH6-T03: API Connector Registry, API Agent Spec & Readonly API Compiler).
+
 ## 16/11/2026 — B-022 / PH5-T05 & PH5-T07 (Theo Dõi Token Usage Chi Phí Thực & Cơ Chế Phục Hồi Khi Crash/Restart)
 
 Hoàn thành B-022 (PH5-T05 Thu usage và theo dõi chi phí thực; PH5-T07 Kiểm tra recovery khi crash/restart). Tiến độ Phase 5 đạt 6/10 task con:

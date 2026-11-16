@@ -52,6 +52,17 @@ const reconcileStaleJobs = (body) => client.post('/agent-builder/recovery/reconc
 
 const reconcileSession = (sessionId) => client.post(`/agent-builder/sessions/${sessionId}/reconcile`)
 
+const exportSessionBackup = (sessionId) => client.get(`/agent-builder/sessions/${sessionId}/backup`)
+
+const importSessionBackup = (bundle, options) => client.post('/agent-builder/sessions/restore', { bundle, options })
+
+const validateSchema = () => client.get('/agent-builder/schema/validate')
+
+const switchDraftRevision = (sessionId, draftRevisionId) =>
+    client.post(`/agent-builder/sessions/${sessionId}/switch-draft`, { draftRevisionId })
+
+const instantRollback = (sessionId, params) => client.post(`/agent-builder/sessions/${sessionId}/instant-rollback`, params)
+
 export default {
     createSession,
     getSession,
@@ -78,5 +89,10 @@ export default {
     getSessionUsage,
     getWorkspaceUsage,
     reconcileStaleJobs,
-    reconcileSession
+    reconcileSession,
+    exportSessionBackup,
+    importSessionBackup,
+    validateSchema,
+    switchDraftRevision,
+    instantRollback
 }

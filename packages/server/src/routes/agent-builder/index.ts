@@ -63,4 +63,13 @@ router.get('/usage', agentBuilderController.getWorkspaceUsage)
 router.post('/recovery/reconcile', agentBuilderController.reconcileStaleJobs)
 router.post('/sessions/:id/reconcile', agentBuilderController.reconcileSession)
 
+// BACKUP, RESTORE & SCHEMA INVARIANTS (PH5-T08)
+router.get('/sessions/:id/backup', agentBuilderController.exportSessionBackup)
+router.post('/sessions/restore', agentBuilderController.importSessionBackup)
+router.get('/schema/validate', agentBuilderController.validateSchemaInvariants)
+
+// ZERO-DOWNTIME DRAFT SWITCH & INSTANT ROLLBACK (PH5-T09)
+router.post('/sessions/:id/switch-draft', agentBuilderController.switchDraftRevision)
+router.post('/sessions/:id/instant-rollback', agentBuilderController.instantRollback)
+
 export default router
