@@ -307,4 +307,42 @@ describe('agentBuilder API client', () => {
         expect(client.post).toHaveBeenCalledWith('/agent-builder/sessions/s1/instant-rollback', payload)
         expect(res.data.revisionNo).toBe(3)
     })
+
+    it('listApiConnectors gửi GET request tới /agent-builder/api-connectors', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'conn-1', name: 'Weather API' }] })
+
+        const res = await agentBuilderApi.listApiConnectors()
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/api-connectors')
+        expect(res.data).toHaveLength(1)
+    })
+
+    it('registerApiConnector gửi POST request tới /agent-builder/api-connectors', async () => {
+        const payload = { name: 'Weather API', baseUrl: 'https://api.weather.com' }
+        client.post.mockResolvedValueOnce({ data: { id: 'conn-1', ...payload } })
+
+        const res = await agentBuilderApi.registerApiConnector(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/api-connectors', payload)
+        expect(res.data.id).toBe('conn-1')
+    })
+
+    it('getApiConnector gửi GET request tới /agent-builder/api-connectors/:id', async () => {
+        client.get.mockResolvedValueOnce({ data: { id: 'conn-1', name: 'Weather API' } })
+
+        const res = await agentBuilderApi.getApiConnector('conn-1')
+
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/api-connectors/conn-1')
+        expect(res.data.name).toBe('Weather API')
+    })
+
+    it('validateApiCall gửi POST request tới /agent-builder/api-connectors/validate-call', async () => {
+        const payload = { connectorId: 'conn-1', operationId: 'getWeather', url: 'https://api.weather.com/v1', method: 'GET' }
+        client.post.mockResolvedValueOnce({ data: { allowed: true } })
+
+        const res = await agentBuilderApi.validateApiCall(payload)
+
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/api-connectors/validate-call', payload)
+        expect(res.data.allowed).toBe(true)
+    })
 })

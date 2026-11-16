@@ -82,6 +82,18 @@ export const ToolRefSchema = z
     .strict()
 
 /**
+ * API connector reference schema (PH6-T02).
+ */
+export const ApiConnectorRefSchema = z
+    .object({
+        connectorId: safeString(1, 100, 'Connector ID'),
+        name: safeString(1, 100, 'Connector Name'),
+        baseUrl: safeString(1, 500, 'Base URL'),
+        allowedOperations: z.array(safeString(1, 100, 'Operation ID')).max(20).optional()
+    })
+    .strict()
+
+/**
  * Execution and visibility policy schema.
  */
 export const PolicySchema = z
@@ -119,6 +131,7 @@ export const AgentSpecSchema = z
             .default('default-builder-model'),
         dataSources: z.array(DataSourceRefSchema).max(10, 'Tối đa 10 data sources').default([]),
         tools: z.array(ToolRefSchema).max(20, 'Tối đa 20 tools').default([]),
+        apiConnectors: z.array(ApiConnectorRefSchema).max(10, 'Tối đa 10 API connectors').optional(),
         policy: PolicySchema.default({
             visibility: 'private',
             executionMode: 'controlled-test',

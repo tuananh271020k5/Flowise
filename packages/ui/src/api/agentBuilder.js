@@ -63,6 +63,14 @@ const switchDraftRevision = (sessionId, draftRevisionId) =>
 
 const instantRollback = (sessionId, params) => client.post(`/agent-builder/sessions/${sessionId}/instant-rollback`, params)
 
+const listApiConnectors = () => client.get('/agent-builder/api-connectors')
+
+const registerApiConnector = (data) => client.post('/agent-builder/api-connectors', data)
+
+const getApiConnector = (id) => client.get(`/agent-builder/api-connectors/${id}`)
+
+const validateApiCall = (params) => client.post('/agent-builder/api-connectors/validate-call', params)
+
 export default {
     createSession,
     getSession,
@@ -94,5 +102,9 @@ export default {
     importSessionBackup,
     validateSchema,
     switchDraftRevision,
-    instantRollback
+    instantRollback,
+    listApiConnectors,
+    registerApiConnector,
+    getApiConnector,
+    validateApiCall
 }

@@ -60,6 +60,7 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         'modelProfileRef',
         'dataSources',
         'tools',
+        'apiConnectors',
         'policy',
         'evaluationExamples'
     ])
@@ -101,6 +102,29 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         // Bổ sung assumption về trích dẫn tài liệu tham khảo
         assumptions.push('Tự động áp dụng cơ chế trích dẫn nguồn tài liệu tham khảo (citation) khi trả lời')
         reasonCodes.push('KNOWLEDGE_CITATION_ASSUMED')
+    }
+
+    // 3c. Kiểm tra quy tắc bắt buộc riêng cho API Readonly Agent (PH6-T02)
+    if (raw.kind === 'api-readonly') {
+        const conns = raw.apiConnectors
+        if (!conns || !Array.isArray(conns) || conns.length === 0) {
+            missingFields.push('apiConnectors')
+            reasonCodes.push('MISSING_API_CONNECTOR')
+        } else {
+            const hasValidConn = conns.every(
+                (c) =>
+                    c &&
+                    typeof c === 'object' &&
+                    ((typeof (c as any).connectorId === 'string' && (c as any).connectorId.trim().length > 0) ||
+                        (typeof (c as any).name === 'string' && (c as any).name.trim().length > 0))
+            )
+            if (!hasValidConn) {
+                missingFields.push('apiConnectors')
+                reasonCodes.push('INVALID_API_CONNECTOR_REF')
+            }
+        }
+        assumptions.push('Áp dụng cơ chế an toàn API Readonly: Chặn mọi thao tác sửa/xóa dữ liệu bên ngoài')
+        reasonCodes.push('API_READONLY_ENFORCED')
     }
 
     // 4. Record default assumptions if fields are not explicitly set

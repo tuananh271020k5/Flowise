@@ -15,6 +15,7 @@ import tokenUsageService from '../../services/agent-builder/cost/tokenUsageServi
 import recoveryService from '../../services/agent-builder/recovery/recoveryService'
 import backupRestoreService from '../../services/agent-builder/backup/backupRestoreService'
 import zeroDowntimeService from '../../services/agent-builder/deployment/zeroDowntimeService'
+import apiConnectorService from '../../services/agent-builder/api-connectors/apiConnectorService'
 import { AgentSpec } from '../../services/agent-builder/types'
 
 const getWorkspaceId = (req: Request): string => {
@@ -633,6 +634,58 @@ const instantRollback = async (req: Request, res: Response, next: NextFunction) 
     }
 }
 
+const listApiConnectors = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const connectors = await apiConnectorService.listConnectors(workspaceId)
+        return res.status(StatusCodes.OK).json(connectors)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const registerApiConnector = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const connector = await apiConnectorService.registerConnector({
+            ...req.body,
+            workspaceId
+        })
+        return res.status(StatusCodes.CREATED).json(connector)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const getApiConnector = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.params?.id) {
+            throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Connector ID is required')
+        }
+        const workspaceId = getWorkspaceId(req)
+        const connector = await apiConnectorService.getConnector(req.params.id, workspaceId)
+        if (!connector) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Connector not found' })
+        }
+        return res.status(StatusCodes.OK).json(connector)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const validateApiCall = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const result = apiConnectorService.validateApiCall({
+            ...req.body,
+            workspaceId
+        })
+        return res.status(StatusCodes.OK).json(result)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     createSession,
     getSessionById,
@@ -664,5 +717,9 @@ export default {
     importSessionBackup,
     validateSchemaInvariants,
     switchDraftRevision,
-    instantRollback
+    instantRollback,
+    listApiConnectors,
+    registerApiConnector,
+    getApiConnector,
+    validateApiCall
 }

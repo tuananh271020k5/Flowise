@@ -1,5 +1,33 @@
 # Nhật ký bàn giao ngắn
 
+## 17/11/2026 — B-024 / PH6-T01, PH6-T02 & PH6-T03 (API Connector Registry, API Spec & Readonly Compiler — Mở Đầu Phase 6)
+
+Hoàn thành B-024 (PH6-T01 API Connector Registry & Operation Allowlist; PH6-T02 API Agent Spec & Thu Thập Yêu Cầu; PH6-T03 API Readonly Template & Compiler):
+
+-   **API Connector Registry & Operation Allowlist (PH6-T01):**
+    -   Xây dựng `apiConnectorService.ts`: Quản lý danh mục kết nối API, phân quyền chặt chẽ theo workspace (Negative Auth: 403 Forbidden).
+    -   Kiểm soát URL prefix matching chống SSRF: Tuyệt đối không để LLM tự ý gọi URL tùy ý ngoài `baseUrl` của Connector đã đăng ký.
+    -   Quản lý danh sách phương thức HTTP được phép (Allowlist Operations).
+    -   Cơ chế an toàn Readonly: Chặn toàn bộ thao tác thay đổi dữ liệu (`POST`, `PUT`, `DELETE`, `PATCH`) trong ngữ cảnh `isReadonlyContext: true`.
+    -   Bộ kiểm thử `apiConnectorService.test.ts` (7/7 tests pass 100%).
+-   **API Agent Spec & Thu Thập Yêu Cầu Tự Động (PH6-T02):**
+    -   Mở rộng `types.ts`, `schema.ts`, `readiness.ts` với `ApiConnectorRef` và validator Zod `ApiConnectorRefSchema`.
+    -   Mở rộng `collectorService.ts`: Nhận diện nhu cầu tích hợp API từ hội thoại tiếng Việt của người dùng ("gọi API thời tiết", "kết nối API"), tự động trích xuất `apiConnectors`, hỏi bổ sung thông tin thiếu ưu tiên nhất mà không hỏi lặp lại.
+    -   Bộ kiểm thử `collectorService.test.ts` (12/12 tests pass 100%).
+-   **API Readonly Template & Compiler (PH6-T03):**
+    -   Xây dựng `apiTemplate.v1.ts` sinh đồ thị Flowise Agentflow V2 tích hợp các node: `startAgentflow` (1.4), `chatOpenAI` (5.0), `requestsGet` (2.0) và `agentAgentflow` (3.2).
+    -   Tự động nhúng quy tắc an toàn bảo vệ API Readonly trong System Prompt.
+    -   Bộ kiểm thử `apiTemplate.test.ts` (1/1 test pass), `compiler.test.ts` (5/5 tests pass).
+-   **Kiểm Thử Tích Hợp Toàn Bộ Chu Trình (Integration Suite):**
+    -   `apiAgentIntegration.test.ts`: Kiểm thử liên thông 5 bước: Đăng ký connector -> Thu thập chat tiếng Việt -> Lập kế hoạch -> Biên dịch Agentflow V2 -> Xác thực allowlist API (Pass 100%).
+-   **API Endpoints & UI Client:**
+    -   Bổ sung 4 API routes: `GET /api-connectors`, `POST /api-connectors`, `GET /api-connectors/:id`, `POST /api-connectors/validate-call`.
+    -   Nâng cấp `packages/ui/src/api/agentBuilder.js` và `agentBuilder.test.js` (35/35 tests pass).
+-   **Kiểm thử & Nghiệm thu:**
+    -   35/35 test suites server agent-builder pass 100% (222+ unit tests).
+    -   4/4 UI test suites pass 100% (113 tests).
+    -   Lập task kế tiếp `B-025.md` (PH6-T04 đến PH6-T08).
+
 ## 17/11/2026 — B-023 / PH5-T08, PH5-T09 & PH5-T10 (Hoàn Tất 100% Phase 5 — Gate Release Nội Bộ)
 
 Hoàn thành B-023 (PH5-T08 Kiểm tra migration database & backup/restore; PH5-T09 Zero-downtime draft switch & instant rollback; PH5-T10 Nghiệm thu toàn diện release nội bộ). **Chính thức hoàn thành 100% Phase 5 (10/10 tasks). Đạt mốc Gate Release Nội Bộ**:

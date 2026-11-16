@@ -3,6 +3,7 @@ import { AgentSpec } from '../types'
 import { ALLOWED_AGENTFLOW_NODES, isNodeAllowed } from './nodeRegistry'
 import { ASSISTANT_TEMPLATE_ID, ASSISTANT_TEMPLATE_VERSION } from './templates/assistantTemplate.v1'
 import { KNOWLEDGE_TEMPLATE_ID, KNOWLEDGE_TEMPLATE_VERSION } from './templates/knowledgeTemplate.v1'
+import { API_TEMPLATE_ID, API_TEMPLATE_VERSION } from './templates/apiTemplate.v1'
 import { createHash } from 'crypto'
 
 export interface CapabilityBinding {
@@ -58,11 +59,15 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     const planHash = calculatePlanHash(spec, specRevisionId)
     const capabilityBindings: CapabilityBinding[] = []
     const connectionRefs: Record<string, string> = {}
-    const isKnowledge = spec.kind === 'knowledge' || (Array.isArray(spec.dataSources) && spec.dataSources.length > 0)
+    const isApi = spec.kind === 'api-readonly' || (Array.isArray(spec.apiConnectors) && spec.apiConnectors.length > 0)
+    const isKnowledge = !isApi && (spec.kind === 'knowledge' || (Array.isArray(spec.dataSources) && spec.dataSources.length > 0))
 
     const expectedChecks: string[] = ['specReady', 'buildReady', 'templateCompatible', 'capabilitiesAllowlisted']
     if (isKnowledge) {
         expectedChecks.push('knowledgeStoreReady', 'retrievalConfigured')
+    }
+    if (isApi) {
+        expectedChecks.push('apiConnectorAllowlisted', 'readonlyPolicyEnforced')
     }
 
     // 1. Ánh xạ Model Capability
@@ -77,7 +82,7 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         type: 'model',
         config: {
             modelName: 'gpt-4o',
-            temperature: isKnowledge ? 0.2 : 0.7
+            temperature: isKnowledge || isApi ? 0.2 : 0.7
         }
     })
     connectionRefs.model = modelNodeName
@@ -103,6 +108,27 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         connectionRefs.datasource = 'documentStoreTool'
     }
 
+    // 2b. Ánh xạ API Capability (RequestsGet) cho API Agent (PH6-T03)
+    if (isApi) {
+        const connector = spec.apiConnectors && spec.apiConnectors.length > 0 ? spec.apiConnectors[0] : undefined
+        const connId = connector?.connectorId || 'conn-weather-v1'
+        const connName = connector?.name || 'API Service'
+        const baseUrl = connector?.baseUrl || 'https://api.openweathermap.org/data/2.5'
+
+        capabilityBindings.push({
+            capabilityId: `cap_api_${connId}`,
+            nodeName: 'requestsGet',
+            nodeVersion: 2.0,
+            type: 'tool',
+            config: {
+                requestsGetUrl: baseUrl,
+                requestsGetName: `api_${connId.replace(/[^a-zA-Z0-9_]/g, '_')}`,
+                requestsGetDescription: `Truy vấn dữ liệu từ ${connName} (${baseUrl})`
+            }
+        })
+        connectionRefs.api = 'requestsGet'
+    }
+
     // 3. Ánh xạ Tools Capabilities (chỉ từ registry allowlist)
     if (spec.tools && spec.tools.length > 0) {
         spec.tools.forEach((tool, idx) => {
@@ -122,11 +148,22 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         })
     }
 
+    let templateId = ASSISTANT_TEMPLATE_ID
+    let templateVersion = ASSISTANT_TEMPLATE_VERSION
+
+    if (isApi) {
+        templateId = API_TEMPLATE_ID
+        templateVersion = API_TEMPLATE_VERSION
+    } else if (isKnowledge) {
+        templateId = KNOWLEDGE_TEMPLATE_ID
+        templateVersion = KNOWLEDGE_TEMPLATE_VERSION
+    }
+
     return {
         id: `plan_${planHash}`,
         specRevisionId,
-        templateId: isKnowledge ? KNOWLEDGE_TEMPLATE_ID : ASSISTANT_TEMPLATE_ID,
-        templateVersion: isKnowledge ? KNOWLEDGE_TEMPLATE_VERSION : ASSISTANT_TEMPLATE_VERSION,
+        templateId,
+        templateVersion,
         runtimeSha: 'flowise-v2-core-runtime',
         capabilityBindings,
         connectionRefs,
@@ -147,13 +184,14 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
         return { valid: false, planId, errors: ['AgentPlan không được để rỗng'] }
     }
 
-    // 1. Kiểm tra Template compatibility (Hỗ trợ cả Assistant và Knowledge Templates)
+    // 1. Kiểm tra Template compatibility (Hỗ trợ Assistant, Knowledge và API Templates)
     const isAssistant = plan.templateId === ASSISTANT_TEMPLATE_ID && plan.templateVersion === ASSISTANT_TEMPLATE_VERSION
     const isKnowledge = plan.templateId === KNOWLEDGE_TEMPLATE_ID && plan.templateVersion === KNOWLEDGE_TEMPLATE_VERSION
+    const isApi = plan.templateId === API_TEMPLATE_ID && plan.templateVersion === API_TEMPLATE_VERSION
 
-    if (!isAssistant && !isKnowledge) {
+    if (!isAssistant && !isKnowledge && !isApi) {
         errors.push(
-            `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID} v${ASSISTANT_TEMPLATE_VERSION} hoặc ${KNOWLEDGE_TEMPLATE_ID} v${KNOWLEDGE_TEMPLATE_VERSION})`
+            `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID}, ${KNOWLEDGE_TEMPLATE_ID} hoặc ${API_TEMPLATE_ID})`
         )
     }
 

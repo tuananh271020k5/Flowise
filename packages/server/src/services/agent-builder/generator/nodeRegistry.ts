@@ -204,6 +204,32 @@ export const ALLOWED_AGENTFLOW_NODES: Record<string, NodeMetadata> = {
         allowedInputs: ['name', 'description', 'retriever', 'returnSourceDocuments', 'retrieverToolMetadataFilter'],
         requiredInputs: ['name', 'description'],
         description: 'Use a retriever as allowed tool for agent'
+    },
+    requestsGet: {
+        name: 'requestsGet',
+        label: 'Requests Get',
+        type: 'RequestsGet',
+        category: 'Tools',
+        supportedVersions: [2.0],
+        recommendedVersion: 2.0,
+        color: '#3B82F6',
+        baseClasses: ['RequestsGet', 'Tool'],
+        allowedInputs: ['requestsGetUrl', 'requestsGetName', 'requestsGetDescription', 'headers', 'queryParams', 'credential'],
+        requiredInputs: ['requestsGetUrl'],
+        description: 'Thực thi truy vấn HTTP GET đến các API bên ngoài được cấp phép (PH6-T03)'
+    },
+    customTool: {
+        name: 'customTool',
+        label: 'Custom Tool',
+        type: 'CustomTool',
+        category: 'Tools',
+        supportedVersions: [3.0],
+        recommendedVersion: 3.0,
+        color: '#8B5CF6',
+        baseClasses: ['CustomTool', 'Tool', 'StructuredTool'],
+        allowedInputs: ['selectedTool', 'returnDirect'],
+        requiredInputs: ['selectedTool'],
+        description: 'Công cụ tùy chỉnh gọi API nội bộ hoặc script được phê duyệt trong Flowise (PH6-T03)'
     }
 }
 

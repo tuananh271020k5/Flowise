@@ -33,6 +33,13 @@ export interface ToolRef {
     config?: Record<string, unknown>
 }
 
+export interface ApiConnectorRef {
+    connectorId: string
+    name: string
+    baseUrl: string
+    allowedOperations?: string[]
+}
+
 export interface AgentSpec {
     schemaVersion: '1.0'
     kind: AgentSpecKind
@@ -44,6 +51,7 @@ export interface AgentSpec {
     modelProfileRef: string
     dataSources: DataSourceRef[]
     tools: ToolRef[]
+    apiConnectors?: ApiConnectorRef[]
     policy: AgentPolicy
     evaluationExamples: EvaluationExample[]
 }

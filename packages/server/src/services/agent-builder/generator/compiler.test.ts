@@ -136,4 +136,59 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(messages[0].content).toContain('NGUYÊN TẮC HỎI ĐÁP THEO TÀI LIỆU')
         expect(messages[0].content).toContain('documentStoreTool')
     })
+
+    it('biên dịch API Readonly AgentPlan sinh RequestsGet node và API safety guidelines (PH6-T03)', () => {
+        const apiSpec: AgentSpec = {
+            schemaVersion: '1.0',
+            kind: 'api-readonly',
+            name: 'Trợ Lý Thời Tiết API',
+            goal: 'Tra cứu thông tin dự báo thời tiết trực tuyến',
+            language: 'vi',
+            instructions: 'Trả lời nhiệt độ và độ ẩm thời gian thực',
+            outputExpectations: ['Ngắn gọn'],
+            modelProfileRef: 'chatOpenAI',
+            dataSources: [],
+            tools: [],
+            apiConnectors: [
+                {
+                    connectorId: 'conn-weather-hcm',
+                    name: 'HCM Weather API',
+                    baseUrl: 'https://api.openweathermap.org/data/2.5',
+                    allowedOperations: ['getWeatherByCity']
+                }
+            ],
+            policy: {
+                visibility: 'private',
+                executionMode: 'controlled-test',
+                allowWrite: false
+            },
+            evaluationExamples: [
+                {
+                    input: 'Thời tiết hôm nay thế nào?',
+                    assertions: ['Nhiệt độ hiện tại']
+                }
+            ]
+        }
+
+        const plan = createAgentPlan(apiSpec, 'rev-api-101')
+        const compiled = compiler.compile(plan)
+
+        expect(compiled.templateId).toBe('api-flow-template')
+
+        // Kiểm tra RequestsGet node
+        const apiNode = compiled.nodes.find((n) => n.data.name === 'requestsGet')
+        expect(apiNode).toBeDefined()
+        expect(apiNode?.data.inputs.requestsGetUrl).toBe('https://api.openweathermap.org/data/2.5')
+
+        // Kiểm tra Agent node kết nối requestsGet
+        const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
+        expect(agentNode).toBeDefined()
+        const agentTools = agentNode?.data.inputs.agentTools as any[]
+        expect(agentTools.some((t) => t.agentSelectedTool === 'requestsGet')).toBe(true)
+
+        // Kiểm tra API Readonly guidelines
+        const messages = agentNode?.data.inputs.agentMessages as any[]
+        expect(messages[0].content).toContain('NGUYÊN TẮC AN TOÀN TRUY VẤN API (API READONLY RULES)')
+        expect(messages[0].content).toContain('READONLY')
+    })
 })

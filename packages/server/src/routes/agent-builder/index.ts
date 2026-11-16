@@ -72,4 +72,10 @@ router.get('/schema/validate', agentBuilderController.validateSchemaInvariants)
 router.post('/sessions/:id/switch-draft', agentBuilderController.switchDraftRevision)
 router.post('/sessions/:id/instant-rollback', agentBuilderController.instantRollback)
 
+// API CONNECTORS & OPERATION ALLOWLIST (PH6-T01 & PH6-T02)
+router.get('/api-connectors', agentBuilderController.listApiConnectors)
+router.post('/api-connectors', agentBuilderController.registerApiConnector)
+router.get('/api-connectors/:id', agentBuilderController.getApiConnector)
+router.post('/api-connectors/validate-call', agentBuilderController.validateApiCall)
+
 export default router

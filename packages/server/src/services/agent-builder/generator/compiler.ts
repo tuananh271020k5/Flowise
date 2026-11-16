@@ -1,5 +1,6 @@
 import { AgentflowEdge, AgentflowNode } from './templates/assistantTemplate.v1'
 import { KNOWLEDGE_TEMPLATE_ID } from './templates/knowledgeTemplate.v1'
+import { API_TEMPLATE_ID } from './templates/apiTemplate.v1'
 import { AgentPlan, validateAgentPlan } from './agentPlan'
 import { ALLOWED_AGENTFLOW_NODES, validateNodeMetadata } from './nodeRegistry'
 
@@ -163,6 +164,15 @@ export class AgentflowCompiler {
             const toolNodeId = `tool_${toolMeta.name}_${index}`
             const yOffset = 120 + (dsBindings.length + index) * 140
 
+            const toolInputs: Record<string, unknown> = { ...(toolBind.config || {}) }
+            if (toolMeta.name === 'requestsGet') {
+                toolInputs.requestsGetUrl = toolBind.config?.requestsGetUrl || 'https://api.openweathermap.org/data/2.5'
+                toolInputs.requestsGetName = toolBind.config?.requestsGetName || 'requests_get'
+                toolInputs.requestsGetDescription = toolBind.config?.requestsGetDescription || 'Thực thi truy vấn HTTP GET'
+            } else if (toolMeta.name === 'customTool') {
+                toolInputs.selectedTool = toolBind.config?.selectedTool || 'default-tool'
+            }
+
             const toolNode: AgentflowNode = {
                 id: toolNodeId,
                 type: 'agentFlow',
@@ -177,7 +187,7 @@ export class AgentflowCompiler {
                     color: toolMeta.color,
                     baseClasses: [...toolMeta.baseClasses],
                     description: toolMeta.description,
-                    inputs: {}
+                    inputs: toolInputs
                 }
             }
             nodes.push(toolNode)
@@ -195,6 +205,15 @@ export class AgentflowCompiler {
                 '1. Luôn tra cứu và tìm kiếm thông tin bằng công cụ truy xuất tài liệu (documentStoreTool) trước khi trả lời.',
                 '2. Mọi câu trả lời bắt buộc phải trích dẫn rõ nguồn gốc (tên tài liệu, điều khoản, chương mục cụ thể).',
                 '3. Nếu tài liệu không chứa đủ căn cứ hoặc câu hỏi nằm ngoài phạm vi tài liệu, hãy thông báo lịch sự rằng tài liệu hiện tại không đề cập, tuyệt đối không tự bịa đặt hay suy diễn sai lệch.'
+            ].join('\n')
+        } else if (plan.templateId === API_TEMPLATE_ID) {
+            systemInstruction += [
+                '',
+                '',
+                '--- NGUYÊN TẮC AN TOÀN TRUY VẤN API (API READONLY RULES) ---',
+                '1. Chỉ sử dụng công cụ requestsGet để lấy dữ liệu từ các endpoints được cấp quyền; không tự bịa đặt tham số hay dữ liệu trả về.',
+                '2. Chế độ hoạt động là READONLY: Tuyệt đối từ chối và cảnh báo nếu người dùng yêu cầu thực hiện thao tác xóa, cập nhật hoặc thay đổi dữ liệu.',
+                '3. Nếu dịch vụ API bên ngoài trả về lỗi hoặc timeout, hãy thông báo lịch sự cho người dùng về trạng thái dịch vụ.'
             ].join('\n')
         }
         const agentNode: AgentflowNode = {

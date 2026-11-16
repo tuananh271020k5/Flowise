@@ -196,6 +196,51 @@ export class CollectorService {
             }
         }
 
+        // 9. Trích xuất kết nối API (apiConnectors) (PH6-T02)
+        const isApiIntent =
+            /(?:gọi\s+api|kết\s+nối\s+api|truy\s+vấn\s+api|api\s+connector|tích\s+hợp\s+api|api\s+thời\s+tiết|api\s+tỷ\s+giá|api\s+đơn\s+hàng)/i.test(
+                lowerText
+            )
+        if (isApiIntent && existingSpec?.kind !== 'api-readonly') {
+            patch.kind = 'api-readonly'
+            extractedFields.push('kind')
+        }
+
+        if (lowerText.includes('thời tiết') && (lowerText.includes('api') || lowerText.includes('nhiệt độ'))) {
+            patch.apiConnectors = [
+                {
+                    connectorId: 'conn-weather-v1',
+                    name: 'Dịch vụ Thời tiết Mẫu (OpenWeather)',
+                    baseUrl: 'https://api.openweathermap.org/data/2.5',
+                    allowedOperations: ['getWeatherByCity']
+                }
+            ]
+            if (patch.kind !== 'api-readonly') {
+                patch.kind = 'api-readonly'
+                extractedFields.push('kind')
+            }
+            extractedFields.push('apiConnectors')
+        } else {
+            const apiPattern = /(?:kết\s+nối\s+api|dùng\s+api|gọi\s+api)\s*[:=]?\s*["'“]?([^.,;\n"”]{3,80})/i
+            const apiMatch = text.match(apiPattern)
+            if (apiMatch && apiMatch[1]) {
+                const apiName = apiMatch[1].trim()
+                const connId = `conn_${apiName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                patch.apiConnectors = [
+                    {
+                        connectorId: connId,
+                        name: apiName,
+                        baseUrl: `https://api.${connId}.internal`
+                    }
+                ]
+                if (patch.kind !== 'api-readonly') {
+                    patch.kind = 'api-readonly'
+                    extractedFields.push('kind')
+                }
+                extractedFields.push('apiConnectors')
+            }
+        }
+
         // Tạo summary thay đổi
         let changeSummary = 'Cập nhật cấu hình Agent Spec'
         if (extractedFields.length > 0) {
@@ -206,8 +251,9 @@ export class CollectorService {
                 tools: 'công cụ',
                 evaluationExamples: 'ví dụ kiểm thử',
                 language: 'ngôn ngữ',
-                kind: 'loại trợ lý (Knowledge Agent)',
-                dataSources: 'kho tài liệu tri thức'
+                kind: 'loại trợ lý',
+                dataSources: 'kho tài liệu tri thức',
+                apiConnectors: 'kết nối API'
             }
             const updatedNames = extractedFields.map((f) => labels[f] || f).join(', ')
             changeSummary = `Bổ sung: ${updatedNames}`
@@ -231,12 +277,17 @@ export class CollectorService {
                 currentSpec.dataSources && currentSpec.dataSources.length > 0
                     ? `- **Kho tài liệu tri thức:** ${currentSpec.dataSources.map((d) => d.name || d.id).join(', ')}\n`
                     : ''
+            const apiConnectorsText =
+                currentSpec.apiConnectors && currentSpec.apiConnectors.length > 0
+                    ? `- **Kết nối API:** ${currentSpec.apiConnectors.map((c) => c.name || c.connectorId).join(', ')}\n`
+                    : ''
             return (
                 `Tuyệt vời! Tôi đã tổng hợp đầy đủ thông tin cho trợ lý **${currentSpec.name || 'mới'}**:\n\n` +
                 `- **Mục tiêu:** ${currentSpec.goal}\n` +
                 `- **Phong cách/Chỉ dẫn:** ${currentSpec.instructions ? currentSpec.instructions.slice(0, 120) + '...' : 'Đầy đủ'}\n` +
                 `- **Mô hình:** ${currentSpec.modelProfileRef || 'default-builder-model'}\n` +
                 dataSourcesText +
+                apiConnectorsText +
                 (currentSpec.tools && currentSpec.tools.length > 0
                     ? `- **Công cụ:** ${currentSpec.tools.map((t) => t.name).join(', ')}\n`
                     : '') +
@@ -280,6 +331,10 @@ export class CollectorService {
             case 'dataSources':
                 question =
                     'Bạn muốn kết nối Agent này với kho tài liệu nào? (Ví dụ: Bạn có thể chọn kho tài liệu mẫu *"Quy chế làm việc nội bộ công ty"* hoặc cung cấp tên/mã kho tài liệu của bạn).'
+                break
+            case 'apiConnectors':
+                question =
+                    'Bạn muốn trợ lý kết nối với API nào? (Ví dụ: Bạn có thể chọn dịch vụ thời tiết OpenWeather hoặc cung cấp tên/đường dẫn API bạn muốn tích hợp).'
                 break
             case 'evaluationExamples':
                 question = 'Để đảm bảo chất lượng, bạn có thể cho tôi một câu hỏi mẫu hoặc tình huống thực tế để kiểm thử trợ lý không?'

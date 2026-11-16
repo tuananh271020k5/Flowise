@@ -92,6 +92,17 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
             expect(res2.patch.dataSources?.[0].name).toBe('Sổ tay nhân viên năm 2026')
             expect(res2.patch.kind).toBe('knowledge')
         })
+
+        it('trích xuất loại Agent api-readonly và apiConnectors từ tiếng Việt (PH6-T02)', () => {
+            const text = 'Tôi muốn làm bot gọi API thời tiết để xem nhiệt độ Hà Nội'
+            const res = collector.extractPatch(text)
+
+            expect(res.patch.kind).toBe('api-readonly')
+            expect(res.patch.apiConnectors).toBeDefined()
+            expect(res.patch.apiConnectors?.[0].connectorId).toBe('conn-weather-v1')
+            expect(res.extractedFields).toContain('apiConnectors')
+            expect(res.extractedFields).toContain('kind')
+        })
     })
 
     describe('Anti-reask & Guided Collector Response (PH1-T09)', () => {
