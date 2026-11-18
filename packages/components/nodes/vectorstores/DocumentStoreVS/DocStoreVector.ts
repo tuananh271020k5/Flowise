@@ -1,5 +1,6 @@
 import { ICommonObject, IDatabaseEntity, INode, INodeData, INodeOptionsValue, INodeOutputsValue, INodeParams } from '../../../src/Interface'
 import { DataSource } from 'typeorm'
+import { BUILDER_STORE, BuilderDocumentRetriever } from './builderKnowledge'
 
 class DocStore_VectorStores implements INode {
     label: string
@@ -78,9 +79,18 @@ class DocStore_VectorStores implements INode {
         const databaseEntities = options.databaseEntities as IDatabaseEntity
         const output = nodeData.outputs?.output as string
 
-        const entity = await appDataSource.getRepository(databaseEntities['DocumentStore']).findOneBy({ id: selectedStore })
+        if (!options.workspaceId) throw new Error('Workspace is required for document retrieval')
+        const entity = await appDataSource
+            .getRepository(databaseEntities['DocumentStore'])
+            .findOneBy({ id: selectedStore, workspaceId: options.workspaceId })
         if (!entity) {
-            return { error: 'Store not found' }
+            throw new Error('Store not found in workspace')
+        }
+        if (JSON.parse(entity.vectorStoreConfig || '{}').name === BUILDER_STORE) {
+            const retriever = new BuilderDocumentRetriever(selectedStore, options)
+            if (output === 'vectorStore')
+                return { asRetriever: () => retriever, similaritySearch: (query: string) => retriever.invoke(query) }
+            return retriever
         }
         const data: ICommonObject = {}
         data.output = output

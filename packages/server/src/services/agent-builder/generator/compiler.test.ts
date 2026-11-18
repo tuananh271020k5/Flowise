@@ -51,9 +51,16 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(agentNode?.data.version).toBe(3.2)
         expect(agentNode?.data.inputs.agentModel).toBe('chatOpenAI')
 
-        // Tool nodes
-        expect(result.nodes.some((n) => n.data.name === 'calculator')).toBe(true)
-        expect(result.nodes.some((n) => n.data.name === 'webSearch')).toBe(true)
+        // Models/tools are embedded in Agent configuration, not V2 execution nodes.
+        expect(result.nodes.map((n) => n.data.name)).toEqual(['startAgentflow', 'agentAgentflow'])
+        expect(agentNode?.data.inputs.agentTools).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ agentSelectedTool: 'calculator', agentSelectedToolConfig: {} }),
+                expect.objectContaining({ agentSelectedTool: 'webSearch', agentSelectedToolConfig: {} })
+            ])
+        )
+        expect(agentNode?.data.inputs.agentModelConfig).toMatchObject({ streaming: false })
+        expect(agentNode?.data.inputs.agentUserMessage).toBe('')
 
         // Edges
         const startEdge = result.edges.find((e) => e.source === 'startAgentflow_0' && e.target === 'agentAgentflow_0')
@@ -120,21 +127,18 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(compiled.templateId).toBe('knowledge-flow-template')
 
         // Kiểm tra DocumentStoreTool node
-        const dsNode = compiled.nodes.find((n) => n.data.name === 'documentStoreTool')
-        expect(dsNode).toBeDefined()
-        expect(dsNode?.data.inputs.selectedStore).toBe('ds_policy_2026')
-        expect(dsNode?.data.inputs.storeName).toBe('Chính sách công ty 2026')
 
         // Kiểm tra Agent node kết nối documentStoreTool
         const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
         expect(agentNode).toBeDefined()
-        const agentTools = agentNode?.data.inputs.agentTools as any[]
-        expect(agentTools.some((t) => t.agentSelectedTool === 'documentStoreTool')).toBe(true)
+        expect(agentNode?.data.inputs.agentKnowledgeDocumentStores).toEqual([
+            { documentStore: 'ds_policy_2026', docStoreDescription: 'Chính sách công ty 2026', returnSourceDocuments: true }
+        ])
 
         // Kiểm tra RAG guideline trong system message
         const messages = agentNode?.data.inputs.agentMessages as any[]
         expect(messages[0].content).toContain('NGUYÊN TẮC HỎI ĐÁP THEO TÀI LIỆU')
-        expect(messages[0].content).toContain('documentStoreTool')
+        expect(messages[0].content).toContain('Trích dẫn nguồn')
     })
 
     it('biên dịch API Readonly AgentPlan sinh RequestsGet node và API safety guidelines (PH6-T03)', () => {
@@ -176,19 +180,17 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(compiled.templateId).toBe('api-flow-template')
 
         // Kiểm tra RequestsGet node
-        const apiNode = compiled.nodes.find((n) => n.data.name === 'requestsGet')
-        expect(apiNode).toBeDefined()
-        expect(apiNode?.data.inputs.requestsGetUrl).toBe('https://api.openweathermap.org/data/2.5')
 
         // Kiểm tra Agent node kết nối requestsGet
         const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
         expect(agentNode).toBeDefined()
         const agentTools = agentNode?.data.inputs.agentTools as any[]
         expect(agentTools.some((t) => t.agentSelectedTool === 'requestsGet')).toBe(true)
+        expect(agentTools[0].agentSelectedToolConfig.requestsGetUrl).toBe('https://api.openweathermap.org/data/2.5')
 
         // Kiểm tra API Readonly guidelines
         const messages = agentNode?.data.inputs.agentMessages as any[]
-        expect(messages[0].content).toContain('NGUYÊN TẮC AN TOÀN TRUY VẤN API (API READONLY RULES)')
+        expect(messages[0].content).toContain('API READONLY RULES')
         expect(messages[0].content).toContain('READONLY')
     })
 
@@ -229,19 +231,17 @@ describe('Deterministic AgentflowCompiler (PH2-T04 / B-008)', () => {
         expect(compiled.templateId).toBe('sql-flow-template')
 
         // Kiểm tra CustomTool node
-        const toolNode = compiled.nodes.find((n) => n.data.name === 'customTool')
-        expect(toolNode).toBeDefined()
-        expect(toolNode?.data.inputs.selectedTool).toBe('sql_executor_readonly')
 
         // Kiểm tra Agent node kết nối customTool
         const agentNode = compiled.nodes.find((n) => n.data.name === 'agentAgentflow')
         expect(agentNode).toBeDefined()
         const agentTools = agentNode?.data.inputs.agentTools as any[]
         expect(agentTools.some((t) => t.agentSelectedTool === 'customTool')).toBe(true)
+        expect(agentTools[0].agentSelectedToolConfig.selectedTool).toBe('sql_executor_readonly')
 
         // Kiểm tra SQL Readonly guidelines
         const messages = agentNode?.data.inputs.agentMessages as any[]
-        expect(messages[0].content).toContain('NGUYÊN TẮC AN TOÀN TRUY VẤN CƠ SỞ DỮ LIỆU (SQL READONLY RULES)')
+        expect(messages[0].content).toContain('SQL READONLY RULES')
         expect(messages[0].content).toContain('SELECT')
         expect(messages[0].content).toContain('orders, customers')
         expect(messages[0].content).toContain('30 dòng')

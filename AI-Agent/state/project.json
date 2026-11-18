@@ -1,40 +1,45 @@
 {
   "schemaVersion": 1,
-  "revision": 42,
-  "updatedAt": "2026-11-17T01:20:00.000Z",
-  "authorization": "TASK-001 baseline authorized by user on 2026-11-14; no product Builder implementation requested",
+  "revision": 76,
+  "updatedAt": "2026-11-18T06:59:34.713Z",
+  "authorization": "User explicitly authorized B-028 product fixes, runtime integration, audit remediation and UI run/test guide on 2026-11-17",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-027",
-  "status": "completed",
-  "productStage": "completed_100_percent_ready_for_production",
-  "summary": "DỰ ÁN CHAT-TO-AGENT BUILDER TRÊN FLOWISE ĐÃ HOÀN THÀNH 100% (76 / 76 TASKS). Hoàn thành trọn vẹn 7 Phase sản phẩm (PH0 đến PH6 gồm 68 tasks) và Bộ lập trình Harness đa nền tảng (8 tasks) theo PLAN_TONG_HOP.md. Toàn bộ 42/42 test suites server agent-builder pass 100% (312/312 tests), 4/4 UI test suites pass 100% (125/125 tests), harness tests pass 14/15, tsc exit 0, build packages/server thành công, build packages/ui thành công. Đã xuất bản FINAL_ACCEPTANCE_REPORT.md và DEPLOYMENT_AND_OPERATION_RUNBOOK.md. Hệ thống sẵn sàng triển khai chính thức.",
+  "currentTask": "B-030",
+  "status": "in_progress",
+  "productStage": "b030_xong_confirmation_flow_implemented",
+  "summary": "Hoàn tất luồng trao đổi nhiều lượt và chỉ tự động build khi người dùng nhắn \"xong\" (hoặc bấm nút Xong — Tạo Agent): cập nhật collectorService.ts, sessionService.ts, ChatPane.jsx, WorkflowPanel.jsx, index.jsx. Lượt trả lời đầu luôn hiển thị hướng dẫn chốt bằng \"xong\"; tin nhắn \"xong\" thuần túy kích hoạt build ngay không tốn thêm lượt gọi LLM hay sinh revision rác. 6 backend Jest suites (70 tests), 4 UI suites (127 tests), prepare 61 files và document-workflow-check.mjs đều pass.",
   "decisions": [
-    "Toàn bộ 76/76 tasks trong PLAN_TONG_HOP.md được nghiệm thu hoàn tất với đầy đủ bằng chứng kiểm thử thực tế.",
-    "Giữ nguyên kiến trúc Agentflow V2 và Flowise runtime cốt lõi, không phá vỡ tính tương thích ngược.",
-    "Hệ thống trang bị đầy đủ cơ chế bảo vệ doanh nghiệp: AST Sandbox VM, SQL Readonly Guard, SSRF Prevention, HMAC Webhook, Redaction, Audit Logs, Rate Limiting và Crash Recovery.",
-    "Bàn giao trọn gói kèm Báo cáo nghiệm thu chi tiết và Sổ tay vận hành thực tế."
+    "Không tự gọi autoBuild() trên các tin nhắn mô tả yêu cầu thông thường; chỉ tự build khi người dùng xác nhận \"xong\" (hoặc bấm nút Xong — Tạo Agent) và spec đã buildReady.",
+    "Tin nhắn xác nhận \"xong\" thuần túy không gọi lại LLM planner và không sinh thêm AgentSpecRevision thừa.",
+    "Hiển thị hướng dẫn cách chốt bằng \"xong\" cả ở màn hình mở đầu ChatPane lẫn trong lượt trả lời đầu tiên của Bot."
   ],
   "changedFiles": [
-    "AI-Agent/tasks/B-027.md",
-    "AI-Agent/plans/FINAL_ACCEPTANCE_REPORT.md",
-    "AI-Agent/plans/DEPLOYMENT_AND_OPERATION_RUNBOOK.md",
-    "AI-Agent/state/WORKLOG.md",
-    "AI-Agent/state/project.json"
+    "packages/server/src/services/agent-builder/collectorService.ts",
+    "packages/server/src/services/agent-builder/sessionService.ts",
+    "packages/ui/src/views/agent-builder/ChatPane.jsx",
+    "packages/ui/src/views/agent-builder/WorkflowPanel.jsx",
+    "packages/ui/src/views/agent-builder/index.jsx",
+    "packages/server/src/services/agent-builder/collectorService.test.ts",
+    "packages/server/src/services/agent-builder/sessionService.test.ts",
+    "AI-Agent/tests/builder/document-workflow-check.mjs",
+    "AI-Agent/tasks/B-030.md",
+    "AI-Agent/context/PROJECT_MAP.md",
+    "AI-Agent/state/WORKLOG.md"
   ],
   "checks": [
-    "42/42 test suites server agent-builder pass 100% (312/312 unit & integration tests).",
-    "4/4 test suites packages/ui pass 100% (125/125 tests).",
-    "TypeScript typecheck (tsc -p packages/server/tsconfig.json --noEmit) exit code 0.",
-    "Production build packages/server (tsc && rimraf dist/enterprise/emails && gulp) hoàn tất thành công.",
-    "Production build packages/ui (vite build) hoàn tất thành công.",
-    "node --test AI-Agent/harness/harness.test.mjs: 14/14 pass (1 skip host symlink)."
+    "Backend Jest (--runInBand, heap 4096): 6 suites / 70 tests PASS (collectorService, sessionService, collectorModel, phase3GateD1Demo, knowledgePipeline, workflow).",
+    "UI Jest (--runInBand, heap 4096): 4 suites / 127 tests PASS.",
+    "node AI-Agent/scripts/prepare-builder.mjs: Prepared 61 backend overlay files PASS.",
+    "BUILDER_SKIP_BROWSER=true document-workflow-check.mjs (DB/cổng/fixture cô lập): PASS luồng chưa build sớm -> nhắn \"xong\" (0 extra LLM calls) -> build & preview thành công."
   ],
-  "blockers": [],
+  "blockers": [
+    "Chờ người dùng Ctrl+C và chạy lại run-builder.mjs để nạp dist mới trên server đang chạy."
+  ],
   "nextActions": [
-    "Commit và push task B-027 hoàn thành toàn bộ dự án lên origin/main và Flowise-Agent-Builder.",
-    "Báo cáo hoàn thành 100% dự án cho người dùng."
+    "Người dùng khởi động lại run-builder.mjs và trải nghiệm luồng trao đổi nhiều lượt -> gõ \"xong\" mới build.",
+    "Nếu người dùng muốn mở rộng sang tổng quát hóa toàn bộ node Agentflow V2 / gắn MCP client tools vào bot con, lập kế hoạch task tiếp theo."
   ],
-  "nextTask": null,
+  "nextTask": "B-030",
   "references": [
     "PLAN_TONG_HOP.md",
     "AI-Agent/plans/FINAL_ACCEPTANCE_REPORT.md",
@@ -46,5 +51,10 @@
     "actualInputTokens": null,
     "actualOutputTokens": null,
     "verifiedSavings": false
+  },
+  "snapshot": {
+    "head": "af8b50d5b526458db6aba4f29356ab0564ed1245",
+    "branch": "main",
+    "sourceFingerprint": "42dbdd2eb85aed68c53ff7c39bbcc08f8fd89ff8aa82b11d18691d3d4616b435"
   }
 }

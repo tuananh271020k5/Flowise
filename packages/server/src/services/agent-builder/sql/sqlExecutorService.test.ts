@@ -1,8 +1,32 @@
 /* eslint-disable */
 import { SqlExecutorService, DEFAULT_ROW_LIMIT, MAX_ALLOWED_ROW_LIMIT } from './sqlExecutorService'
+import { mkdtempSync, unlinkSync, rmdirSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { Database } from 'sqlite3'
 
 describe('SqlExecutorService (PH6-T05)', () => {
     let service: SqlExecutorService
+    let tempDir: string
+    const originalConnections = process.env.BUILDER_SQL_CONNECTIONS
+    beforeAll(async () => {
+        tempDir = mkdtempSync(join(tmpdir(), 'builder-sql-test-'))
+        const file = join(tempDir, 'readonly.sqlite')
+        const db = new Database(file)
+        await new Promise<void>((resolve, reject) =>
+            db.exec('CREATE TABLE orders(id INTEGER, total_amount INTEGER); INSERT INTO orders VALUES(1,25),(2,50),(3,75);', (error) =>
+                error ? reject(error) : resolve()
+            )
+        )
+        await new Promise<void>((resolve, reject) => db.close((error) => (error ? reject(error) : resolve())))
+        process.env.BUILDER_SQL_CONNECTIONS = JSON.stringify({ fixture: { workspaceId: 'ws-exec', type: 'sqlite', path: file } })
+    })
+    afterAll(() => {
+        if (originalConnections === undefined) delete process.env.BUILDER_SQL_CONNECTIONS
+        else process.env.BUILDER_SQL_CONNECTIONS = originalConnections
+        unlinkSync(join(tempDir, 'readonly.sqlite'))
+        rmdirSync(tempDir)
+    })
 
     beforeEach(() => {
         service = new SqlExecutorService()
@@ -176,6 +200,7 @@ describe('SqlExecutorService (PH6-T05)', () => {
                 workspaceId: 'ws-exec',
                 name: 'Exec DB',
                 databaseType: 'sqlite',
+                credentialRef: 'fixture',
                 allowedTables: ['orders']
             })
 
@@ -183,8 +208,26 @@ describe('SqlExecutorService (PH6-T05)', () => {
             expect(res.columns).toContain('id')
             expect(res.columns).toContain('total_amount')
             expect(res.rows.length).toBe(2)
-            expect(res.executionTimeMs).toBeGreaterThan(0)
+            expect(res.rows).toEqual([
+                { id: 1, total_amount: 25 },
+                { id: 2, total_amount: 50 }
+            ])
+            expect(res.executionTimeMs).toBeGreaterThanOrEqual(0)
             expect(res.sanitizedQuery).toContain('LIMIT 2')
+            const empty = await service.executeQuery('ws-exec', db.id, 'SELECT * FROM orders WHERE 1=0')
+            expect(empty.rows).toEqual([])
+            expect(empty.rowCount).toBe(0)
+        })
+
+        it('fails closed without a workspace-owned server connection', async () => {
+            const db = await service.registerDatabase({
+                workspaceId: 'ws-other',
+                name: 'Missing',
+                databaseType: 'sqlite',
+                credentialRef: 'fixture',
+                allowedTables: ['orders']
+            })
+            await expect(service.executeQuery('ws-other', db.id, 'SELECT * FROM orders')).rejects.toThrow('chưa có kết nối')
         })
 
         it('should reject execution when SQL is dangerous', async () => {

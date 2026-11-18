@@ -1,4 +1,6 @@
 jest.mock('flowise-components', () => ({}))
+// Unit-test prediction boundary; real runtime is covered by the B-028 browser smoke.
+jest.mock('../runtimePredictionService', () => ({ predictDraft: jest.fn(async () => ({ text: 'Trợ Lý Kiểm Thử Xuất Bản' })) }))
 jest.mock('../../../utils/getRunningExpressApp', () => ({ getRunningExpressApp: jest.fn() }))
 jest.mock('../../../utils/logger', () => ({
     __esModule: true,

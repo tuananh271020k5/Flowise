@@ -134,7 +134,7 @@ describe('Flowise Agentflow V2 Runtime Contract Test (PH2-T10 / Gate Phase 2)', 
 
             // 3. Biên dịch tất định sang Graph
             const compiledGraph = compiler.compile(plan)
-            expect(compiledGraph.nodes.length).toBeGreaterThanOrEqual(3) // Start + Agent + Tool (+ Model node)
+            expect(compiledGraph.nodes.length).toBe(2) // Start -> Agent; tools are embedded configuration.
             expect(compiledGraph.edges.length).toBeGreaterThanOrEqual(1)
 
             // 4. Server Flow Validation

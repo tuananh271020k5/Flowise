@@ -1,7 +1,7 @@
 # Flowise Chat-to-Agent — shared project guidance
 
 -   Product: a Vietnamese chat interface collects requirements and builds agents on the existing Flowise Agentflow V2 runtime.
--   Current scope: planning, shared project memory, and local coding harness only. Product implementation has not started. A later explicit user request can expand this scope.
+-   Current scope: the user explicitly expanded scope to product implementation and B-028 runtime/UI fixes. Verify the Chat-to-Agent loop against running code; see AI-Agent/GUI_TEST_GUIDE.md. Advanced roadmap items remain subject to their own acceptance evidence.
 -   Start with `AI-Agent/state/project.json`, then `AI-Agent/context/PROJECT_MAP.md` and the selected task. Read only the relevant section of the master plan. Do not reload the full blueprint or scan the entire repository each session.
 -   `AI-Agent/state/project.json` is the canonical progress/handoff record for Codex, Claude Code, Antigravity, and Gemini CLI. Verify its assumptions against the current Git state; it is memory, not proof that code or tests exist.
 -   Check `git status --short` before edits. Preserve pre-existing changes. Never run the old `AI-Agent/scripts/sync-ai-config.py` as part of this harness: it resets generated directories.
@@ -24,9 +24,10 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 -   Keep retrieval bounded: start with one focused query and 2–4 files. Expand when evidence is missing. Do not re-read source already returned as current; read flagged stale files or uncovered details directly.
 -   Docs, config, runtime behavior, and tests may require direct inspection. CodeGraph is not a compiler or a runtime verification tool.
 -   Root instructions are the only shared rules source. `CLAUDE.md` and `GEMINI.md` are thin adapters. Detailed docs load on demand.
--   Optional startup pack: `node AI-Agent/harness/harness.mjs context --task AI-Agent/tasks/B-002.md`. It contains state/map/task, so do not also attach those same files in full.
+-   Optional startup pack: `node AI-Agent/harness/harness.mjs context`. It uses the current configured task; it contains state/map/task, so do not also attach those same files in full.
 -   Test the actual change with the narrowest meaningful checks. Report commands run, outcomes, and what remains unverified. Never invent build results, token counts, or completion percentages.
 -   Write a checkpoint before a long operation, after each completed subtask or meaningful test result, and when handing off. Include the phase/subtask ID in summary, completed vs partial work, changed paths, actual checks, blockers and the exact next action. Use the current revision to avoid overwriting a newer handoff. This is a workflow rule, not an automatic quota-exhaustion hook.
 -   After an interrupted session, follow `AI-Agent/harness/HANDOFF.md`: reconcile shared state with live Git diff and relevant logs/processes before resuming; do not assume uncheckpointed edits were tested or finished.
 -   Do not place credentials, raw conversations, full logs, or customer documents in shared memory. Local generated packs/logs/usage belong under ignored `AI-Agent/.local/`.
 -   Use `pnpm.cmd` on this Windows host. The Flowise runtime requires Node 24; harness utilities work with Node 22+. Do not change system execution policy to run scripts.
+-   Host stability (17/11/2026): Windows logged two bugchecks `0x133` during this session. Run product install/build/test jobs sequentially, including server and UI builds; use Turbo `--concurrency=1` and Jest `--runInBand`. Start Node build processes with a 4096 MB heap limit; increase it only after an explicit heap error is diagnosed. Keep progress/logs on disk before each job. A crash-interrupted build has no verified result. OS reboot/shutdown, driver changes and disabling system watchdogs require an explicit user request; project scripts must not perform them automatically.

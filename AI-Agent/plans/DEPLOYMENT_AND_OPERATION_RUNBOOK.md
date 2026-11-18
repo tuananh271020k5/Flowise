@@ -1,115 +1,33 @@
-# SỔ TAY TRIỂN KHAI VÀ VẬN HÀNH (DEPLOYMENT & OPERATION RUNBOOK)
-## HỆ THỐNG FLOWISE CHAT-TO-AGENT BUILDER
+# Vận hành và cổng phát hành
 
-**Tài liệu dành cho:** DevOps, Quản trị hệ thống và Đội ngũ phát triển  
-**Phiên bản:** 1.0.0 (Tương ứng hoàn thành 100% Phase 0 - Phase 6)  
-**Ngày phát hành:** 17/11/2026
+Cập nhật 17/11/2026. Chưa nghiệm thu production; tài liệu cũ gắn nhãn hoàn thành PH0–PH6 đã được thay thế.
 
----
+## Chạy local
 
-## 1. YÊU CẦU MÔI TRƯỜNG & HẠ TẦNG
+Dùng [hướng dẫn UI](../GUI_TEST_GUIDE.md). Hai lệnh từ root trên máy đã có dependencies/baseline:
 
-- **Node.js:** Phiên bản `>= 24.15.0` (theo `.nvmrc` và cấu hình engines).
-- **Package Manager:** `pnpm` phiên bản `>= 10.0.0`.
-- **Cơ sở dữ liệu:** SQLite (mặc định cho môi trường dev/staging tại `packages/server/dist/database.sqlite`) hoặc PostgreSQL / MySQL cho môi trường production.
-- **Hệ điều hành:** Linux (Ubuntu 22.04 LTS / 24.04 LTS) hoặc Windows Server / macOS.
-- **Tài nguyên tối thiểu:** 2 vCPU, 4GB RAM (Khuyến nghị production: 4 vCPU, 8GB RAM).
-
----
-
-## 2. BIẾN MÔI TRƯỜNG CẦN THIẾT (.env)
-
-Tạo file `.env` tại thư mục gốc của repository hoặc `packages/server/.env`:
-
-```bash
-# Cấu hình Cổng và Máy chủ
-PORT=3000
-FLOWISE_USERNAME=admin
-FLOWISE_PASSWORD=YourSecurePassword123!
-
-# Cấu hình Database (nếu sử dụng Postgres)
-# DATABASE_TYPE=postgres
-# DATABASE_PORT=5432
-# DATABASE_HOST=localhost
-# DATABASE_NAME=flowise
-# DATABASE_USER=flowise_user
-# DATABASE_PASSWORD=YourDbPassword
-
-# Khóa mã hóa bảo mật (Credential Encryption)
-SECRETKEY=your-32-character-secret-key-here!!
-
-# Cấu hình Khóa API Mặc định cho LLM (Tùy chọn)
-OPENAI_API_KEY=sk-...
-
-# Cấu hình Giới hạn Tải & Rate Limiting
-BUILDER_MAX_SESSION_MESSAGES=100
-BUILDER_EVAL_MAX_EXAMPLES=5
-BUILDER_RATE_LIMIT_PER_MINUTE=60
+```powershell
+node AI-Agent/scripts/prepare-builder.mjs
+node AI-Agent/scripts/run-builder.mjs
 ```
 
----
+Launcher dùng Node24, backend3037 và UI8080 trên localhost. SQLite, encryption key, log/storage đặt dưới `AI-Agent/.local/builder-runtime`. Sao lưu DB cùng key; không đưa file chứa credential vào Git. Dừng terminal bằng Ctrl+C. Không chạy package `npx flowise` khác để nghiệm thu source này.
 
-## 3. CÁC BƯỚC CÀI ĐẶT VÀ KHỞI CHẠY (LOCAL / ON-PREMISE)
+## Cấu hình thực sự được đọc
 
-### Bước 1: Clone mã nguồn
-```bash
-git clone https://github.com/tuananh271020k5/Flowise.git
-cd Flowise
-git checkout main
-```
+- `AI-Agent/.local/builder.env`: dotenv local tùy chọn của launcher; đã được ignore.
+- `BUILDER_PORT`, `BUILDER_UI_PORT`, `BUILDER_RUNTIME_NAME`: cổng và tên thư mục dữ liệu riêng.
+- `BUILDER_MODEL_NAME`, `BUILDER_MODEL_BASE_URL`, `BUILDER_CREDENTIAL_ID`: profile mặc định server; UI profile trong Variable của workspace được ưu tiên. Credential ID phải thuộc workspace.
+- `BUILDER_ALLOW_LOCAL_MODEL=true`: cho phép URL model local do quản trị viên cấu hình. OpenAI thường không cần bật.
+- `OPENAI_API_KEY`: fallback môi trường của server nếu không dùng credential workspace; ưu tiên cấu hình key qua UI cho demo.
+- `BUILDER_SQL_CONNECTIONS`: JSON do quản trị viên cấp ánh xạ credentialRef → workspaceId/type/path hoặc url. Không nhận URL database/mật khẩu từ LLM hoặc body truy vấn. SQLite mở readonly; PG/MySQL dùng transaction readonly. Chưa kiểm chứng PG/MySQL thật.
 
-### Bước 2: Cài đặt dependencies
-```bash
-pnpm install --frozen-lockfile
-```
+Không dùng các tên biến rate/budget được suy diễn từ tài liệu cũ; xem source trước khi thay cấu hình. Giới hạn evaluation hiện được validate1–10; bảng rate limit trong `security/rateLimiter.ts`.
 
-### Bước 3: Build toàn bộ dự án
-```bash
-pnpm build
-```
+## Xác minh và phát hành
 
-### Bước 4: Khởi chạy dịch vụ
-```bash
-pnpm start
-```
-Hệ thống sẽ khởi động giao diện web tại `http://localhost:3000`. Người dùng có thể đăng nhập và truy cập trang **Agent Builder** qua menu bên trái hoặc đường dẫn `http://localhost:3000/agent-builder`.
+Kết quả hiện tại đọc tại [báo cáo nghiệm thu](FINAL_ACCEPTANCE_REPORT.md). B-028 có unit/component tests và browser/runtime với provider fixture; cần người dùng chạy lại với key/model thật. Không suy ra chất lượng model hoặc khả năng phát hành từ số test pass.
 
----
+Trước release cần full build/typecheck cuối trên máy ổn định; kiểm tra RBAC từng thao tác, tenant isolation, load, backup/restore, migration và observability bền vững. API/SQL Agent, RAG, approval, SharePoint/Fabric, Word add-in và client MCP ngoài có backlog B-029. Public publishing cần nghiệm thu riêng trước khi chia sẻ ra ngoài.
 
-## 4. QUY TRÌNH VẬN HÀNH & BẢO TRÌ
-
-### 4.1. Giám Sát Sức Khỏe Hệ Thống (Health Checks)
-- **API Kiểm tra sức khỏe:** `GET /api/v1/ping` -> Trả về `pong` (HTTP 200).
-- **API Kiểm tra số liệu Builder Metrics:** `GET /api/v1/agent-builder/metrics` -> Trả về số lượng sessions, tổng builds thành công, số bài test đã chạy.
-
-### 4.2. Quản Lý Nhật Ký (Audit Logs) & Dọn Dẹp Dữ Liệu
-- Nhật ký thao tác của người dùng (`BUILD`, `TEST`, `PUBLISH`, `ROLLBACK`) được lưu trữ bảo mật và che giấu toàn bộ API keys.
-- **Lệnh dọn dẹp phiên làm việc cũ:**
-  Hệ thống hỗ trợ endpoint dọn dẹp các session không hoạt động quá 30 ngày:
-  `POST /api/v1/agent-builder/retention/sweep` (Yêu cầu quyền Admin).
-
-### 4.3. Xử Lý Khi Server Khởi Động Lại Đột Ngột (Crash Recovery)
-- Khi server bị restart đột ngột trong khi đang thực hiện build hoặc chạy eval:
-  `CrashRecoveryService` sẽ tự động đánh dấu các job bị treo sang trạng thái `FAILED` kèm lý do rõ ràng, ngăn ngừa tình trạng deadlock hoặc khóa phiên làm việc.
-- Quản trị viên cũng có thể kích hoạt hòa giải thủ công:
-  `POST /api/v1/agent-builder/recovery/reconcile`.
-
-### 4.4. Quy Trình Sao Lưu Và Khôi Phục (Backup & Restore)
-- **Sao lưu:**
-  `GET /api/v1/agent-builder/sessions/:sessionId/backup` -> Xuất file JSON chứa toàn bộ lịch sử revision, đặc tả và kết quả kiểm thử.
-- **Khôi phục:**
-  `POST /api/v1/agent-builder/sessions/restore` kèm payload JSON đã sao lưu.
-
----
-
-## 5. QUY TRÌNH ROLLBACK PHIÊN BẢN (KHI CẦN THIẾT)
-
-Nếu phiên bản mới phát sinh lỗi nghiệp vụ:
-1. **Rollback ở mức Agent:** Người dùng hoặc quản trị viên có thể bấm "Khôi phục phiên bản" (hoặc gọi `POST /api/v1/agent-builder/sessions/:sessionId/instant-rollback` kèm `targetRevisionNumber`) để đưa Agent về trạng thái hoạt động ổn định trước đó ngay lập tức.
-2. **Rollback ở mức Ứng dụng (Deploy):**
-   ```bash
-   git checkout <commit-sha-ổn-định-trước-đó>
-   pnpm install
-   pnpm build
-   pnpm start
-   ```
+Máy hiện tại từng bugcheck0x133 khi build nặng. Chạy job tuần tự, heap4096MB, Turbo concurrency1, Jest runInBand; không tự reboot hay đổi driver. Kết quả của job bị crash là chưa xác minh.

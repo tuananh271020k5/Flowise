@@ -81,6 +81,11 @@ describe('CustomToolSandboxService (PH6-T09)', () => {
     })
 
     describe('executeTool & executeRawCode - Sandbox Execution', () => {
+        it('rejects computed constructor escape without exposing host process', async () => {
+            const result = await service.executeRawCode('return String["con"+"structor"]("return typeof process")()', {})
+            expect(result.success).toBe(false)
+            expect(result.error).toContain('Code generation from strings disallowed')
+        })
         it('should execute valid safe code within sandbox successfully', async () => {
             const code = 'return { sum: a + b, product: a * b };'
             const result = await service.executeRawCode(code, { a: 10, b: 5 })

@@ -1,6 +1,6 @@
+import { executeIsolated } from './isolatedExecutor'
 import { StatusCodes } from 'http-status-codes'
 import { AdapterError } from '../errors/builderErrors'
-import vm from 'vm'
 
 export interface CustomToolDefinition {
     id: string
@@ -113,9 +113,7 @@ export class CustomToolSandboxService {
         }
     }
 
-    async registerCustomTool(
-        params: Omit<CustomToolDefinition, 'id' | 'createdDate' | 'updatedDate'>
-    ): Promise<CustomToolDefinition> {
+    async registerCustomTool(params: Omit<CustomToolDefinition, 'id' | 'createdDate' | 'updatedDate'>): Promise<CustomToolDefinition> {
         if (!params.name || !params.workspaceId || !params.code) {
             throw new AdapterError('REQUIRED_FIELDS_MISSING', 'Name, workspaceId và code là bắt buộc', StatusCodes.BAD_REQUEST)
         }
@@ -190,58 +188,8 @@ export class CustomToolSandboxService {
         }
 
         const start = Date.now()
-
-        // Chuẩn bị sandbox context độc lập, đóng băng các API nguy hiểm
-        const sandbox: Record<string, unknown> = {
-            ...params,
-            console: {
-                log: () => {},
-                warn: () => {},
-                error: () => {}
-            },
-            Math,
-            Date,
-            JSON,
-            parseInt,
-            parseFloat,
-            String,
-            Number,
-            Boolean,
-            Array,
-            Object: {
-                keys: Object.keys,
-                values: Object.values,
-                entries: Object.entries,
-                assign: Object.assign
-            }
-        }
-
-        try {
-            const context = vm.createContext(sandbox)
-            // Bọc code trong một IIFE để nhận return
-            const wrappedScript = `
-                (function() {
-                    ${code}
-                })()
-            `
-            const script = new vm.Script(wrappedScript)
-            const result = script.runInContext(context, {
-                timeout: timeoutMs,
-                displayErrors: true
-            })
-
-            return {
-                success: true,
-                output: result,
-                executionTimeMs: Math.max(1, Date.now() - start)
-            }
-        } catch (err: any) {
-            return {
-                success: false,
-                error: err?.message || 'Lỗi thực thi trong sandbox',
-                executionTimeMs: Math.max(1, Date.now() - start)
-            }
-        }
+        const result = await executeIsolated(code, params, timeoutMs)
+        return { ...result, executionTimeMs: Math.max(1, Date.now() - start) }
     }
 }
 

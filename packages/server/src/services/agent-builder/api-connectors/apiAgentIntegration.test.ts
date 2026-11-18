@@ -104,12 +104,15 @@ describe('PH6-T01, PH6-T02, PH6-T03: API Agent Integration Suite', () => {
         const agentNode = compiledGraph.nodes.find((n) => n.data.name === 'agentAgentflow')
 
         expect(startNode).toBeDefined()
-        expect(modelNode).toBeDefined()
-        expect(toolNode).toBeDefined()
+        expect(modelNode).toBeUndefined()
+        expect(toolNode).toBeUndefined()
         expect(agentNode).toBeDefined()
 
         // Kiểm tra URL được cấu hình đúng vào tool
-        expect(toolNode?.data.inputs.requestsGetUrl).toBe('https://api.openweathermap.org/data/2.5')
+        expect(agentNode?.data.inputs.agentModel).toBe('chatOpenAI')
+        expect((agentNode?.data.inputs.agentTools as any[])[0].agentSelectedToolConfig.requestsGetUrl).toBe(
+            'https://api.openweathermap.org/data/2.5'
+        )
 
         // 5. PH6-T01: Kiểm tra tính nghiêm ngặt của Operation Allowlist
         // Gọi hợp lệ

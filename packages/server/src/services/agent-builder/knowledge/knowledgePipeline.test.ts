@@ -160,17 +160,14 @@ describe('Knowledge Agent Pipeline & Citation Verification (PH4-T05 & PH4-T06 / 
         const graph = JSON.parse(savedDraft!.flowData)
 
         // Kiểm tra sự hiện diện của DocumentStoreTool node
-        const docToolNode = graph.nodes.find((n: any) => n.data.name === 'documentStoreTool')
-        expect(docToolNode).toBeDefined()
-        expect(docToolNode.data.version).toBe(1.0)
-        expect(docToolNode.data.inputs.selectedStore).toBe('fixture-docstore-company-policy')
-        expect(docToolNode.data.inputs.topK).toBe(4)
 
         // Kiểm tra Agent node kết nối documentStoreTool và có RAG guideline
         const agentNode = graph.nodes.find((n: any) => n.data.name === 'agentAgentflow')
         expect(agentNode).toBeDefined()
-        const agentTools = agentNode.data.inputs.agentTools as any[]
-        expect(agentTools.some((t) => t.agentSelectedTool === 'documentStoreTool')).toBe(true)
+        expect(agentNode.data.inputs.agentKnowledgeDocumentStores[0]).toMatchObject({
+            documentStore: 'fixture-docstore-company-policy',
+            returnSourceDocuments: true
+        })
         expect(agentNode.data.inputs.agentMessages[0].content).toContain('NGUYÊN TẮC HỎI ĐÁP THEO TÀI LIỆU')
 
         // 4. Chạy bộ kiểm thử tự động (Evaluation Runner) & Kiểm tra Nguồn trích dẫn (PH4-T06)
@@ -193,7 +190,15 @@ describe('Knowledge Agent Pipeline & Citation Verification (PH4-T05 & PH4-T06 / 
         const evalReport = await evalRunner.runTestSuite({
             flowId: savedDraft!.id,
             workspaceId,
-            examples: testExamples
+            examples: testExamples,
+            // Explicit fixture only exercises evaluation plumbing; this is not live RAG acceptance.
+            mockPredictFn: async (input) =>
+                input.includes('bất lão')
+                    ? { text: 'không có thông tin, từ chối suy diễn', sourceDocuments: [] }
+                    : {
+                          text: input.includes('remote') ? 'làm việc từ xa 02 ngày' : 'nghỉ phép 14 ngày',
+                          sourceDocuments: [{ pageContent: 'Fixture policy passage', title: 'Quy Chế Hoạt Động' }]
+                      }
         })
 
         expect(evalReport.totalCount).toBe(3)

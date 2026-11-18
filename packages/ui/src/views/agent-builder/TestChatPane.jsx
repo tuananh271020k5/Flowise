@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { MemoizedReactMarkdown } from '@/ui-component/markdown/MemoizedReactMarkdown'
 import PropTypes from 'prop-types'
 import {
     Box,
@@ -362,7 +363,7 @@ const TestChatPane = ({
                         <IconButton
                             size='small'
                             color='primary'
-                            onClick={() => window.open(`/canvas/${flowId}`, '_blank', 'noopener,noreferrer')}
+                            onClick={() => window.open(`/v2/agentcanvas/${flowId}`, '_blank', 'noopener,noreferrer')}
                         >
                             <IconExternalLink size={18} />
                         </IconButton>
@@ -423,9 +424,13 @@ const TestChatPane = ({
                                 color: msg.role === 'user' ? '#fff' : theme.palette.text.primary
                             }}
                         >
-                            <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                {msg.content}
-                            </Typography>
+                            {msg.role === 'user' ? (
+                                <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                    {msg.content}
+                                </Typography>
+                            ) : (
+                                <MemoizedReactMarkdown>{msg.content}</MemoizedReactMarkdown>
+                            )}
                         </Paper>
 
                         {/* Huy hiệu Assertion nếu có */}
@@ -496,13 +501,28 @@ const TestChatPane = ({
                                                         {doc.title || `Tài liệu nguồn #${docIdx + 1}`}
                                                     </Typography>
                                                     <Chip
-                                                        label='Xác thực từ Store'
+                                                        label='Nguồn tham khảo'
                                                         size='small'
                                                         color='info'
                                                         variant='outlined'
                                                         sx={{ height: 18, fontSize: '0.62rem' }}
                                                     />
                                                 </Box>
+                                                {typeof doc.source === 'string' &&
+                                                    (/^https?:\/\//i.test(doc.source) ||
+                                                        /^\/api\/v1\/agent-builder\/documents\/[a-f\d-]+\/chunks\/[a-f\d-]+$/i.test(
+                                                            doc.source
+                                                        )) && (
+                                                        <Typography
+                                                            component='a'
+                                                            href={doc.source}
+                                                            target='_blank'
+                                                            rel='noopener noreferrer'
+                                                            variant='caption'
+                                                        >
+                                                            Mở nguồn tham khảo
+                                                        </Typography>
+                                                    )}
                                                 <Typography
                                                     variant='caption'
                                                     sx={{

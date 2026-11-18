@@ -63,7 +63,7 @@ export class BuilderMcpService {
                         content: { type: 'string', description: 'Nội dung tin nhắn yêu cầu bằng tiếng Việt' },
                         clientMessageId: { type: 'string', description: 'Khóa idempotency ngẫu nhiên của tin nhắn' }
                     },
-                    required: ['sessionId', 'content']
+                    required: ['sessionId', 'content', 'clientMessageId']
                 }
             },
             {
@@ -95,11 +95,7 @@ export class BuilderMcpService {
     /**
      * Thực thi một MCP Tool theo giao thức chuẩn (Tool Execution).
      */
-    async callTool(params: {
-        workspaceId: string
-        toolName: string
-        arguments?: Record<string, unknown>
-    }): Promise<McpToolCallResult> {
+    async callTool(params: { workspaceId: string; toolName: string; arguments?: Record<string, unknown> }): Promise<McpToolCallResult> {
         const { workspaceId, toolName, arguments: args = {} } = params
 
         try {
@@ -168,18 +164,19 @@ export class BuilderMcpService {
                     }
 
                     const snapshot = await sessionService.getSessionById(sessionId, workspaceId)
-                    const flowId = (snapshot.session as any)?.activeDraftRevisionId || `flow_${sessionId}`
+                    const drafts = await buildPipelineService.getDraftHistory(sessionId, workspaceId)
+                    const draft = drafts.filter((item) => item.specRevisionId === snapshot.currentSpecRevision?.id).at(-1)
+                    if (!draft) throw new Error('Chưa có draft cho revision hiện tại. Build trước khi chạy test.')
+                    const flowId = draft.flowId
                     const maxExamples = typeof args.maxExamples === 'number' ? args.maxExamples : 5
-                    
+
                     let parsedSpec: any = {}
                     try {
                         parsedSpec = snapshot.currentSpecRevision?.spec ? JSON.parse(snapshot.currentSpecRevision.spec) : {}
                     } catch {
                         parsedSpec = {}
                     }
-                    const examples = parsedSpec?.evaluationExamples || [
-                        { input: 'Chào bạn', assertions: ['Chào'] }
-                    ]
+                    const examples = parsedSpec?.evaluationExamples || []
 
                     const testResult = await evaluationRunnerService.runTestSuite({
                         flowId,

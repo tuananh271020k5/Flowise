@@ -1,10 +1,12 @@
 # PLAN TỔNG HỢP — HỆ THỐNG CHAT TẠO AGENT TRÊN FLOWISE
 
-**Cập nhật: 14/11/2026. Đây là file đầu tiên cần mở để xem toàn bộ lộ trình.**
+**Cập nhật: 17/11/2026. Đây là file tổng hợp lộ trình; tiến độ thực tế đọc từ state chung.**
 
 **Tổng cộng: 7 phase sản phẩm, 68 task con; thêm 8 task harness hỗ trợ lập trình. Tổng phạm vi kế hoạch: 76 task con.**
 
 Đã hoàn thành việc khảo sát/lập kế hoạch `PLAN-000` và triển khai local harness ở phiên trước. **68 task sản phẩm chưa được nghiệm thu hoàn thành**; một phần khảo sát PH0 đã có bằng chứng để dùng lại. File này tổ chức phạm vi công việc; tiến độ bàn giao mới nhất vẫn nằm tại [state chung](AI-Agent/state/project.json).
+
+**B-028 đang nghiệm thu lại luồng cốt lõi:** chat thu thập → tự build → runtime preview → sửa → refresh đã qua browser với provider HTTP fixture. Xem [hướng dẫn chạy/test](AI-Agent/GUI_TEST_GUIDE.md) và [báo cáo bằng chứng](AI-Agent/plans/FINAL_ACCEPTANCE_REPORT.md). Báo cáo cũ “76/76 hoàn thành” không còn giá trị nghiệm thu. Các nhánh PH4–PH6 và benchmark H chưa được suy ra hoàn thành từ unit test.
 
 ## 1. Bảng tổng hợp phase và số task
 

@@ -199,7 +199,13 @@ describe('EvaluationRunnerService (PH3-T03)', () => {
             const report = await runner.runTestSuite({
                 flowId: knowledgeFlow.id,
                 workspaceId: 'ws-alpha',
-                examples: knowledgeExamples
+                examples: knowledgeExamples,
+                mockPredictFn: async (input) => ({
+                    text: input.includes('remote') ? 'làm việc từ xa 02 ngày' : 'nghỉ phép 14 ngày',
+                    sourceDocuments: [
+                        { pageContent: 'Test fixture passage', title: 'Quy Chế Hoạt Động', source: 'fixture://policy_2026.pdf' }
+                    ]
+                })
             })
 
             expect(report.totalCount).toBe(2)
@@ -236,7 +242,8 @@ describe('EvaluationRunnerService (PH3-T03)', () => {
             const report = await runner.runTestSuite({
                 flowId: knowledgeFlow.id,
                 workspaceId: 'ws-alpha',
-                examples: outOfDomainExamples
+                examples: outOfDomainExamples,
+                mockPredictFn: async () => ({ text: 'không có thông tin, từ chối suy diễn', sourceDocuments: [] })
             })
 
             expect(report.totalCount).toBe(1)

@@ -21,9 +21,15 @@ import customToolSandboxService from '../../services/agent-builder/custom-tools/
 import builderWebhookService from '../../services/agent-builder/webhooks/builderWebhookService'
 import builderMcpService from '../../services/agent-builder/mcp/builderMcpService'
 import { AgentSpec } from '../../services/agent-builder/types'
+import modelSettingsService from '../../services/agent-builder/modelSettingsService'
+import { predictDraft } from '../../services/agent-builder/runtimePredictionService'
+import documentUploadService from '../../services/agent-builder/knowledge/documentUploadService'
+import { DocumentStoreFileChunk } from '../../database/entities/DocumentStoreFileChunk'
+import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 
 const getWorkspaceId = (req: Request): string => {
-    return req.user?.activeWorkspaceId || (req.body?.workspaceId as string) || (req.query?.workspaceId as string) || 'default'
+    if (!req.user?.activeWorkspaceId) throw new InternalFlowiseError(StatusCodes.UNAUTHORIZED, 'Đăng nhập để dùng Agent Builder')
+    return req.user.activeWorkspaceId
 }
 
 const getOrganizationId = (req: Request): string => {
@@ -254,12 +260,13 @@ const runTestSuite = async (req: Request, res: Response, next: NextFunction) => 
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Chưa có bản draft nào được tạo cho phiên này')
         }
 
-        const latestDraft = drafts[drafts.length - 1]
+        const latestDraft = drafts.filter((draft) => draft.specRevisionId === snapshot.currentSpecRevision?.id).at(-1)
+        if (!latestDraft) throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Chưa có draft cho revision hiện tại')
         const result = await evaluationRunnerService.runTestSuite({
             flowId: latestDraft.flowId,
             workspaceId,
             examples: spec.evaluationExamples || [],
-            maxExamples: req.body?.maxExamples || 10
+            maxExamples: req.body?.maxExamples ?? 10
         })
 
         const passRate = result.totalCount > 0 ? Math.round((result.passedCount / result.totalCount) * 100) : 100
@@ -829,12 +836,7 @@ const receiveWebhook = async (req: Request, res: Response, next: NextFunction) =
         const signature = (req.headers['x-flowise-signature'] || req.headers['x-webhook-signature'] || '') as string
         const eventName = (req.headers['x-flowise-event'] || req.body?.event || 'generic.event') as string
 
-        const result = await builderWebhookService.processWebhookEvent(
-            endpointId,
-            signature,
-            eventName,
-            req.body
-        )
+        const result = await builderWebhookService.processWebhookEvent(endpointId, signature, eventName, req.body)
         return res.status(result.statusCode).json(result)
     } catch (error) {
         next(error)
@@ -869,7 +871,95 @@ const callMcpTool = async (req: Request, res: Response, next: NextFunction) => {
     }
 }
 
+const getModelProfile = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.json(await modelSettingsService.getProfile(getWorkspaceId(req)))
+    } catch (error) {
+        next(error)
+    }
+}
+const listModels = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.json(await modelSettingsService.listModels(getWorkspaceId(req)))
+    } catch (error) {
+        next(error)
+    }
+}
+const saveModelProfile = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.json(await modelSettingsService.saveProfile(getWorkspaceId(req), req.body || {}))
+    } catch (error) {
+        next(error)
+    }
+}
+const previewDraft = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.json(await predictDraft(req.params.id, getWorkspaceId(req), req.body || {}))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const uploadDocuments = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const snapshot = await sessionService.getSessionById(req.params.id, workspaceId)
+        const expectedRevision = Number(req.body.expectedRevision)
+        if (!Number.isInteger(expectedRevision) || expectedRevision !== snapshot.session.currentRevisionNo)
+            throw new InternalFlowiseError(409, 'Phiên đã thay đổi. Tải lại trước khi gửi tài liệu.')
+        if (typeof req.body.clientMessageId !== 'string' || !req.body.clientMessageId.trim() || req.body.clientMessageId.length > 128)
+            throw new InternalFlowiseError(400, 'clientMessageId không hợp lệ')
+        const files = req.files as Express.Multer.File[]
+        const sources = await documentUploadService.ingest(
+            req.params.id,
+            workspaceId,
+            files,
+            req.body.retrievalMode || 'lexical',
+            req.body.embeddingModel || 'text-embedding-3-small'
+        )
+        const previous = snapshot.currentSpecRevision ? JSON.parse(snapshot.currentSpecRevision.spec).dataSources || [] : []
+        const merged = [...new Map([...previous, ...sources].map((source: any) => [source.id, source])).values()]
+        if (merged.length > 10) throw new InternalFlowiseError(400, 'Mỗi Agent tối đa 10 nguồn tài liệu.')
+        const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+        return res.json(
+            await sessionService.addMessage(req.params.id, workspaceId, {
+                content: `${content || 'Dùng các tài liệu đính kèm làm nguồn cho Agent.'}\n\nTài liệu đính kèm: ${sources
+                    .map((source) => source.name)
+                    .join(', ')}`,
+                clientMessageId: req.body.clientMessageId,
+                expectedRevision,
+                specPatch: { dataSources: merged as any, kind: 'knowledge' }
+            })
+        )
+    } catch (error) {
+        next(error)
+    }
+}
+
+const readDocumentChunk = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        await knowledgeStoreService.getStoreById(req.params.storeId, getWorkspaceId(req))
+        const chunk = await getRunningExpressApp()
+            .AppDataSource.getRepository(DocumentStoreFileChunk)
+            .findOneBy({ id: req.params.chunkId, storeId: req.params.storeId })
+        if (!chunk) throw new InternalFlowiseError(404, 'Không tìm thấy đoạn tài liệu')
+        const meta = JSON.parse(chunk.metadata || '{}')
+        res.type('text/plain').setHeader('X-Content-Type-Options', 'nosniff')
+        return res.send(
+            `${meta.filename || 'Tài liệu'}${meta.page ? ` — trang ${meta.page}` : ''}\nĐoạn ${chunk.chunkNo}\n\n${chunk.pageContent}`
+        )
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
+    uploadDocuments,
+    readDocumentChunk,
+    listModels,
+    getModelProfile,
+    saveModelProfile,
+    previewDraft,
     createSession,
     getSessionById,
     addMessage,

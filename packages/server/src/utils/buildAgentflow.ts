@@ -2240,6 +2240,24 @@ export const executeAgentFlow = async ({
 
     // check if last agentFlowExecutedData.data.output contains the key "content"
     const lastNodeOutput = agentFlowExecutedData[agentFlowExecutedData.length - 1].data?.output as ICommonObject | undefined
+    // A retriever is commonly followed by processing/reply nodes. Preserve only sources
+    // returned by nodes that actually executed, rather than losing them at the last node.
+    if (lastNodeOutput) {
+        const sources = agentFlowExecutedData.flatMap((step) => {
+            const output = step.data?.output as ICommonObject | undefined
+            return Array.isArray(output?.sourceDocuments) ? output.sourceDocuments : []
+        })
+        const seen = new Set<string>()
+        if (sources.length)
+            lastNodeOutput.sourceDocuments = sources
+                .filter((doc: any) => {
+                    const key = JSON.stringify([doc.metadata?.source, doc.pageContent])
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                })
+                .slice(0, 20)
+    }
     let content = (lastNodeOutput?.content as string) ?? ' '
 
     /* Check for post-processing settings */
@@ -2434,6 +2452,7 @@ export const executeAgentFlow = async ({
     result.followUpPrompts = JSON.stringify(apiMessage.followUpPrompts)
     result.executionId = newExecution.id
     result.agentFlowExecutedData = agentFlowExecutedData
+    if (lastNodeOutput?.sourceDocuments?.length) result.sourceDocuments = lastNodeOutput.sourceDocuments
     if (apiMessage.action) result.action = JSON.parse(apiMessage.action)
 
     if (sessionId) result.sessionId = sessionId

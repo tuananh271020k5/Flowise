@@ -5,6 +5,7 @@ import { AgentSpecRevision } from '../../../database/entities/AgentSpecRevision'
 import { AgentDraftRevision } from '../../../database/entities/AgentDraftRevision'
 import { BuildJob } from '../../../database/entities/BuildJob'
 import { ChatFlow } from '../../../database/entities/ChatFlow'
+import { DocumentStore } from '../../../database/entities/DocumentStore'
 import { getRunningExpressApp } from '../../../utils/getRunningExpressApp'
 import { AgentSpec } from '../types'
 import { createAgentPlan, validateAgentPlan } from '../generator/agentPlan'
@@ -13,6 +14,7 @@ import { validateFlowGraph } from '../generator/flowValidator'
 import { FlowiseDraftAdapter } from '../adapter/flowiseDraftAdapter'
 import { BuildJobManager } from './buildJobManager'
 import collectorService from '../collectorService'
+import modelSettingsService from '../modelSettingsService'
 import { AdapterError, BuildPipelineError, CompilerError } from '../errors/builderErrors'
 
 export interface BuildExecutionResult {
@@ -62,6 +64,52 @@ export class BuildPipelineService {
 
     private get jobRepo(): Repository<BuildJob> {
         return this.ds.getRepository(BuildJob)
+    }
+
+    /**
+     * Tìm DocumentStore thật theo tên: collector có thể dính kèm mô tả vào tên kho
+     * (vd "Iphone làm nguồn kiến thức..."). Thứ tự: trùng chính xác > tên store nằm trong chuỗi
+     * trích ra > chuỗi trích ra nằm trong tên store. Ưu tiên tên dài nhất khớp để tránh trúng kho ngắn chung chung.
+     */
+    private async findStoreByName(workspaceId: string, rawName: string): Promise<DocumentStore | undefined> {
+        const name = rawName.trim().toLowerCase()
+        if (!name) return undefined
+        const stores = await this.ds.getRepository(DocumentStore).find({ where: { workspaceId } })
+        const candidates = stores
+            .map((store) => ({ store, name: (store.name || '').trim().toLowerCase() }))
+            .filter((candidate) => candidate.name.length >= 2)
+        const exact = candidates.find((candidate) => candidate.name === name)
+        if (exact) return exact.store
+        const inside = candidates.filter((candidate) => name.includes(candidate.name)).sort((a, b) => b.name.length - a.name.length)
+        if (inside.length) return inside[0].store
+        const outside = candidates.filter((candidate) => candidate.name.includes(name)).sort((a, b) => b.name.length - a.name.length)
+        if (outside.length) return outside[0].store
+        return undefined
+    }
+
+    /**
+     * Đổi id dataSources type documentStore sang ID DocumentStore thật trong workspace theo tên (case-insensitive).
+     * Không tìm thấy hoặc chưa upsert thì chặn build; không lưu graph trỏ vào ID mẫu/nguồn không truy cập được.
+     */
+    private async resolveDataSourceStoreIds(spec: AgentSpec, workspaceId: string) {
+        if (!Array.isArray(spec.dataSources) || spec.dataSources.length === 0) return
+        for (const source of spec.dataSources) {
+            if (!source || source.type !== 'documentStore') continue
+            const oldId = source.id
+            let store = await this.ds.getRepository(DocumentStore).findOneBy({ id: source.id, workspaceId })
+            if (!store && !/^[a-f0-9-]{36}$/i.test(source.id)) store = (await this.findStoreByName(workspaceId, source.name)) || null
+            if (!store || store.status !== 'UPSERTED')
+                throw new CompilerError(
+                    'KNOWLEDGE_SOURCE_NOT_READY',
+                    `Nguồn ${source.name || source.id} không có trong workspace hoặc chưa sẵn sàng truy xuất.`
+                )
+            if (store) {
+                source.id = store.id
+                source.name = store.name
+                for (const step of spec.workflow?.steps || [])
+                    if (step.sourceIds) step.sourceIds = step.sourceIds.map((id) => (id === oldId ? store!.id : id))
+            }
+        }
     }
 
     /**
@@ -178,6 +226,10 @@ export class BuildPipelineService {
                 throw new BuildPipelineError('INVALID_SPEC_JSON', `Dữ liệu spec không phải JSON hợp lệ: ${e.message}`)
             }
 
+            // 5.5. Nối kho tài liệu trong spec với DocumentStore thật của workspace theo tên (B-029/PH4).
+            // Collector chỉ trích được tên kho từ hội thoại; ID thật mới giúp Agent truy xuất được tài liệu.
+            if (!this.customDataSource) await this.resolveDataSourceStoreIds(spec, workspaceId)
+
             // 6. Lập AgentPlan và Validate Plan
             const plan = createAgentPlan(spec, targetRevision.id)
             const planValidation = validateAgentPlan(plan)
@@ -187,6 +239,34 @@ export class BuildPipelineService {
 
             // 7. Biên dịch Graph tất định
             const compiledGraph = compiler.compile(plan)
+            if (!this.customDataSource) {
+                const profile = await modelSettingsService.getProfile(workspaceId)
+                const app = getRunningExpressApp()
+                for (const node of compiledGraph.nodes) {
+                    const metadata = app.nodesPool.componentNodes[node.data.name]
+                    if (!metadata) throw new CompilerError('NODE_UNAVAILABLE', `Runtime chưa nạp node ${node.data.name}`)
+                    node.data.version = metadata.version
+                    node.data.inputParams = metadata.inputs || []
+                    if (node.data.name === 'agentAgentflow')
+                        node.data.inputs.agentModelConfig = {
+                            modelName: profile.modelName,
+                            basepath: profile.baseUrl,
+                            FLOWISE_CREDENTIAL_ID: profile.credentialId,
+                            temperature: 0.3,
+                            streaming: false,
+                            timeout: 30000
+                        }
+                    if (node.data.name === 'llmAgentflow')
+                        node.data.inputs.llmModelConfig = {
+                            modelName: profile.modelName,
+                            basepath: profile.baseUrl,
+                            FLOWISE_CREDENTIAL_ID: profile.credentialId,
+                            temperature: 0.3,
+                            streaming: false,
+                            timeout: 30000
+                        }
+                }
+            }
 
             // 8. Server Flow Validation
             const flowValidation = validateFlowGraph(compiledGraph)
@@ -232,24 +312,9 @@ export class BuildPipelineService {
                 }
             }
 
-            // 9. Lưu trữ hoặc cập nhật ChatFlow Draft
-            // Tìm draft trước đó của cùng session nếu có
-            const previousDrafts = await this.draftRevisionRepo.find({
-                where: { sessionId },
-                order: { createdDate: 'DESC' },
-                take: 1
-            })
-
-            let targetFlow: ChatFlow
-            if (previousDrafts.length > 0) {
-                try {
-                    targetFlow = await this.draftAdapter.updateDraft(previousDrafts[0].flowId, workspaceId, compiledGraph)
-                } catch {
-                    targetFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
-                }
-            } else {
-                targetFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
-            }
+            // 9. Save a distinct flow for this revision.
+            // Preserve each draft revision instead of overwriting a previously tested graph.
+            const targetFlow: ChatFlow = await this.draftAdapter.createDraft(workspaceId, compiledGraph)
 
             // 10. Ghi nhận AgentDraftRevision mapping
             const draftRevision = this.draftRevisionRepo.create({

@@ -10,6 +10,8 @@ import { AgentSpec } from '../types'
 import collectorService from '../collectorService'
 import { BuilderAuditService } from '../audit/builderAuditService'
 import { EvaluationRunnerService } from './evaluationRunnerService'
+import modelSettingsService from '../modelSettingsService'
+import { prepareAgentPreview } from '../agentBehaviorPolicy'
 
 export interface PublishParams {
     sessionId: string
@@ -191,6 +193,17 @@ export class PublishService {
         }
 
         // 6. Thực thi chuyển đổi trạng thái Xuất Bản
+        if (!this.customDataSource) {
+            const profile = await modelSettingsService.getProfile(workspaceId)
+            chatflow.flowData = prepareAgentPreview(
+                chatflow.flowData,
+                chatflow.name,
+                profile.webSearchEnabled,
+                new Date(),
+                profile,
+                spec.workflow?.steps
+            )
+        }
         chatflow.deployed = true
         chatflow.isPublic = isPublic
         await this.chatflowRepo.save(chatflow)

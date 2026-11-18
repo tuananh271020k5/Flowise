@@ -64,6 +64,7 @@ export interface AgentSpec {
     sqlConfig?: SqlAgentConfig
     policy: AgentPolicy
     evaluationExamples: EvaluationExample[]
+    workflow?: import('./workflow').WorkflowSpec
 }
 
 export type PartialAgentSpec = Partial<Omit<AgentSpec, 'policy' | 'evaluationExamples' | 'dataSources' | 'tools' | 'sqlConfig'>> & {
@@ -111,6 +112,7 @@ export interface SpecPatchResult {
     patch: Partial<AgentSpec>
     extractedFields: string[]
     changeSummary: string
+    usage?: { provider: string; model: string; promptTokens: number; completionTokens: number }
 }
 
 export type SSEEventType =

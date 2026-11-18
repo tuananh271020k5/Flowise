@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { WorkflowSchema } from './workflow'
 import { AgentSpec, AgentSpecValidationResult } from './types'
 
 /**
@@ -150,6 +151,10 @@ export const AgentSpecSchema = z
         tools: z.array(ToolRefSchema).max(20, 'Tối đa 20 tools').default([]),
         apiConnectors: z.array(ApiConnectorRefSchema).max(10, 'Tối đa 10 API connectors').optional(),
         sqlConfig: SqlAgentConfigSchema.optional(),
+        workflow: WorkflowSchema.refine(
+            (value) => !containsSecret(JSON.stringify(value)) && !containsScriptTag(JSON.stringify(value)),
+            'Workflow không được chứa secret/script'
+        ).optional(),
         policy: PolicySchema.default({
             visibility: 'private',
             executionMode: 'controlled-test',

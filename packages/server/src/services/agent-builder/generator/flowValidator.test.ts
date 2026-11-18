@@ -26,7 +26,7 @@ describe('Server Flow Validator (PH2-T05 / B-009)', () => {
         const result = validateFlowGraph(compiled)
         expect(result.valid).toBe(true)
         expect(result.errors).toHaveLength(0)
-        expect(result.nodeCount).toBeGreaterThanOrEqual(3)
+        expect(result.nodeCount).toBe(2)
         expect(result.edgeCount).toBeGreaterThanOrEqual(1)
     })
 

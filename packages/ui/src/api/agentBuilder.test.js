@@ -7,6 +7,29 @@ jest.mock('./client', () => ({
 }))
 
 describe('agentBuilder API client', () => {
+    it('uploads real FormData with revision zero and never includes a model key', async () => {
+        client.post.mockResolvedValueOnce({ data: { session: { id: 's1' } } })
+        const file = new File(['Hướng dẫn phần mềm'], 'guide.md', { type: 'text/markdown' })
+        await agentBuilderApi.uploadDocuments('s1', {
+            files: [file],
+            content: 'Tạo trợ lý theo tài liệu',
+            clientMessageId: 'm1',
+            expectedRevision: 0,
+            retrievalMode: 'lexical'
+        })
+        const [url, body] = client.post.mock.calls[0]
+        expect(url).toBe('/agent-builder/sessions/s1/documents')
+        expect(body).toBeInstanceOf(FormData)
+        expect(body.get('expectedRevision')).toBe('0')
+        expect(body.get('files').name).toBe('guide.md')
+        expect(body.get('apiKey')).toBeNull()
+    })
+    it('loads the catalog with GET and sends no key or provider override from the browser', async () => {
+        client.get.mockResolvedValueOnce({ data: { models: ['custom/model'] } })
+        const result = await agentBuilderApi.listModels()
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/models')
+        expect(result.data.models).toEqual(['custom/model'])
+    })
     afterEach(() => {
         jest.clearAllMocks()
     })
@@ -87,13 +110,13 @@ describe('agentBuilder API client', () => {
         expect(res.data).toHaveLength(1)
     })
 
-    it('testPrediction gửi POST request tới /prediction/:id', async () => {
+    it('testPrediction gửi POST request tới preview có xác thực', async () => {
         const payload = { question: 'Xin chào' }
         client.post.mockResolvedValueOnce({ data: { text: 'Chào bạn!' } })
 
         const res = await agentBuilderApi.testPrediction('f1', payload)
 
-        expect(client.post).toHaveBeenCalledWith('/prediction/f1', payload)
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/drafts/f1/preview', payload)
         expect(res.data.text).toBe('Chào bạn!')
     })
 

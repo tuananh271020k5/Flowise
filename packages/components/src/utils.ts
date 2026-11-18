@@ -2304,6 +2304,10 @@ export const isReasoningModelOpenAI = (name: string): boolean => {
     if (name === 'codex-mini') return true
     if (name.includes('gpt-5') && name.includes('-chat')) return false
     if (name.includes('gpt-5')) return true
+    // GPT-6 family (gpt-6-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-luna, ...) only supports
+    // the default sampling parameters; temperature/topP values are rejected with 400.
+    if (name.includes('gpt-6') && name.includes('-chat')) return false
+    if (name.includes('gpt-6')) return true
     return false
 }
 

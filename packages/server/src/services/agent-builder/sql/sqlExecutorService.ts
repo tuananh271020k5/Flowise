@@ -130,7 +130,11 @@ export class SqlExecutorService {
         }
 
         if (!params.allowedTables || params.allowedTables.length === 0) {
-            throw new AdapterError('ALLOWED_TABLES_REQUIRED', 'Phải cấu hình ít nhất 1 bảng được phép đọc trong allowedTables', StatusCodes.BAD_REQUEST)
+            throw new AdapterError(
+                'ALLOWED_TABLES_REQUIRED',
+                'Phải cấu hình ít nhất 1 bảng được phép đọc trong allowedTables',
+                StatusCodes.BAD_REQUEST
+            )
         }
 
         const id = `sql-cfg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
@@ -186,7 +190,10 @@ export class SqlExecutorService {
             .trim()
 
         // 2. Chặn multi-statements (dấu ; nối nhiều câu lệnh)
-        const statements = cleanQuery.split(';').map((s) => s.trim()).filter((s) => s.length > 0)
+        const statements = cleanQuery
+            .split(';')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
         if (statements.length > 1) {
             return {
                 valid: false,
@@ -331,11 +338,7 @@ export class SqlExecutorService {
     /**
      * Thực thi câu lệnh SQL một cách an toàn trên bộ mock/sandbox data.
      */
-    async executeQuery(
-        workspaceId: string,
-        databaseId: string,
-        query: string
-    ): Promise<SqlQueryResult> {
+    async executeQuery(workspaceId: string, databaseId: string, query: string): Promise<SqlQueryResult> {
         const config = await this.getDatabase(databaseId, workspaceId)
         if (!config) {
             throw new AdapterError('DATABASE_NOT_FOUND', `Cấu hình cơ sở dữ liệu ${databaseId} không tồn tại`, StatusCodes.NOT_FOUND)
@@ -350,48 +353,8 @@ export class SqlExecutorService {
             throw new AdapterError('SQL_SAFETY_VIOLATION', validation.error || 'Câu lệnh SQL không an toàn', StatusCodes.BAD_REQUEST)
         }
 
-        const start = Date.now()
-
-        // Mock Execution Engine với dữ liệu mẫu theo schema
-        const mockRows: Record<string, unknown>[] = []
-        const table = validation.targetTables[0] || 'records'
-        const limit = validation.appliedLimit
-
-        for (let i = 1; i <= Math.min(limit, 3); i++) {
-            if (table === 'orders') {
-                mockRows.push({
-                    id: i,
-                    customer_id: 100 + i,
-                    total_amount: i * 250000,
-                    status: i % 2 === 0 ? 'completed' : 'processing',
-                    created_at: new Date(Date.now() - i * 86400000).toISOString()
-                })
-            } else if (table === 'customers') {
-                mockRows.push({
-                    id: 100 + i,
-                    name: `Khách hàng ${i}`,
-                    email: `customer${i}@example.vn`,
-                    city: i === 1 ? 'Hanoi' : 'HCMC',
-                    created_at: new Date(Date.now() - i * 186400000).toISOString()
-                })
-            } else {
-                mockRows.push({
-                    id: i,
-                    title: `Bản ghi mẫu ${i}`,
-                    created_at: new Date().toISOString()
-                })
-            }
-        }
-
-        const columns = mockRows.length > 0 ? Object.keys(mockRows[0]) : ['result']
-
-        return {
-            columns,
-            rows: mockRows,
-            rowCount: mockRows.length,
-            executionTimeMs: Math.max(1, Date.now() - start),
-            sanitizedQuery: validation.sanitizedQuery
-        }
+        const { queryReadonly } = await import('./readonlyDriver')
+        return queryReadonly(config, validation.sanitizedQuery, validation.appliedLimit)
     }
 }
 

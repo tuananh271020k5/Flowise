@@ -294,6 +294,37 @@ describe('BuilderSessionService & API Integration (B-004)', () => {
             expect(response.buildIntent?.status).toBe('dispatched')
             expect(response.session.buildIntent).toContain('"status":"dispatched"')
             expect(response.assistantMessage?.content).toContain('sẵn sàng (buildReady)')
+            expect(response.assistantMessage?.content).toContain('"xong"')
+            expect(response.buildResult).toBeUndefined()
+        })
+
+        it('chỉ kích hoạt autoBuild khi người dùng nhắn "xong", không tự build sớm và không tạo thêm revision rác', async () => {
+            const executeBuild = jest.fn().mockResolvedValue({ success: true, flowId: 'flow-built-on-xong' })
+            const customService = new BuilderSessionService(mockDataSource, undefined, { executeBuild } as any)
+            const { session } = await customService.createSession({
+                workspaceId: 'ws-1',
+                organizationId: 'org-1',
+                userId: 'user-1',
+                initialGoal: 'Tôi cần tạo bot hỗ trợ nhân viên mới'
+            })
+
+            const turn1 = await customService.addMessage(session.id, 'ws-1', {
+                clientMessageId: 'turn-1-spec',
+                content: 'Đặt tên là Trợ lý Nội bộ và hướng dẫn là luôn lịch sự, giải thích rõ ràng'
+            })
+            expect(turn1.readiness?.buildReady).toBe(true)
+            expect(turn1.buildResult).toBeUndefined()
+            expect(executeBuild).not.toHaveBeenCalled()
+
+            const revBeforeXong = turn1.currentSpecRevision?.revisionNo
+            const turn2 = await customService.addMessage(session.id, 'ws-1', {
+                clientMessageId: 'turn-2-confirm',
+                content: 'xong'
+            })
+            expect(executeBuild).toHaveBeenCalledTimes(1)
+            expect(turn2.buildResult).toEqual({ success: true, flowId: 'flow-built-on-xong' })
+            expect(turn2.currentSpecRevision?.revisionNo).toBe(revBeforeXong)
+            expect(turn2.assistantMessage?.content).toContain('Đã nhận xác nhận **"xong"**')
         })
 
         it('tự động trích xuất patch tiếng Việt từ nội dung chat không cần specPatch (PH1-T09)', async () => {

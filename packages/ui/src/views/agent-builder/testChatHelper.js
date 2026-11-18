@@ -71,7 +71,7 @@ export function extractSourceDocuments(responseData) {
 
         const pageContent = item.pageContent || item.content || item.text || ''
         const metadata = item.metadata || {}
-        const title = metadata.title || metadata.source || metadata.docName || `Đoạn trích #${index + 1}`
+        const title = metadata.title || metadata.filename || metadata.source || metadata.docName || `Đoạn trích #${index + 1}`
         const source = metadata.source || metadata.sourceUri || ''
 
         return {

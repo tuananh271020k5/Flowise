@@ -6,6 +6,7 @@ import { KNOWLEDGE_TEMPLATE_ID, KNOWLEDGE_TEMPLATE_VERSION } from './templates/k
 import { API_TEMPLATE_ID, API_TEMPLATE_VERSION } from './templates/apiTemplate.v1'
 import { SQL_TEMPLATE_ID, SQL_TEMPLATE_VERSION } from './templates/sqlTemplate.v1'
 import { createHash } from 'crypto'
+import { WORKFLOW_TEMPLATE_ID, WORKFLOW_TEMPLATE_VERSION } from '../workflow'
 
 export interface CapabilityBinding {
     capabilityId: string
@@ -47,6 +48,7 @@ export const calculatePlanHash = (spec: AgentSpec, specRevisionId: string): stri
         instructions: spec.instructions,
         tools: spec.tools,
         dataSources: spec.dataSources,
+        workflow: spec.workflow,
         specRevisionId
     })
     return createHash('sha256').update(raw).digest('hex').slice(0, 16)
@@ -93,25 +95,25 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     connectionRefs.model = modelNodeName
 
     // 2. Ánh xạ Data Source Capability (DocumentStoreTool) cho Knowledge Agent
-    if (isKnowledge) {
-        const store = spec.dataSources && spec.dataSources.length > 0 ? spec.dataSources[0] : undefined
-        const storeId = store?.id || 'fixture-docstore-company-policy'
-        const storeName = store?.name || 'Quy chế làm việc nội bộ'
+    if (spec.dataSources?.length)
+        for (const store of spec.dataSources) {
+            const storeId = store?.id || 'fixture-docstore-company-policy'
+            const storeName = store?.name || 'Quy chế làm việc nội bộ'
 
-        capabilityBindings.push({
-            capabilityId: `cap_datasource_${storeId}`,
-            nodeName: 'documentStoreTool',
-            nodeVersion: 1.0,
-            type: 'datasource',
-            config: {
-                selectedStore: storeId,
-                storeName: storeName,
-                topK: 4,
-                returnSourceDocuments: true
-            }
-        })
-        connectionRefs.datasource = 'documentStoreTool'
-    }
+            capabilityBindings.push({
+                capabilityId: `cap_datasource_${storeId}`,
+                nodeName: 'documentStoreTool',
+                nodeVersion: 1.0,
+                type: 'datasource',
+                config: {
+                    selectedStore: storeId,
+                    storeName: storeName,
+                    topK: 4,
+                    returnSourceDocuments: true
+                }
+            })
+            connectionRefs.datasource = 'documentStoreTool'
+        }
 
     // 2b. Ánh xạ API Capability (RequestsGet) cho API Agent (PH6-T03)
     if (isApi) {
@@ -183,7 +185,10 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
     let templateId = ASSISTANT_TEMPLATE_ID
     let templateVersion = ASSISTANT_TEMPLATE_VERSION
 
-    if (isSql) {
+    if (spec.workflow) {
+        templateId = WORKFLOW_TEMPLATE_ID
+        templateVersion = WORKFLOW_TEMPLATE_VERSION
+    } else if (isSql) {
         templateId = SQL_TEMPLATE_ID
         templateVersion = SQL_TEMPLATE_VERSION
     } else if (isApi) {
@@ -224,8 +229,10 @@ export const validateAgentPlan = (plan: AgentPlan): AgentPlanValidationResult =>
     const isKnowledge = plan.templateId === KNOWLEDGE_TEMPLATE_ID && plan.templateVersion === KNOWLEDGE_TEMPLATE_VERSION
     const isApi = plan.templateId === API_TEMPLATE_ID && plan.templateVersion === API_TEMPLATE_VERSION
     const isSql = plan.templateId === SQL_TEMPLATE_ID && plan.templateVersion === SQL_TEMPLATE_VERSION
+    const isWorkflow = plan.templateId === WORKFLOW_TEMPLATE_ID && plan.templateVersion === WORKFLOW_TEMPLATE_VERSION
+    if (isWorkflow && !plan.spec?.workflow) errors.push('Workflow template thiếu kế hoạch các bước')
 
-    if (!isAssistant && !isKnowledge && !isApi && !isSql) {
+    if (!isAssistant && !isKnowledge && !isApi && !isSql && !isWorkflow) {
         errors.push(
             `Template "${plan.templateId}" phiên bản "${plan.templateVersion}" không được hỗ trợ (yêu cầu: ${ASSISTANT_TEMPLATE_ID}, ${KNOWLEDGE_TEMPLATE_ID}, ${API_TEMPLATE_ID} hoặc ${SQL_TEMPLATE_ID})`
         )

@@ -1,5 +1,6 @@
 import { containsScriptTag, containsSecret, validateAgentSpec } from './schema'
 import { AgentSpec, ReadinessResult } from './types'
+import { workflowProblems } from './workflow'
 
 /**
  * Required fields for an assistant to be buildReady.
@@ -63,7 +64,8 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         'apiConnectors',
         'sqlConfig',
         'policy',
-        'evaluationExamples'
+        'evaluationExamples',
+        'workflow'
     ])
 
     const unknownKeys = Object.keys(raw).filter((k) => !allowedKeys.has(k))
@@ -131,12 +133,40 @@ export function computeReadiness(spec: unknown): ReadinessResult {
     // 3d. Kiểm tra quy tắc bắt buộc riêng cho SQL Readonly Agent (PH6-T06)
     if (raw.kind === 'sql-readonly') {
         const sqlCfg = raw.sqlConfig as any
-        if (!sqlCfg || typeof sqlCfg !== 'object' || !sqlCfg.allowedTables || !Array.isArray(sqlCfg.allowedTables) || sqlCfg.allowedTables.length === 0) {
+        if (
+            !sqlCfg ||
+            typeof sqlCfg !== 'object' ||
+            !sqlCfg.allowedTables ||
+            !Array.isArray(sqlCfg.allowedTables) ||
+            sqlCfg.allowedTables.length === 0
+        ) {
             missingFields.push('sqlConfig.allowedTables')
             reasonCodes.push('MISSING_ALLOWED_TABLES')
         }
         assumptions.push('Áp dụng cơ chế an toàn SQL Readonly: Chặn mọi câu lệnh DDL/DML gây hại và giới hạn số dòng (row limit)')
         reasonCodes.push('SQL_READONLY_ENFORCED')
+    }
+
+    if (raw.workflow !== undefined) {
+        const issues = workflowProblems(raw.workflow)
+        const workflow = raw.workflow as AgentSpec['workflow']
+        if (Array.isArray(workflow?.steps)) {
+            const sources = Array.isArray(raw.dataSources) ? (raw.dataSources as AgentSpec['dataSources']) : []
+            if (workflow.steps.some((step) => step.type === 'retriever') && !sources.length) {
+                missingFields.push('dataSources')
+                issues.push('Hãy đính kèm tài liệu hoặc chọn Document Store để truy xuất.')
+            }
+            if (sources.length && !workflow.steps.some((step) => step.type === 'retriever'))
+                issues.push('Đã gắn tài liệu nhưng kế hoạch chưa có bước truy xuất để dùng tài liệu.')
+            for (const step of workflow.steps)
+                if (step.type === 'retriever' && step.sourceIds?.some((id) => !sources.some((source) => source.id === id)))
+                    issues.push('Bước truy xuất tham chiếu tài liệu chưa được cấp.')
+        }
+        if (issues.length) {
+            missingFields.push('workflow')
+            errors.push(...issues)
+            reasonCodes.push('WORKFLOW_NOT_READY')
+        }
     }
 
     // 4. Record default assumptions if fields are not explicitly set

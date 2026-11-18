@@ -6,7 +6,6 @@ import {
     CardHeader,
     Chip,
     Divider,
-    LinearProgress,
     Stack,
     Typography,
     Alert,
@@ -36,6 +35,8 @@ import {
 
 // Bản đồ dịch tên trường thiếu sang tiếng Việt thân thiện
 const FIELD_LABELS = {
+    workflow: 'Kế hoạch các bước, nguồn dữ liệu và kết nối',
+    dataSources: 'Tài liệu làm nguồn cho Agent',
     name: 'Tên Trợ lý (cần định danh rõ ràng)',
     goal: 'Mục tiêu chính (mô tả mục đích hoạt động)',
     instructions: 'Hướng dẫn vận hành chi tiết (system prompt)',
@@ -49,7 +50,6 @@ const SpecCard = ({ spec, readiness, revisionNumber, onOpenRevisions, onGenerate
 
     const isReady = readiness?.buildReady || readiness?.status === 'ready'
     const status = readiness?.status || 'collecting'
-    const score = Math.round((readiness?.score || 0) * 100)
     const missingFields = readiness?.missingFields || []
 
     const getStatusChip = () => {
@@ -104,21 +104,12 @@ const SpecCard = ({ spec, readiness, revisionNumber, onOpenRevisions, onGenerate
                 <Box sx={{ mb: 2.5 }}>
                     <Stack direction='row' justifyContent='space-between' alignItems='center' sx={{ mb: 1 }}>
                         <Typography variant='subtitle2' color='textSecondary'>
-                            Độ hoàn thiện cấu hình:
+                            Trạng thái yêu cầu:
                         </Typography>
                         <Stack direction='row' spacing={1} alignItems='center'>
                             {getStatusChip()}
-                            <Typography variant='subtitle2' sx={{ fontWeight: 700 }}>
-                                {score}%
-                            </Typography>
                         </Stack>
                     </Stack>
-                    <LinearProgress
-                        variant='determinate'
-                        value={score}
-                        color={isReady ? 'success' : score > 50 ? 'warning' : 'primary'}
-                        sx={{ height: 8, borderRadius: 4 }}
-                    />
                 </Box>
 
                 {/* Cảnh báo các trường còn thiếu (Missing Fields) */}
@@ -190,7 +181,9 @@ const SpecCard = ({ spec, readiness, revisionNumber, onOpenRevisions, onGenerate
                                 </Typography>
                             </Stack>
                             <Typography variant='body2'>
-                                {spec?.model?.name ? `${spec.model.provider || 'OpenAI'} / ${spec.model.name}` : 'Mặc định (GPT-4o)'}
+                                {spec?.model?.name
+                                    ? `${spec.model.provider || 'OpenAI'} / ${spec.model.name}`
+                                    : 'Theo Cấu hình model của workspace'}
                             </Typography>
                         </Box>
                     </Stack>

@@ -1,7 +1,17 @@
 import express from 'express'
 import agentBuilderController from '../../controllers/agent-builder'
+import { checkAnyPermission } from '../../enterprise/rbac/PermissionCheck'
+import { builderMcpTransport } from '../../services/agent-builder/mcp/httpTransport'
+import multer from 'multer'
+import sessionService from '../../services/agent-builder/sessionService'
 
 const router = express.Router()
+router.use(checkAnyPermission('agentflows:create,agentflows:update'))
+router.get('/model-profile', agentBuilderController.getModelProfile)
+router.get('/models', checkAnyPermission('credentials:create,credentials:update'), agentBuilderController.listModels)
+router.put('/model-profile', checkAnyPermission('credentials:create,credentials:update'), agentBuilderController.saveModelProfile)
+router.post('/drafts/:id/preview', agentBuilderController.previewDraft)
+router.post('/mcp', builderMcpTransport)
 
 // CREATE SESSION
 router.post('/sessions', agentBuilderController.createSession)
@@ -11,6 +21,24 @@ router.get('/sessions/:id', agentBuilderController.getSessionById)
 
 // ADD MESSAGE (with Idempotency & Revision Conflict handling)
 router.post('/sessions/:id/messages', agentBuilderController.addMessage)
+router.post(
+    '/sessions/:id/documents',
+    checkAnyPermission('documentStores:create,documentStores:update'),
+    async (req, _res, next) => {
+        try {
+            await sessionService.getSessionById(req.params.id, req.user?.activeWorkspaceId || '')
+            next()
+        } catch (error) {
+            next(error)
+        }
+    },
+    multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 6, fieldSize: 18000 } }).array(
+        'files',
+        5
+    ),
+    agentBuilderController.uploadDocuments
+)
+router.get('/documents/:storeId/chunks/:chunkId', agentBuilderController.readDocumentChunk)
 
 // LIST REVISIONS
 router.get('/sessions/:id/revisions', agentBuilderController.getRevisions)

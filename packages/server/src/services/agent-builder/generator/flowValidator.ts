@@ -67,7 +67,7 @@ export const validateFlowGraph = (graph: {
         // Đếm các loại node quan trọng
         if (nodeName === 'startAgentflow') {
             startNodeCount++
-        } else if (nodeName === 'agentAgentflow') {
+        } else if (nodeName === 'agentAgentflow' || nodeName === 'llmAgentflow') {
             agentNodeCount++
         } else if (nodeName === 'directReplyAgentflow') {
             directReplyCount++
@@ -134,11 +134,13 @@ export const validateFlowGraph = (graph: {
         const connectedFromStart = edges.filter((e) => e.source === startId).map((e) => e.target)
         const hasValidStartTarget = connectedFromStart.some((targetId) => {
             const targetNode = nodes.find((n) => n.id === targetId)
-            return targetNode?.data?.name === 'agentAgentflow' || targetNode?.data?.name === 'directReplyAgentflow'
+            return ['agentAgentflow', 'directReplyAgentflow', 'llmAgentflow', 'retrieverAgentflow', 'conditionAgentflow'].includes(
+                targetNode?.data?.name || ''
+            )
         })
 
         if (!hasValidStartTarget && edges.length > 0) {
-            errors.push('Start node phải được kết nối trực tiếp tới Agent node hoặc DirectReply node')
+            errors.push('Start node phải được kết nối tới một bước xử lý được hỗ trợ')
         }
     }
 

@@ -7,8 +7,8 @@ export default defineConfig(async ({ mode }) => {
     let proxy = undefined
     if (mode === 'development') {
         const serverEnv = dotenv.config({ processEnv: {}, path: '../server/.env' }).parsed
-        const serverHost = serverEnv?.['HOST'] ?? 'localhost'
-        const serverPort = parseInt(serverEnv?.['PORT'] ?? 3000)
+        const serverHost = process.env.FLOWISE_SERVER_HOST || serverEnv?.['HOST'] || '127.0.0.1'
+        const serverPort = parseInt(process.env.FLOWISE_SERVER_PORT || serverEnv?.['PORT'] || 3000)
         if (!Number.isNaN(serverPort) && serverPort > 0 && serverPort < 65535) {
             proxy = {
                 '^/api(/|$).*': {
@@ -42,7 +42,7 @@ export default defineConfig(async ({ mode }) => {
             outDir: './build'
         },
         server: {
-            open: true,
+            open: process.env.BUILDER_DEV_NO_OPEN !== 'true',
             proxy,
             port: process.env.VITE_PORT ?? 8080,
             host: process.env.VITE_HOST

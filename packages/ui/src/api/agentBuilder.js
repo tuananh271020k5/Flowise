@@ -16,7 +16,17 @@ const cancelBuild = (jobId, body) => client.post(`/agent-builder/builds/${jobId}
 
 const getDraftHistory = (id) => client.get(`/agent-builder/sessions/${id}/drafts`)
 
-const testPrediction = (flowId, body) => client.post(`/prediction/${flowId}`, body)
+const testPrediction = (flowId, body) => client.post(`/agent-builder/drafts/${flowId}/preview`, body)
+const getModelProfile = () => client.get('/agent-builder/model-profile')
+const listModels = () => client.get('/agent-builder/models')
+const uploadDocuments = (sessionId, { files, content, clientMessageId, expectedRevision, retrievalMode, embeddingModel }) => {
+    const body = new FormData()
+    for (const file of files) body.append('files', file)
+    for (const [key, value] of Object.entries({ content, clientMessageId, expectedRevision, retrievalMode, embeddingModel }))
+        if (value !== undefined) body.append(key, String(value))
+    return client.post(`/agent-builder/sessions/${sessionId}/documents`, body, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+const saveModelProfile = (body) => client.put('/agent-builder/model-profile', body)
 
 const runTestSuite = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/test-suite`, body)
 
@@ -96,6 +106,10 @@ const listMcpTools = () => client.get('/agent-builder/mcp/tools')
 const callMcpTool = (params) => client.post('/agent-builder/mcp/call', params)
 
 export default {
+    uploadDocuments,
+    listModels,
+    getModelProfile,
+    saveModelProfile,
     createSession,
     getSession,
     sendMessage,

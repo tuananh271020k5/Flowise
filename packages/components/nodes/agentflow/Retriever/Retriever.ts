@@ -172,11 +172,19 @@ class Retriever_Agentflow implements INode {
                     options
                 )) as BaseRetriever
 
-                docs = await docStoreVectorInstance.invoke(retrieverQuery || input, { signal: abortController?.signal })
+                docs.push(...(await docStoreVectorInstance.invoke(retrieverQuery || input, { signal: abortController?.signal })))
             }
         }
 
-        const docsText = docs.map((doc) => doc.pageContent).join('\n')
+        docs = docs.slice(0, 12)
+        const docsText = docs
+            .map(
+                (doc, index) =>
+                    `[${index + 1}] ${doc.metadata?.filename || doc.metadata?.source || 'Tài liệu'}${
+                        doc.metadata?.page ? ` (trang ${doc.metadata.page})` : ''
+                    }\n${doc.pageContent}`
+            )
+            .join('\n\n')
 
         // Update flow state if needed
         let newState = { ...state }
@@ -206,7 +214,8 @@ class Retriever_Agentflow implements INode {
                     question: retrieverQuery || input
                 },
                 output: {
-                    content: finalOutput
+                    content: finalOutput,
+                    sourceDocuments: docs
                 },
                 state: newState
             }

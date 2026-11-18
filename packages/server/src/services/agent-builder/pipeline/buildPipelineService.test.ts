@@ -320,7 +320,7 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
             expect(totalDraftsAfterSecond).toBe(totalDraftsAfterFirst)
         })
 
-        it('cập nhật bản draft hiện có khi cùng session có revision tiếp theo', async () => {
+        it('giữ nguyên draft cũ và tạo flow riêng khi session có revision tiếp theo', async () => {
             const session = await mockSessionRepo.save({
                 id: 'sess-6',
                 workspaceId: 'ws-alpha',
@@ -373,8 +373,10 @@ describe('BuildPipelineService & Idempotency (PH2-T08)', () => {
                 specRevisionId: rev2.id
             })
 
-            // Tái sử dụng cùng một ChatFlow ID để update graph mới
-            expect(result2.flowId).toBe(result1.flowId)
+            // A previously tested revision must keep its original graph.
+            expect(result2.flowId).not.toBe(result1.flowId)
+            const originalFlow = await mockChatflowRepo.findOneBy({ id: result1.flowId })
+            expect(originalFlow?.name).toBe(readySpec.name)
             expect(result2.flowName).toBe('Trợ lý Nâng Cấp v2')
 
             // Tạo mapping mới cho rev2

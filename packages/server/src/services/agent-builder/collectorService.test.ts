@@ -143,16 +143,19 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
             expect(responseNoDoc).toContain('Quy chế làm việc nội bộ')
         })
 
-        it('thông báo sẵn sàng và kích hoạt build khi không còn trường thiếu (buildReady)', () => {
+        it('thông báo sẵn sàng (buildReady) và nhắc người dùng nhắn "xong" để kích hoạt build', () => {
             const fullSpec: Partial<AgentSpec> = {
                 name: 'Bot Tư Vấn',
                 goal: 'Tư vấn dịch vụ',
                 instructions: 'Lịch sự, ngắn gọn'
             }
 
-            const response = collector.generateCollectorResponse([], fullSpec, ['instructions'])
-            expect(response).toContain('buildReady')
-            expect(response).toContain('tự động kích hoạt lệnh phát sinh Agentflow V2')
+            const waitingResponse = collector.generateCollectorResponse([], fullSpec, ['instructions'])
+            expect(waitingResponse).toContain('buildReady')
+            expect(waitingResponse).toContain('"xong"')
+
+            const builtResponse = collector.generateCollectorResponse([], fullSpec, [], { success: true })
+            expect(builtResponse).toContain('Đã nhận xác nhận **"xong"** và tạo thành công Agentflow V2')
         })
     })
 
@@ -218,6 +221,25 @@ describe('CollectorService (PH1-T09 & PH1-T10 / B-006)', () => {
                 timestamp: new Date().toISOString()
             })
             expect(mockRes.write).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('Explicit "xong" build confirmation detection', () => {
+        const { isPureBuildConfirmation, isBuildConfirmationMessage } = require('./collectorService')
+
+        it('nhận diện chính xác các câu xác nhận "xong" thuần túy và câu chốt cuối dòng', () => {
+            expect(isPureBuildConfirmation('xong')).toBe(true)
+            expect(isPureBuildConfirmation('Xong!')).toBe(true)
+            expect(isPureBuildConfirmation('ok xong rồi')).toBe(true)
+            expect(isPureBuildConfirmation('hết yêu cầu rồi')).toBe(true)
+            expect(isPureBuildConfirmation('tạo agent đi')).toBe(true)
+            expect(isBuildConfirmationMessage('Đặt tên là Trợ lý DeskFlow, trả lời ngắn gọn. Xong')).toBe(true)
+        })
+
+        it('không nhận nhầm câu mô tả nghiệp vụ bình thường có chữ "xong" ở giữa câu', () => {
+            expect(isPureBuildConfirmation('Tạo trợ lý hướng dẫn nhân viên khi làm xong thủ tục')).toBe(false)
+            expect(isBuildConfirmationMessage('Tạo trợ lý hướng dẫn nhân viên khi làm xong thủ tục')).toBe(false)
+            expect(isBuildConfirmationMessage('Tôi cần thêm quy tắc trả lời lịch sự bằng tiếng Việt')).toBe(false)
         })
     })
 })

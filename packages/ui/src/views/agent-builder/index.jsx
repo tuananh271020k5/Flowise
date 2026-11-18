@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Grid, Alert, Snackbar, Typography, Box, Tabs, Tab } from '@mui/material'
+import { Grid, Alert, Button, Snackbar, Typography, Box, Tabs, Tab } from '@mui/material'
 import { IconSettings, IconMessageCode } from '@tabler/icons-react'
 import MainCard from '@/ui-component/cards/MainCard'
 import { BackdropLoader } from '@/ui-component/loading/BackdropLoader'
@@ -9,6 +9,17 @@ import ChatPane from './ChatPane'
 import SpecCard from './SpecCard'
 import TestChatPane from './TestChatPane'
 import RevisionsDialog from './RevisionsDialog'
+import ModelSettingsDialog from './ModelSettingsDialog'
+import WorkflowPanel from './WorkflowPanel'
+import client from '@/api/client'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+const parseSpec = (value) => {
+    try {
+        return typeof value === 'string' ? JSON.parse(value) : value
+    } catch {
+        return null
+    }
+}
 
 const AgentBuilderView = () => {
     const { id: paramSessionId } = useParams()
@@ -28,6 +39,26 @@ const AgentBuilderView = () => {
     const [isRevisionsOpen, setIsRevisionsOpen] = useState(false)
 
     // Phase 3 State: Quản lý Build & Chat Thử Nghiệm (PH3-T01, PH3-T02)
+    const [modelOpen, setModelOpen] = useState(false)
+    const [modelProfile, setModelProfile] = useState(null)
+    useEffect(() => {
+        agentBuilderApi
+            .getModelProfile()
+            .then(({ data }) => setModelProfile(data))
+            .catch(() => {})
+    }, [])
+    const applyBuildResult = (data) => {
+        if (data?.success && data.flowId) {
+            setCurrentFlowId(data.flowId)
+            setBuildStatus('completed')
+            setBuildError(null)
+            setActiveTab('test')
+        } else if (data?.success === false) {
+            setCurrentFlowId(null)
+            setBuildStatus('failed')
+            setBuildError(data.error || data.message)
+        }
+    }
     const [activeTab, setActiveTab] = useState('spec') // 'spec' | 'test'
     const [currentFlowId, setCurrentFlowId] = useState(null)
     const [currentBuildJobId, setCurrentBuildJobId] = useState(null)
@@ -52,9 +83,10 @@ const AgentBuilderView = () => {
             const data = res.data
             setSessionId(data.session?.id || sid)
             setMessages(data.messages || [])
+            setRevisionNumber(data.session?.currentRevisionNo || 0)
             if (data.currentSpecRevision) {
-                setSpec(data.currentSpecRevision.spec || null)
-                setRevisionNumber(data.currentSpecRevision.revisionNumber || 1)
+                setSpec(parseSpec(data.currentSpecRevision.spec) || null)
+                setRevisionNumber(data.currentSpecRevision.revisionNo || data.currentSpecRevision.revisionNumber || 1)
             }
             if (data.readiness) {
                 setReadiness(data.readiness)
@@ -64,9 +96,9 @@ const AgentBuilderView = () => {
             try {
                 const draftRes = await agentBuilderApi.getDraftHistory(sid)
                 if (draftRes.data && draftRes.data.length > 0) {
-                    const latestDraft = draftRes.data[draftRes.data.length - 1]
-                    setCurrentFlowId(latestDraft.flowId)
-                    setBuildStatus('completed')
+                    const latestDraft = draftRes.data.filter((draft) => draft.specRevisionId === data.currentSpecRevision?.id).at(-1)
+                    setCurrentFlowId(latestDraft?.flowId || null)
+                    setBuildStatus(latestDraft ? 'completed' : null)
                 }
             } catch {
                 // Không bắt buộc phải có draft
@@ -102,89 +134,60 @@ const AgentBuilderView = () => {
     useEffect(() => {
         if (!sessionId) return
 
-        let eventSource
-        try {
-            const baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000'
-            eventSource = new EventSource(`${baseURL}/api/v1/agent-builder/sessions/${sessionId}/events`)
-
-            eventSource.addEventListener('connected', () => {
-                // Đã kết nối/tái kết nối SSE thành công (PH3-T07)
-            })
-
-            eventSource.addEventListener('revision', (e) => {
+        const controller = new AbortController()
+        fetchEventSource((client.defaults.baseURL || '/api/v1') + '/agent-builder/sessions/' + sessionId + '/events', {
+            signal: controller.signal,
+            credentials: 'include',
+            headers: { 'x-request-from': 'internal' },
+            openWhenHidden: true,
+            async onopen(response) {
+                if (response.status === 401 || response.status === 403) controller.abort()
+                if (!response.ok) throw new Error('SSE HTTP ' + response.status)
+            },
+            onmessage(event) {
+                let data
                 try {
-                    const payload = JSON.parse(e.data)
-                    if (payload.spec) setSpec(payload.spec)
-                    if (payload.revisionNumber) setRevisionNumber(payload.revisionNumber)
-                    if (payload.readiness) setReadiness(payload.readiness)
+                    data = JSON.parse(event.data)
                 } catch {
-                    // Ignore parse error
+                    return
                 }
-            })
-
-            eventSource.addEventListener('message', (e) => {
-                try {
-                    const payload = JSON.parse(e.data)
-                    if (payload.eventType === 'build_cancelled') {
-                        setBuildStatus('cancelled')
-                        setSnackbarMessage('Tác vụ build đã bị hủy.')
-                    } else if (payload.id && payload.content) {
-                        setMessages((prev) => {
-                            if (prev.some((m) => m.id === payload.id)) return prev
-                            return [...prev, payload]
-                        })
-                    }
-                } catch {
-                    // Ignore parse error
+                if (event.event === 'revision') {
+                    setSpec(parseSpec(data.spec))
+                    setRevisionNumber(data.revisionNo || 1)
                 }
-            })
-
-            eventSource.addEventListener('build_cancelled', () => {
-                setBuildStatus('cancelled')
-                setSnackbarMessage('Tác vụ build đã bị hủy.')
-            })
-
-            eventSource.addEventListener('build_completed', (e) => {
-                try {
-                    const payload = JSON.parse(e.data)
-                    if (payload.flowId) {
-                        setCurrentFlowId(payload.flowId)
-                    }
-                    setBuildStatus('completed')
-                    setSnackbarMessage('Biên dịch Agentflow V2 hoàn tất thành công!')
-                } catch {
-                    // Ignore parse error
+                if (event.event === 'readiness') setReadiness(data)
+                if (event.event === 'message' && data.id)
+                    setMessages((items) => (items.some((m) => m.id === data.id) ? items : [...items, data]))
+                if (event.event === 'build_dispatched') {
+                    setCurrentFlowId(null)
+                    setBuildStatus('building')
+                    setBuildError(null)
                 }
-            })
-
-            eventSource.addEventListener('build_failed', (e) => {
-                try {
-                    const payload = JSON.parse(e.data)
+                if (event.event === 'build_completed') applyBuildResult({ success: true, ...data })
+                if (event.event === 'build_failed') {
                     setBuildStatus('failed')
-                    setBuildError(payload.error || 'Biên dịch thất bại')
-                } catch {
-                    // Ignore parse error
+                    setBuildError(data.error)
                 }
-            })
-        } catch {
-            // Ignore SSE connection error
-        }
-
-        return () => {
-            if (eventSource) eventSource.close()
-        }
+                if (event.event === 'build_cancelled' || data.eventType === 'build_cancelled') setBuildStatus('cancelled')
+            },
+            onerror(error) {
+                if (controller.signal.aborted) throw error
+                return 2000
+            }
+        }).catch(() => {})
+        return () => controller.abort()
     }, [sessionId])
 
     // Xử lý gửi tin nhắn đàm thoại
-    const handleSendMessage = async (content) => {
-        if (!content || isSending) return
+    const handleSendMessage = async (content, files = [], documentOptions = {}) => {
+        if ((!content && !files.length) || isSending) return false
         const clientMessageId = generateClientMessageId()
 
         // Optimistic UI: thêm tin nhắn của user ngay lập tức
         const optimisticMessage = {
             id: clientMessageId,
             role: 'user',
-            content,
+            content: content || `Đính kèm: ${files.map((file) => file.name).join(', ')}`,
             createdAt: new Date().toISOString()
         }
         setMessages((prev) => [...prev, optimisticMessage])
@@ -192,21 +195,64 @@ const AgentBuilderView = () => {
         setError(null)
 
         try {
-            if (!sessionId) {
+            if (files.length) {
+                let sid = sessionId
+                let expectedRevision = revisionNumber
+                if (!sid) {
+                    const created = await agentBuilderApi.createSession({})
+                    sid = created.data.session.id
+                    expectedRevision = created.data.session.currentRevisionNo || 0
+                    setSessionId(sid)
+                    setRevisionNumber(expectedRevision)
+                }
+                const { data } = await agentBuilderApi.uploadDocuments(sid, {
+                    files,
+                    content,
+                    clientMessageId,
+                    expectedRevision,
+                    ...documentOptions
+                })
+                setMessages((prev) => [
+                    ...prev.filter(
+                        (message) =>
+                            message.id !== clientMessageId &&
+                            message.id !== data.userMessage?.id &&
+                            message.id !== data.assistantMessage?.id
+                    ),
+                    data.userMessage,
+                    ...(data.assistantMessage ? [data.assistantMessage] : [])
+                ])
+                setSpec(parseSpec(data.currentSpecRevision?.spec))
+                setRevisionNumber(data.currentSpecRevision?.revisionNo || expectedRevision)
+                setReadiness(data.readiness)
+                if (data.currentSpecRevision?.revisionNo !== revisionNumber) {
+                    setCurrentFlowId(null)
+                    setBuildStatus(null)
+                }
+                setActiveTab('workflow')
+                applyBuildResult(data.buildResult)
+                if (!sessionId) navigate(`/agent-builder/${sid}`, { replace: true })
+            } else if (!sessionId) {
                 // Khởi tạo phiên mới với tin nhắn ban đầu
                 const res = await agentBuilderApi.createSession({
                     initialGoal: content,
                     initialPrompt: content
                 })
                 const data = res.data
+                if (data.currentSpecRevision?.revisionNo !== revisionNumber && !data.buildResult?.success) {
+                    setCurrentFlowId(null)
+                    setBuildStatus(null)
+                    if (parseSpec(data.currentSpecRevision?.spec)?.workflow) setActiveTab('workflow')
+                }
+                applyBuildResult(data.buildResult)
                 const newSid = data.session?.id
 
                 if (newSid) {
                     setSessionId(newSid)
                     setMessages(data.messages || [optimisticMessage])
                     if (data.currentSpecRevision) {
-                        setSpec(data.currentSpecRevision.spec || null)
-                        setRevisionNumber(data.currentSpecRevision.revisionNumber || 1)
+                        setSpec(parseSpec(data.currentSpecRevision.spec) || null)
+                        setRevisionNumber(data.currentSpecRevision.revisionNo || data.currentSpecRevision.revisionNumber || 1)
                     }
                     if (data.readiness) {
                         setReadiness(data.readiness)
@@ -222,6 +268,12 @@ const AgentBuilderView = () => {
                     expectedRevision: revisionNumber
                 })
                 const data = res.data
+                if (data.currentSpecRevision?.revisionNo !== revisionNumber && !data.buildResult?.success) {
+                    setCurrentFlowId(null)
+                    setBuildStatus(null)
+                    if (parseSpec(data.currentSpecRevision?.spec)?.workflow) setActiveTab('workflow')
+                }
+                applyBuildResult(data.buildResult)
 
                 // Cập nhật danh sách tin nhắn với tin nhắn phản hồi của assistant
                 if (data.assistantMessage) {
@@ -233,14 +285,15 @@ const AgentBuilderView = () => {
                 }
 
                 if (data.currentSpecRevision) {
-                    setSpec(data.currentSpecRevision.spec || null)
-                    setRevisionNumber(data.currentSpecRevision.revisionNumber || revisionNumber)
+                    setSpec(parseSpec(data.currentSpecRevision.spec) || null)
+                    setRevisionNumber(data.currentSpecRevision.revisionNo || data.currentSpecRevision.revisionNumber || revisionNumber)
                 }
 
                 if (data.readiness) {
                     setReadiness(data.readiness)
                 }
             }
+            return true
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Lỗi khi gửi tin nhắn:', err)
@@ -250,6 +303,8 @@ const AgentBuilderView = () => {
             } else {
                 setError(err?.response?.data?.message || 'Có lỗi xảy ra khi gửi tin nhắn. Vui lòng thử lại.')
             }
+            setMessages((items) => items.filter((message) => message.id !== clientMessageId))
+            return false
         } finally {
             setIsSending(false)
         }
@@ -293,8 +348,8 @@ const AgentBuilderView = () => {
                 setSessionId(data.session.id)
                 setMessages(data.messages || [])
                 if (data.currentSpecRevision) {
-                    setSpec(data.currentSpecRevision.spec || null)
-                    setRevisionNumber(data.currentSpecRevision.revisionNumber || data.currentSpecRevision.revisionNo || 1)
+                    setSpec(parseSpec(data.currentSpecRevision.spec) || null)
+                    setRevisionNumber(data.currentSpecRevision.revisionNo || data.currentSpecRevision.revisionNumber || 1)
                 }
                 if (data.readiness) {
                     setReadiness(data.readiness)
@@ -374,6 +429,17 @@ const AgentBuilderView = () => {
             }}
         >
             <BackdropLoader open={isLoading} />
+            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Button onClick={() => setModelOpen(true)}>Cấu hình model</Button>
+                <Typography variant='body2'>{modelProfile?.ready ? modelProfile.modelName : 'Chưa cấu hình API key'}</Typography>
+            </Box>
+            <ModelSettingsDialog
+                open={modelOpen}
+                onClose={() => setModelOpen(false)}
+                onSaved={(data) => {
+                    setModelProfile(data)
+                }}
+            />
 
             {error && (
                 <Alert severity='error' sx={{ mb: 2 }} onClose={() => setError(null)}>
@@ -384,7 +450,14 @@ const AgentBuilderView = () => {
             <Grid container spacing={2} sx={{ flex: 1, height: '100%', minHeight: 0 }}>
                 {/* Cột trái: Khung Chat trò chuyện đàm thoại thiết kế (7/12 desktop) */}
                 <Grid item xs={12} md={7} lg={7} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <ChatPane messages={messages} isSending={isSending} onSendMessage={handleSendMessage} onNewSession={handleNewSession} />
+                    <ChatPane
+                        messages={messages}
+                        documents={spec?.dataSources || []}
+                        isSending={isSending}
+                        canConfirmBuild={Boolean(readiness?.buildReady && buildStatus !== 'completed' && messages.length > 0)}
+                        onSendMessage={handleSendMessage}
+                        onNewSession={handleNewSession}
+                    />
                 </Grid>
 
                 {/* Cột phải: Tabs chuyển đổi Cấu hình Spec / Chat Thử Nghiệm (5/12 desktop) */}
@@ -398,6 +471,7 @@ const AgentBuilderView = () => {
                             variant='fullWidth'
                         >
                             <Tab icon={<IconSettings size={18} />} iconPosition='start' label='Cấu hình Agent' value='spec' />
+                            <Tab label='Luồng thực hiện' value='workflow' />
                             <Tab icon={<IconMessageCode size={18} />} iconPosition='start' label='Chat Thử Nghiệm' value='test' />
                         </Tabs>
                     </Box>
@@ -416,9 +490,13 @@ const AgentBuilderView = () => {
                     )}
 
                     {/* Nội dung Tab Chat Thử Nghiệm (PH3-T01, PH3-T02) */}
+                    {activeTab === 'workflow' && (
+                        <WorkflowPanel workflow={spec?.workflow} readiness={readiness} buildStatus={buildStatus} />
+                    )}
                     {activeTab === 'test' && (
                         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                             <TestChatPane
+                                key={currentFlowId || 'pending'}
                                 sessionId={sessionId}
                                 flowId={currentFlowId}
                                 flowName={spec?.name || 'Trợ lý Agentflow'}

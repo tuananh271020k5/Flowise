@@ -6,7 +6,12 @@ import { BuilderMessage } from '../../database/entities/BuilderMessage'
 import { BuilderSession } from '../../database/entities/BuilderSession'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
-import collectorService, { CollectorService } from './collectorService'
+import collectorService, {
+    CollectorService,
+    isBuildConfirmationMessage,
+    isPureBuildConfirmation,
+    stripAttachmentNotice
+} from './collectorService'
 import { BuildPipelineService } from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
 import { computeSpecDiff, SpecDiffResult } from './specDiffService'
@@ -35,6 +40,7 @@ export interface SessionSnapshot {
     messages: BuilderMessage[]
     currentSpecRevision: AgentSpecRevision | null
     readiness: ReadinessResult | null
+    buildResult?: { success: boolean; flowId?: string; error?: string }
 }
 
 export interface AddMessageResponse {
@@ -43,6 +49,7 @@ export interface AddMessageResponse {
     session: BuilderSession
     currentSpecRevision: AgentSpecRevision | null
     readiness: ReadinessResult | null
+    buildResult?: { success: boolean; flowId?: string; error?: string }
     buildIntent?: BuildIntent | null
     idempotentReplay?: boolean
 }
@@ -67,6 +74,24 @@ export class BuilderSessionService {
     constructor(private customDataSource?: DataSource, customCollector?: CollectorService, customPipeline?: BuildPipelineService) {
         this.collector = customCollector || collectorService
         this.buildPipeline = customPipeline || new BuildPipelineService(this.customDataSource)
+    }
+
+    private async autoBuild(sessionId: string, workspaceId: string, revision: AgentSpecRevision) {
+        this.collector.broadcastSSE(sessionId, {
+            type: 'build_dispatched',
+            data: { revisionNo: revision.revisionNo },
+            timestamp: new Date().toISOString()
+        })
+        try {
+            return await this.buildPipeline.executeBuild({ sessionId, workspaceId, specRevisionId: revision.id })
+        } catch (error: any) {
+            this.collector.broadcastSSE(sessionId, {
+                type: 'build_failed',
+                data: { error: error.message },
+                timestamp: new Date().toISOString()
+            })
+            return { success: false, error: error.message }
+        }
     }
 
     private get sessionRepo(): Repository<BuilderSession> {
@@ -125,7 +150,9 @@ export class BuilderSessionService {
             messages.push(savedUserMsg)
 
             // 2. Trích xuất patch ban đầu từ initial goal
-            const patchResult = this.collector.extractPatch(goalText)
+            const patchResult = this.customDataSource
+                ? this.collector.extractPatch(goalText)
+                : await this.collector.extractWithModel(goalText, {}, data.workspaceId)
             const initialSpec: Partial<AgentSpec> = {
                 schemaVersion: '1.0',
                 kind: 'assistant',
@@ -134,6 +161,13 @@ export class BuilderSessionService {
                 modelProfileRef: 'default-builder-model',
                 ...patchResult.patch
             }
+            if (patchResult.usage)
+                tokenUsageService.recordUsage({
+                    sessionId: savedSession.id,
+                    workspaceId: data.workspaceId,
+                    source: 'conversation',
+                    ...patchResult.usage
+                })
 
             readiness = computeReadiness(initialSpec)
 
@@ -155,11 +189,19 @@ export class BuilderSessionService {
             savedSession.currentRevisionNo = 1
             await this.sessionRepo.save(savedSession)
 
+            const confirmedOnStart = isBuildConfirmationMessage(goalText)
+            const buildResult =
+                confirmedOnStart && readiness?.buildReady && currentRevision
+                    ? await this.autoBuild(savedSession.id, data.workspaceId, currentRevision)
+                    : undefined
+
             // 4. Create assistant guidance message using Collector
             const assistantContent = this.collector.generateCollectorResponse(
                 readiness.missingFields,
                 initialSpec,
-                patchResult.extractedFields
+                patchResult.extractedFields,
+                buildResult,
+                { isFirstReply: true, confirmedByUser: confirmedOnStart }
             )
             const assistantMsg = this.messageRepo.create({
                 sessionId: savedSession.id,
@@ -170,6 +212,14 @@ export class BuilderSessionService {
             })
             const savedAssistantMsg = await this.messageRepo.save(assistantMsg)
             messages.push(savedAssistantMsg)
+
+            return {
+                buildResult,
+                session: savedSession,
+                messages,
+                currentSpecRevision: currentRevision,
+                readiness
+            }
         }
 
         return {
@@ -291,7 +341,10 @@ export class BuilderSessionService {
             timestamp: new Date().toISOString()
         })
 
-        // 4. Load Base Spec
+        // 4. Load Base Spec & kiểm tra đây có phải lượt trả lời đầu tiên của assistant không
+        const priorAssistantMessage = await this.messageRepo.findOneBy({ sessionId, role: 'assistant' })
+        const isFirstReply = !priorAssistantMessage
+
         let baseSpec: Partial<AgentSpec> = {
             schemaVersion: '1.0',
             kind: 'assistant',
@@ -312,14 +365,35 @@ export class BuilderSessionService {
             }
         }
 
-        // 5. Trích xuất Patch từ nội dung chat (PH1-T09)
-        const extracted = this.collector.extractPatch(data.content, baseSpec)
+        // 5. Trích xuất Patch từ nội dung chat (bỏ qua gọi LLM khi tin nhắn chỉ là xác nhận "xong" thuần túy)
+        const cleanUserText = stripAttachmentNotice(data.content)
+        const hasExplicitPatch = Boolean(data.specPatch && Object.keys(data.specPatch).length > 0)
+        const pureConfirm = isPureBuildConfirmation(cleanUserText) && !hasExplicitPatch && Boolean(currentRevision)
+        const confirmedToBuild = isBuildConfirmationMessage(cleanUserText)
+
+        const extracted = pureConfirm
+            ? { patch: {}, extractedFields: [], changeSummary: 'Người dùng xác nhận hoàn tất yêu cầu' }
+            : this.customDataSource
+            ? this.collector.extractPatch(data.content, baseSpec)
+            : await this.collector.extractWithModel(data.content, { ...baseSpec, ...(data.specPatch || {}) }, workspaceId)
         const mergedPatch: Partial<AgentSpec> = {
             ...extracted.patch,
             ...(data.specPatch || {})
         }
+        if (!pureConfirm && !this.customDataSource && !mergedPatch.workflow && !baseSpec.workflow)
+            mergedPatch.workflow = {
+                summary: 'Cần xác định luồng xử lý trước khi tạo Agent.',
+                steps: [],
+                edges: [],
+                questions: [
+                    'Bạn muốn Agent nhận đầu vào gì và trả kết quả nào? Hãy nêu các bước bắt buộc hoặc đính kèm tài liệu để tôi thiết kế luồng.'
+                ],
+                blockers: []
+            }
 
-        const hasSpecChanges = Object.keys(mergedPatch).length > 0
+        const hasSpecChanges = Object.entries(mergedPatch).some(
+            ([key, value]) => JSON.stringify(value) !== JSON.stringify((baseSpec as any)[key])
+        )
         let readiness: ReadinessResult | null = null
         let dispatchedIntent: BuildIntent | null = null
 
@@ -354,20 +428,6 @@ export class BuilderSessionService {
                 dispatchedIntent = await this.collector.dispatchBuildIntent(sessionId, nextRevisionNo, updatedSpec as AgentSpec)
                 session.buildIntent = JSON.stringify(dispatchedIntent)
                 session.state = 'ready'
-
-                // Tự động cập nhật draft ChatFlow sang revision mới nếu session đã có draft trước đó (PH3-T04)
-                try {
-                    const existingDraft = await this.draftRevisionRepo.findOneBy({ sessionId })
-                    if (existingDraft) {
-                        await this.buildPipeline.executeBuild({
-                            sessionId,
-                            workspaceId,
-                            specRevisionId: currentRevision.id
-                        })
-                    }
-                } catch {
-                    // Không chặn luồng chat nếu auto sync gặp lỗi
-                }
             }
 
             await this.sessionRepo.save(session)
@@ -391,12 +451,19 @@ export class BuilderSessionService {
             }
         }
 
-        // 7. Sinh phản hồi đàm thoại của Collector (Anti-reask)
+        // 7. Chỉ tự động thực thi Build khi người dùng đã xác nhận hoàn tất yêu cầu ("xong") và Spec đạt buildReady
+        const buildResult =
+            confirmedToBuild && readiness?.buildReady && currentRevision
+                ? await this.autoBuild(sessionId, workspaceId, currentRevision)
+                : undefined
         let assistantMsg: BuilderMessage | undefined
         if (data.role !== 'assistant') {
             const currentSpecState = hasSpecChanges ? { ...baseSpec, ...mergedPatch } : baseSpec
             const missing = readiness ? readiness.missingFields : []
-            const replyText = this.collector.generateCollectorResponse(missing, currentSpecState, extracted.extractedFields)
+            const replyText = this.collector.generateCollectorResponse(missing, currentSpecState, extracted.extractedFields, buildResult, {
+                isFirstReply,
+                confirmedByUser: confirmedToBuild
+            })
 
             const assistantRecord = this.messageRepo.create({
                 sessionId,
@@ -415,18 +482,8 @@ export class BuilderSessionService {
             })
         }
 
-        // Ghi nhận Token Usage (PH5-T05)
-        const promptTokens = Math.max(1, Math.ceil(savedUserMsg.content.length / 3.5))
-        const completionTokens = assistantMsg ? Math.max(1, Math.ceil(assistantMsg.content.length / 3.5)) : 0
-        tokenUsageService.recordUsage({
-            sessionId,
-            workspaceId,
-            source: 'conversation',
-            provider: 'default',
-            model: 'gpt-4o-mini',
-            promptTokens,
-            completionTokens
-        })
+        // Only provider-reported usage is recorded; missing usage remains unmeasured.
+        if (extracted.usage) tokenUsageService.recordUsage({ sessionId, workspaceId, source: 'conversation', ...extracted.usage })
 
         return {
             userMessage: savedUserMsg,
@@ -434,7 +491,8 @@ export class BuilderSessionService {
             session,
             currentSpecRevision: currentRevision,
             readiness,
-            buildIntent: dispatchedIntent
+            buildIntent: dispatchedIntent,
+            buildResult
         }
     }
 
@@ -571,7 +629,7 @@ export class BuilderSessionService {
         this.collector.broadcastSSE(sessionId, {
             type: 'revision',
             data: {
-                revisionNumber: savedRevision.revisionNo,
+                revisionNo: savedRevision.revisionNo,
                 spec: targetSpec,
                 readiness
             },

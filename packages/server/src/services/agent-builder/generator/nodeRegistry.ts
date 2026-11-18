@@ -36,6 +36,55 @@ export interface NodeValidationResult {
  * Pinned chặt chẽ theo Flowise Core Apache 2.0 runtime.
  */
 export const ALLOWED_AGENTFLOW_NODES: Record<string, NodeMetadata> = {
+    llmAgentflow: {
+        name: 'llmAgentflow',
+        label: 'LLM',
+        type: 'LLM',
+        category: 'Agent Flows',
+        supportedVersions: [1.1],
+        recommendedVersion: 1.1,
+        color: '#64B5F6',
+        baseClasses: ['LLM'],
+        description: 'Một bước xử lý văn bản bằng model',
+        allowedInputs: [
+            'llmModel',
+            'llmModelConfig',
+            'llmMessages',
+            'llmEnableMemory',
+            'llmMemoryType',
+            'llmUserMessage',
+            'llmReturnResponseAs',
+            'llmStructuredOutput',
+            'llmUpdateState'
+        ],
+        requiredInputs: ['llmModel']
+    },
+    retrieverAgentflow: {
+        name: 'retrieverAgentflow',
+        label: 'Retriever',
+        type: 'Retriever',
+        category: 'Agent Flows',
+        supportedVersions: [1.1],
+        recommendedVersion: 1.1,
+        color: '#B8BEDD',
+        baseClasses: ['Retriever'],
+        description: 'Truy xuất các đoạn tài liệu được cấp',
+        allowedInputs: ['retrieverKnowledgeDocumentStores', 'retrieverQuery', 'outputFormat', 'retrieverUpdateState'],
+        requiredInputs: ['retrieverQuery']
+    },
+    conditionAgentflow: {
+        name: 'conditionAgentflow',
+        label: 'Condition',
+        type: 'Condition',
+        category: 'Agent Flows',
+        supportedVersions: [1.0],
+        recommendedVersion: 1.0,
+        color: '#FFB938',
+        baseClasses: ['Condition'],
+        description: 'Kiểm tra dữ liệu và rẽ nhánh true/false',
+        allowedInputs: ['conditions'],
+        requiredInputs: ['conditions']
+    },
     startAgentflow: {
         name: 'startAgentflow',
         label: 'Start',
@@ -68,6 +117,13 @@ export const ALLOWED_AGENTFLOW_NODES: Record<string, NodeMetadata> = {
         baseClasses: ['Agent'],
         allowedInputs: [
             'agentModel',
+            'agentModelConfig',
+            'agentKnowledgeDocumentStores',
+            'agentKnowledgeVSEmbeddings',
+            'agentEnableMemory',
+            'agentMemoryType',
+            'agentUserMessage',
+            'agentReturnResponseAs',
             'agentMessages',
             'agentTools',
             'agentToolsBuiltInOpenAI',

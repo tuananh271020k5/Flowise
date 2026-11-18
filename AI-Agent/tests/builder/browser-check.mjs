@@ -1,0 +1,66 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import {fileURLToPath,pathToFileURL} from 'node:url'
+if(process.env.BUILDER_SMOKE_TEST!=='true')throw Error('Run only against B028-smoke; see AI-Agent/tests/builder/README.md')
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..')
+const version=fs.readdirSync(path.join(root,'node_modules/.pnpm')).find(name=>/^playwright@\d/.test(name))
+if(!version)throw Error('Playwright is required for the optional browser smoke')
+const {chromium}=await import(pathToFileURL(path.join(root,'node_modules/.pnpm',version,'node_modules/playwright/index.mjs')).href)
+const state=JSON.parse(fs.readFileSync('AI-Agent/.local/B-028/api-state.json','utf8'))
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'})
+const page=await browser.newPage({viewport:{width:1440,height:1000}})
+page.setDefaultTimeout(20000)
+page.setDefaultNavigationTimeout(60000)
+const errors=[]
+page.on('pageerror',e=>errors.push(e.message))
+try {
+ await page.goto('http://127.0.0.1:8080/signin',{waitUntil:'domcontentloaded'})
+ await page.locator('input[type=email]').fill(state.email)
+ await page.locator('input[type=password]').fill(state.password)
+ await page.getByRole('button',{name:'Login',exact:true}).click()
+ await page.waitForURL(u=>!u.pathname.includes('signin'),{timeout:20000})
+ await page.goto('http://127.0.0.1:8080/agent-builder',{waitUntil:'domcontentloaded'})
+ await page.getByPlaceholder('Mô tả trợ lý',{exact:false}).waitFor({timeout:30000})
+ await page.getByRole('button',{name:'Cấu hình model',exact:true}).click()
+ await page.getByLabel('Tên model').waitFor()
+ if(await page.getByLabel('API key',{exact:true}).inputValue())throw Error('Saved key exposed in UI')
+ await page.getByRole('button',{name:'Đóng',exact:true}).click()
+ const results=[]
+ async function send(content,first=false){
+   const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('/agent-builder/sessions')&&(first?!r.url().includes('/messages'):r.url().includes('/messages')))
+   await page.getByPlaceholder('Mô tả trợ lý',{exact:false}).fill(content)
+   await page.getByPlaceholder('Mô tả trợ lý',{exact:false}).press('Enter')
+   const r=await response;const data=await r.json();if(!r.ok())throw Error(JSON.stringify(data))
+   results.push({revision:data.currentSpecRevision?.revisionNo,ready:data.readiness?.buildReady,flowId:data.buildResult?.flowId})
+   await page.getByPlaceholder('Mô tả trợ lý',{exact:false}).waitFor({state:'visible'})
+   return data
+ }
+ await send('Tôi cần bot hỗ trợ khách hàng về giờ mở cửa và đổi trả.',true)
+ await send('Đặt tên là Hỗ trợ cửa hàng')
+ const built=await send('Hướng dẫn: Chỉ trả lời B028-OK, lịch sự và ngắn gọn.')
+ if(!built.buildResult?.success)throw Error('No automatic build')
+ const preview=page.getByPlaceholder('Nhập câu hỏi để thử nghiệm với Agent...')
+ await preview.waitFor();await preview.fill('Xin chào');await preview.press('Enter')
+ await page.getByText('B028-OK',{exact:true}).waitFor()
+ const edited=await send('Hướng dẫn: Chỉ trả lời B028-NEW, lịch sự và ngắn gọn.')
+ if(!edited.buildResult?.success||edited.buildResult.flowId===built.buildResult.flowId)throw Error('Revision draft not immutable')
+ await preview.fill('Xin chào lần nữa');await preview.press('Enter')
+ await page.getByText('B028-NEW',{exact:true}).waitFor()
+ const url=page.url();await page.reload({waitUntil:'domcontentloaded'})
+ await page.getByRole('tab',{name:'Cấu hình Agent',exact:true}).click()
+ await page.getByText('Hỗ trợ cửa hàng',{exact:true}).first().waitFor()
+ await page.getByText(/B028-NEW/).first().waitFor()
+ await page.getByRole('tab',{name:'Chat Thử Nghiệm',exact:true}).click()
+ await preview.fill('Xin chào sau refresh');await preview.press('Enter')
+ await page.getByText('B028-NEW',{exact:true}).waitFor()
+ if(errors.length)throw Error('Browser JS errors: '+errors.join(';'))
+ fs.writeFileSync('AI-Agent/.local/B-028/browser-result.json',JSON.stringify({passed:true,url,results,errors},null,2))
+ fs.writeFileSync('AI-Agent/.local/B-028/browser-page.txt',await page.locator('body').innerText())
+ await page.screenshot({path:'AI-Agent/.local/B-028/browser-initial.png',fullPage:true})
+ console.log('PASS: model dialog, collect, automatic build, runtime preview, edit, refresh; revisions:',results)
+} catch(e) {
+ console.log('FAIL',e.message,'URL',page.url(),'ERRORS',errors)
+ console.log((await page.locator('body').innerText()).slice(-2500))
+ await page.screenshot({path:'AI-Agent/.local/B-028/browser-error.png',fullPage:true})
+ process.exitCode=1
+} finally {await browser.close()}

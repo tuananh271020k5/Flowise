@@ -9,6 +9,7 @@ import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { v4 as uuidv4 } from 'uuid'
 import { getErrorMessage } from '../../errors/utils'
 import { MODE } from '../../Interface'
+import { AgentDraftRevision } from '../../database/entities/AgentDraftRevision'
 
 // Send input message and get prediction result (External)
 const createPrediction = async (req: Request, res: Response, next: NextFunction) => {
@@ -30,6 +31,12 @@ const createPrediction = async (req: Request, res: Response, next: NextFunction)
         const chatflow = await chatflowsService.getChatflowById(req.params.id, workspaceId)
         if (!chatflow) {
             throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Chatflow ${req.params.id} not found`)
+        }
+        const builderDraft = await getRunningExpressApp().AppDataSource.getRepository(AgentDraftRevision).findOneBy({
+            flowId: chatflow.id
+        })
+        if (builderDraft && (!chatflow.deployed || !chatflow.isPublic) && workspaceId !== chatflow.workspaceId) {
+            throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Agent Builder draft requires authenticated workspace preview')
         }
         let isDomainAllowed = true
         let unauthorizedOriginError = 'This site is not allowed to access this chatbot'

@@ -92,7 +92,7 @@ describe('FlowiseDraftAdapter (PH2-T06)', () => {
             const serialized = adapter.serializeFlowData(validGraph)
             expect(typeof serialized).toBe('string')
             const parsed = JSON.parse(serialized)
-            expect(parsed.nodes.length).toBeGreaterThanOrEqual(3)
+            expect(parsed.nodes.length).toBe(2)
             expect(parsed.edges.length).toBeGreaterThanOrEqual(1)
             expect(parsed.viewport).toBeDefined()
         })
@@ -123,7 +123,7 @@ describe('FlowiseDraftAdapter (PH2-T06)', () => {
 
             // Verify flowData là valid json
             const parsed = JSON.parse(flow.flowData)
-            expect(parsed.nodes.length).toBeGreaterThanOrEqual(3)
+            expect(parsed.nodes.length).toBe(2)
             expect(parsed.edges.length).toBeGreaterThanOrEqual(1)
         })
 
@@ -203,7 +203,7 @@ describe('FlowiseDraftAdapter (PH2-T06)', () => {
 
             const snapshot = await adapter.getDraftById(created.id, 'ws-alpha')
             expect(snapshot.chatflow.id).toBe(created.id)
-            expect(snapshot.parsedFlowData.nodes.length).toBeGreaterThanOrEqual(3)
+            expect(snapshot.parsedFlowData.nodes.length).toBe(2)
             expect(snapshot.parsedFlowData.edges.length).toBeGreaterThanOrEqual(1)
         })
 

@@ -1,7 +1,9 @@
 # Kế hoạch hệ thống Chat-to-Agent trên Flowise
 
 **Bản 1.0 — 14/11/2026 — đề xuất để triển khai về sau.**
-**Phiên hiện tại chỉ tạo kế hoạch, bộ nhớ chung và tiện ích harness cục bộ. Chưa viết UI/API/migration Builder.**
+**Ghi chú hiện trạng 17/11/2026:** người dùng đã cho phép triển khai sản phẩm. UI/API/migration Builder đã có; B-028 sửa auto-build và tích hợp runtime. Các mục bên dưới là thiết kế gốc; nghiệm thu theo [báo cáo thực tế](FINAL_ACCEPTANCE_REPORT.md), không dùng mô tả “chưa triển khai” cũ làm trạng thái hiện tại.
+
+**B-030:** [task triển khai hiện tại](../tasks/B-030.md) bổ sung upload trong chat và planner/compiler sinh workflow nhiều bước trên Flowise V2. Kế hoạch có dữ liệu vào/ra, nhánh và blocker cho khả năng chưa hỗ trợ. [Hướng dẫn thử DeskFlow](../GUI_TEST_GUIDE.md) dùng phần mềm demo và tài liệu kèm theo, thay cho kiểm tra chỉ có Start → Agent. Đây là đợt sửa/hoàn thiện theo yêu cầu người dùng, không phải tuyên bố hoàn tất thêm toàn bộ roadmap.
 
 **Bảng phase và toàn bộ task con đã gom tại [PLAN_TONG_HOP.md](../../PLAN_TONG_HOP.md): 7 phase sản phẩm / 68 task con, thêm 8 task harness. Mở file đó trước khi cần giao việc; file này giải thích kiến trúc và lý do.**
 
@@ -21,7 +23,7 @@ Tài liệu V2 đi đúng hướng. Cần sửa thông tin phiên bản, giấy 
 | -------------- | ------------------------------ | --------------------------------------- | --------------------------------------- |
 | Coding harness | Codex, Claude Code, Gemini CLI | Ngữ cảnh ngắn, handoff, kiểm tra, số đo | Bộ tiện ích local và tài liệu           |
 | CodeGraph      | AI lập trình                   | Source/symbol/call path đúng phạm vi    | Đã truy xuất được; giữ kết nối hiện tại |
-| Chat-to-Agent  | Người dùng nghiệp vụ           | Agent draft/test/revision               | Có kế hoạch; chưa triển khai            |
+| Chat-to-Agent  | Người dùng nghiệp vụ           | Agent draft/test/revision               | B-028 chạy loop local với provider fixture; xem báo cáo thực tế |
 
 Harness không thay runtime, không điều khiển quota của nhà cung cấp. CodeGraph không phải connector cho Agent nghiệp vụ. Cả ba AI đọc một trạng thái chung, nhưng không cần chạy đồng thời trên một working tree.
 
@@ -198,4 +200,4 @@ Một task có một người/AI giữ quyền ghi tại một thời điểm. C
 
 Trước làm: đọc checkpoint, kiểm tra revision/SHA/Git status, xác định acceptance và source cần mở. Sau làm: test phù hợp, review diff, ghi kết quả thực tế, cập nhật status/next task và bàn giao dưới khoảng 250 từ. Chi tiết lịch sử nằm trong worklog/PR, không nạp tất cả ở cold start.
 
-TASK-001/PH0-T01–T06 đã chạy baseline runtime ngày 14/11/2026; xem [bằng chứng](../context/TASK-001_RUNTIME.md). B-002/PH0-T07–T08 là nhóm kế tiếp. Builder chưa được triển khai.
+TASK-001/PH0-T01–T06 đã chạy baseline runtime ngày 14/11/2026; xem [bằng chứng](../context/TASK-001_RUNTIME.md). Tiến độ hiện tại là B-028; xem state chung và báo cáo nghiệm thu cập nhật. Phần này giữ lại quyết định khảo sát ban đầu.

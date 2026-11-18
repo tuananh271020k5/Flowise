@@ -4,7 +4,9 @@
 
 Các AI dựa vào **file chung trên đĩa và trạng thái code**, không tự chia sẻ lịch sử hội thoại hoặc suy nghĩ. `state/project.json` là checkpoint mới nhất được ghi; nó không biết những thao tác diễn ra sau lần ghi đó.
 
-Kết thúc task và bàn giao bằng commit theo [GIT_WORKFLOW.md](GIT_WORKFLOW.md). `origin` đã nối fork của người dùng; commit local và push GitHub là hai thao tác riêng.
+Bàn giao cùng máy dùng được cả working tree chưa commit. Theo [GIT_WORKFLOW.md](GIT_WORKFLOW.md), chỉ commit/push khi được yêu cầu; không cần commit để đổi AI. `origin` là fork của người dùng.
+
+**Bàn giao hiện tại 17/11/2026:** B-030-T06, user QA thất bại dù fixture đã pass. Đọc state và task B-030 để biết lỗi trả lời lệch câu hỏi, No data ở Start/Rendered và giả thuyết mất question binding. **Người dùng đang yêu cầu chưa sửa code; chỉ tiếp nhận/chẩn đoán tới khi có lệnh mới.** Codex không tự tắt/restart server của người dùng. Tiến độ nằm trong file chung; Antigravity không tự có ảnh/lịch sử chat Codex.
 
 ## 1. Nguồn thông tin cần khi tiếp nhận
 
@@ -76,7 +78,7 @@ Chỉ tiếp tục phạm vi đã được giao. Dùng CodeGraph cho đúng sour
 Ghi checkpoint sau mỗi subtask/kết quả kiểm tra quan trọng, trước thao tác dài và khi bàn giao.
 ```
 
-Nếu chỉ muốn kiểm tra việc nạp ngữ cảnh, thêm: **“Chỉ báo trạng thái, chưa sửa code hoặc chạy task triển khai.”** Hiện project vẫn `planning_only`/Builder chưa bắt đầu; một lần mở Antigravity không tự cho phép triển khai sản phẩm.
+Nếu chỉ muốn kiểm tra việc nạp ngữ cảnh, thêm: **“Chỉ báo trạng thái, chưa sửa code hoặc chạy task triển khai.”** Trạng thái hiện tại lấy từ state/task, không dùng baseline planning_only cũ. Lệnh giới hạn phạm vi mới nhất của người dùng có hiệu lực khi đổi AI.
 
 ## 4. Nếu Codex đã hết quota đột ngột
 

@@ -1081,20 +1081,24 @@ export const NodeExecutionDetails = ({ data, label, status, metadata, isPublic, 
                                 </Box>
                             )}
                             {(() => {
+                                const renderedOutput = data?.output?.content ?? data?.output?.question
                                 // Check if the content is a stringified JSON or array
-                                if (data?.output?.content) {
+                                if (renderedOutput) {
                                     try {
                                         // Try to parse as JSON
-                                        const parsedContent = JSON.parse(data.output.content)
-                                        // If it parses successfully, it's JSON - use JSONViewer
-                                        return (
-                                            <div style={{ marginTop: 10, marginBottom: 10 }}>
-                                                <JSONViewer data={parsedContent} />
-                                            </div>
-                                        )
+                                        const parsedContent = JSON.parse(renderedOutput)
+                                        if (parsedContent && typeof parsedContent === 'object') {
+                                            // If it parses successfully, it's JSON - use JSONViewer
+                                            return (
+                                                <div style={{ marginTop: 10, marginBottom: 10 }}>
+                                                    <JSONViewer data={parsedContent} />
+                                                </div>
+                                            )
+                                        }
+                                        return <MemoizedReactMarkdown>{String(renderedOutput)}</MemoizedReactMarkdown>
                                     } catch (e) {
                                         // Not valid JSON, render as markdown
-                                        return <MemoizedReactMarkdown>{data?.output?.content || `*No data*`}</MemoizedReactMarkdown>
+                                        return <MemoizedReactMarkdown>{renderedOutput || `*No data*`}</MemoizedReactMarkdown>
                                     }
                                 } else {
                                     return <MemoizedReactMarkdown>{`*No data*`}</MemoizedReactMarkdown>

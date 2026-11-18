@@ -1,4 +1,5 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { extractWebCitations } from '../webCitations'
 import {
     ICommonObject,
     IDatabaseEntity,
@@ -1350,6 +1351,7 @@ class Agent_Agentflow implements INode {
 
             // Extract artifacts from annotations in response metadata and replace inline data
             if (response.response_metadata) {
+                sourceDocuments.push(...extractWebCitations(response.response_metadata, response.content))
                 const {
                     artifacts: extractedArtifacts,
                     fileAnnotations: extractedFileAnnotations,

@@ -14,18 +14,26 @@ import {
     Avatar,
     ButtonBase,
     CircularProgress,
-    Tooltip
+    Tooltip,
+    Button,
+    Chip,
+    Alert,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    TextField
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { IconSend, IconRobot, IconUser, IconPlus, IconBulb, IconMessages } from '@tabler/icons-react'
+import { IconSend, IconRobot, IconUser, IconPlus, IconBulb, IconMessages, IconPaperclip, IconCheck } from '@tabler/icons-react'
 import { MemoizedReactMarkdown } from '@/ui-component/markdown/MemoizedReactMarkdown'
 import moment from 'moment'
 
 // 3 Kịch bản mẫu khởi đầu theo Task B-002
 const STARTER_SCENARIOS = [
     {
-        title: 'Trợ lý CSKH & FAQ Bán hàng',
-        prompt: 'Tôi muốn tạo một trợ lý trả lời thắc mắc sản phẩm, tư vấn chính sách bảo hành và đổi trả cho cửa hàng phụ kiện điện thoại.'
+        title: 'Hướng dẫn sử dụng phần mềm theo tài liệu',
+        prompt: 'Tạo trợ lý hướng dẫn phần mềm theo tài liệu tôi đính kèm. Hiểu câu hỏi, tìm nội dung liên quan, kiểm tra có bằng chứng rồi hướng dẫn từng bước và dẫn nguồn; nếu thiếu thì hỏi rõ, không bịa chức năng.'
     },
     {
         title: 'Phân loại Vé Hỗ trợ Kỹ thuật',
@@ -37,10 +45,23 @@ const STARTER_SCENARIOS = [
     }
 ]
 
-const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSession }) => {
+const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirmBuild = false, onSendMessage, onNewSession }) => {
     const theme = useTheme()
     const [inputValue, setInputValue] = useState('')
     const messagesEndRef = useRef(null)
+    const [files, setFiles] = useState([])
+    const [fileError, setFileError] = useState('')
+    const [retrievalMode, setRetrievalMode] = useState('lexical')
+    const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small')
+    const chooseFiles = (picked) => {
+        const next = [...files, ...Array.from(picked || [])]
+        if (next.length > 5 || next.some((file) => file.size > 5 * 1024 * 1024 || !/\.(pdf|docx|txt|md|csv)$/i.test(file.name))) {
+            setFileError('Chọn tối đa 5 file PDF/DOCX/TXT/MD/CSV, mỗi file tối đa 5 MB.')
+            return
+        }
+        setFileError('')
+        setFiles(next)
+    }
 
     const scrollToBottom = (behavior = 'smooth') => {
         messagesEndRef.current?.scrollIntoView({ behavior })
@@ -50,27 +71,39 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
         scrollToBottom('smooth')
     }, [messages, isSending])
 
-    const handleSend = () => {
+    const handleSend = async () => {
         const trimmed = inputValue.trim()
-        if (!trimmed || isSending) return
-        onSendMessage(trimmed)
-        setInputValue('')
+        if ((!trimmed && !files.length) || isSending) return
+        const sent = await onSendMessage(trimmed, files, { retrievalMode, embeddingModel })
+        if (sent !== false) {
+            setInputValue('')
+            setFiles([])
+        }
     }
 
     const handleKeyDown = (e) => {
+        if (e.nativeEvent?.isComposing) return
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             handleSend()
         }
     }
 
-    const handleSelectScenario = (prompt) => {
+    const handleSelectScenario = async (prompt) => {
         if (isSending) return
-        onSendMessage(prompt)
+        if ((await onSendMessage(prompt, files, { retrievalMode, embeddingModel })) !== false) {
+            setInputValue('')
+            setFiles([])
+        }
     }
 
     return (
         <Card
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+                event.preventDefault()
+                if (!isSending) chooseFiles(event.dataTransfer.files)
+            }}
             sx={{
                 height: '100%',
                 display: 'flex',
@@ -93,7 +126,16 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
                 }
                 action={
                     <Tooltip title='Tạo phiên làm việc mới'>
-                        <IconButton size='small' color='primary' onClick={onNewSession}>
+                        <IconButton
+                            disabled={isSending}
+                            size='small'
+                            color='primary'
+                            onClick={() => {
+                                setFiles([])
+                                setInputValue('')
+                                onNewSession()
+                            }}
+                        >
                             <IconPlus size={20} />
                         </IconButton>
                     </Tooltip>
@@ -131,10 +173,15 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
                         <Typography variant='h3' sx={{ fontWeight: 700, mb: 1 }}>
                             Chào mừng đến với Chat-to-Agent Builder
                         </Typography>
-                        <Typography variant='body1' color='textSecondary' sx={{ maxWidth: 520, mx: 'auto', mb: 3 }}>
-                            Hãy mô tả trợ lý bạn muốn xây dựng bằng tiếng Việt tự nhiên. Hệ thống sẽ tự động tổng hợp mục tiêu, hướng dẫn và
-                            cấu hình cho Agentflow V2.
+                        <Typography variant='body1' color='textSecondary' sx={{ maxWidth: 520, mx: 'auto', mb: 2 }}>
+                            Hãy mô tả trợ lý bạn muốn xây dựng bằng tiếng Việt tự nhiên. Hệ thống sẽ cùng bạn trao đổi nhiều lượt để tổng
+                            hợp mục tiêu, hướng dẫn và luồng xử lý.
                         </Typography>
+                        <Alert severity='info' sx={{ maxWidth: 600, mx: 'auto', mb: 3, textAlign: 'left', borderRadius: 2 }}>
+                            <strong>Cách chốt yêu cầu:</strong> Bạn và Bot cứ trả lời qua lại cho đến khi bạn đưa ra hết yêu cầu. Khi đã
+                            xong, chỉ cần nhắn <strong>&quot;xong&quot;</strong> (hoặc bấm nút <strong>Xong — Tạo Agent</strong>), lúc đó hệ
+                            thống mới tự động build Agent!
+                        </Alert>
 
                         {/* Gợi ý kịch bản mẫu */}
                         <Typography
@@ -231,7 +278,7 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
                                             color: isUser
                                                 ? theme.palette.mode === 'dark'
                                                     ? '#ffffff'
-                                                    : theme.palette.primary.contrastText || '#000000'
+                                                    : theme.palette.text.primary
                                                 : 'text.primary',
                                             borderTopRightRadius: isUser ? 4 : 16,
                                             borderTopLeftRadius: !isUser ? 4 : 16,
@@ -292,7 +339,9 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
                             >
                                 <CircularProgress size={16} color='inherit' />
                                 <Typography variant='body2' color='textSecondary' sx={{ fontStyle: 'italic' }}>
-                                    Trợ lý đang phân tích yêu cầu và cập nhật Spec...
+                                    {files.length
+                                        ? 'Đang đọc tài liệu, chia đoạn và lập kế hoạch…'
+                                        : 'Đang phân tích yêu cầu và thiết kế luồng…'}
                                 </Typography>
                             </Box>
                         </Stack>
@@ -306,6 +355,114 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
 
             {/* Ô nhập tin nhắn */}
             <Box sx={{ p: 2, background: theme.palette.mode === 'dark' ? theme.palette.background.default : '#fafafa' }}>
+                {!!documents.length && (
+                    <Stack spacing={0.5} sx={{ mb: 1 }}>
+                        <Typography variant='caption'>Tài liệu đã gắn với Agent</Typography>
+                        {documents.map((doc) => (
+                            <Chip
+                                key={doc.id}
+                                size='small'
+                                variant='outlined'
+                                label={`${doc.name} · ${doc.config?.chunkCount || '?'} đoạn · ${
+                                    doc.config?.retrievalMode === 'vector'
+                                        ? 'embedding'
+                                        : doc.config?.uploaded
+                                        ? 'từ khóa'
+                                        : 'Document Store'
+                                }`}
+                            />
+                        ))}
+                    </Stack>
+                )}
+                <Button size='small' component='label' startIcon={<IconPaperclip size={18} />} disabled={isSending} sx={{ mb: 1 }}>
+                    Đính kèm tài liệu
+                    <input
+                        disabled={isSending}
+                        name='documents'
+                        aria-label='Đính kèm tài liệu'
+                        type='file'
+                        hidden
+                        multiple
+                        accept='.pdf,.docx,.txt,.md,.csv'
+                        onChange={(event) => {
+                            chooseFiles(event.target.files)
+                            event.target.value = ''
+                        }}
+                    />
+                </Button>
+                {fileError && (
+                    <Alert severity='error' sx={{ mb: 1 }}>
+                        {fileError}
+                    </Alert>
+                )}
+                {!!files.length && (
+                    <Stack spacing={1} sx={{ mb: 1 }}>
+                        {files.map((file, index) => (
+                            <Chip
+                                key={`${file.name}-${index}`}
+                                label={`${file.name} · ${Math.ceil(file.size / 1024)} KB`}
+                                disabled={isSending}
+                                onDelete={() => setFiles(files.filter((_, i) => i !== index))}
+                            />
+                        ))}
+                        <FormControl size='small'>
+                            <InputLabel id='retrieval-mode-label'>Cách tìm trong tài liệu</InputLabel>
+                            <Select
+                                labelId='retrieval-mode-label'
+                                label='Cách tìm trong tài liệu'
+                                value={retrievalMode}
+                                disabled={isSending}
+                                onChange={(event) => setRetrievalMode(event.target.value)}
+                            >
+                                <MenuItem value='lexical'>Theo từ khóa — không gọi embedding</MenuItem>
+                                <MenuItem value='vector'>Theo ngữ nghĩa — embedding của provider</MenuItem>
+                            </Select>
+                        </FormControl>
+                        {retrievalMode === 'vector' && (
+                            <>
+                                <TextField
+                                    size='small'
+                                    label='Model embedding'
+                                    value={embeddingModel}
+                                    disabled={isSending}
+                                    onChange={(event) => setEmbeddingModel(event.target.value)}
+                                />
+                                <Alert severity='info'>
+                                    Dùng key/Base URL đã lưu để tạo và truy vấn embedding. Provider phải hỗ trợ model này và có thể tính
+                                    phí.
+                                </Alert>
+                            </>
+                        )}
+                    </Stack>
+                )}
+                {canConfirmBuild && !isSending && (
+                    <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        alignItems={{ xs: 'stretch', sm: 'center' }}
+                        justifyContent='space-between'
+                        spacing={1}
+                        sx={{
+                            mb: 1.25,
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 1.5,
+                            border: `1px solid ${theme.palette.success.main}`,
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(76,175,80,0.12)' : 'rgba(76,175,80,0.08)'
+                        }}
+                    >
+                        <Typography variant='body2'>Đã đủ thông tin thiết kế. Bạn có thể nhắn thêm yêu cầu hoặc chốt tạo Agent:</Typography>
+                        <Button
+                            size='small'
+                            variant='contained'
+                            color='success'
+                            startIcon={<IconCheck size={16} />}
+                            onClick={() => onSendMessage('xong', [], { retrievalMode, embeddingModel })}
+                            sx={{ fontWeight: 600, flexShrink: 0 }}
+                        >
+                            Xong — Tạo Agent
+                        </Button>
+                    </Stack>
+                )}
                 <OutlinedInput
                     fullWidth
                     multiline
@@ -320,7 +477,13 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
                         <InputAdornment position='end'>
                             <Tooltip title='Gửi tin nhắn (Enter)'>
                                 <span>
-                                    <IconButton color='primary' onClick={handleSend} disabled={!inputValue.trim() || isSending} edge='end'>
+                                    <IconButton
+                                        aria-label='Gửi yêu cầu'
+                                        color='primary'
+                                        onClick={handleSend}
+                                        disabled={(!inputValue.trim() && !files.length) || isSending}
+                                        edge='end'
+                                    >
                                         <IconSend size={20} />
                                     </IconButton>
                                 </span>
@@ -339,7 +502,9 @@ const ChatPane = ({ messages = [], isSending = false, onSendMessage, onNewSessio
 
 ChatPane.propTypes = {
     messages: PropTypes.array,
+    documents: PropTypes.array,
     isSending: PropTypes.bool,
+    canConfirmBuild: PropTypes.bool,
     onSendMessage: PropTypes.func.isRequired,
     onNewSession: PropTypes.func.isRequired
 }

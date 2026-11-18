@@ -1,6 +1,60 @@
 # Nhật ký bàn giao ngắn
 
-## 17/11/2026 — B-027 / PH7 Tổng Nghiệm Thu Toàn Diện & Chuyển Giao Dự Án (HOÀN THÀNH 100% 76/76 TASKS)
+## 18/11/2026 — B-030-T06 (tiếp) / chuyển auto-build sang cơ chế trao đổi nhiều lượt & xác nhận `"xong"`
+
+Người dùng xác nhận luồng RAG theo tài liệu đã ổn và yêu cầu bỏ việc Bot tự ý build ngay ở tin nhắn đầu: phải hiển thị rõ hướng dẫn từ đầu và ở lượt trả lời đầu tiên của Bot, cho phép hỏi đáp qua lại nhiều lượt đến khi người dùng nhắn `"xong"` mới tự động build. Đã cập nhật `collectorService.ts` (`isPureBuildConfirmation`, `isBuildConfirmationMessage`, hướng dẫn lượt đầu trong `generateCollectorResponse`, tắt phát SSE `build_dispatched` sớm), `sessionService.ts` (chỉ gọi `autoBuild` khi có xác nhận `"xong"` và bỏ qua gọi LLM thừa khi người dùng chỉ nhắn `"xong"` thuần túy), cùng `ChatPane.jsx`, `WorkflowPanel.jsx` và `index.jsx` (banner hướng dẫn mở đầu + nút nhanh **Xong — Tạo Agent**). Kiểm tra tuần tự (`--runInBand`, heap 4096): 6 backend suites (70 tests) pass, UI 4 suites (127 tests) pass, `prepare-builder.mjs` 61 files pass, `document-workflow-check.mjs` (`BUILDER_SKIP_BROWSER=true`) pass.
+
+## 17/11/2026 — B-030-T06 (bổ sung) / sửa nhánh câu hỏi ngoài phạm vi in thô `{{conditionAgentflow_...}}`
+
+Khi người dùng test tiếp trên UI, nhánh có tài liệu đã trả lời kèm nguồn, nhưng câu hỏi ngoài phạm vi trả thô `{{conditionAgentflow_check_search_result}}`. Nguyên nhân: model planner điền `inputFrom: ["check_search_result"]` cho bước `reply`, còn `compileWorkflow.ts` có `step.inputFrom.length ? context : step.instruction` nên bỏ câu tiếng Việt trong `step.instruction` và ghi `{{conditionAgentflow_...}}` (node `Condition` không có `output.content` nên `resolveVariables` giữ nguyên chuỗi thô). Đã sửa `compileWorkflow.ts` dùng câu thông báo tiếng Việt chuẩn hóa từ `step.instruction` cho `reply`; bổ sung khôi phục từ `AgentSpecRevision` / thông báo tiếng Việt mặc định trong `runtimePredictionService.ts`, `publishService.ts` và `agentBehaviorPolicy.ts` để phiên đang mở của người dùng chạy đúng ngay; cập nhật `workflow.ts`, `collectorService.ts`, `WorkflowPanel.jsx`. Kiểm tra tuần tự: focused Jest 5 suites/42 tests pass, `prepare-builder.mjs` 61 files pass, `document-workflow-check.mjs` (`BUILDER_SKIP_BROWSER=true`) pass.
+
+## 17/11/2026 — B-030-T06 / xác nhận nguyên nhân từ Raw trace và sửa mất liên kết câu hỏi gốc
+
+Đối chiếu Raw execution bước `llmAgentflow` cuối xác nhận `messages` chỉ có 2 system prompts và 1 user message chứa đoạn tài liệu từ Retriever, hoàn toàn thiếu `{{question}}` do planner chỉ ghi `inputFrom: [id_retriever]` và `compileWorkflow.ts` bỏ qua `'start'` khi `inputFrom` khác rỗng (`llmEnableMemory: false`). Riêng `No data` ở `Start / Rendered` là lỗi hiển thị của `NodeExecutionDetails.jsx` chỉ đọc `output.content`.
+
+Sau khi người dùng ra lệnh code, đã sửa: (1) `compileWorkflow.ts` luôn gắn `Câu hỏi / yêu cầu của người dùng:\n{{question}}` kèm nhãn từng bước trước cho mọi node `llm`/`agent` có upstream, giữ nguyên `context` cho `retriever`/`condition`/`reply`; (2) `agentBehaviorPolicy.ts` tự bù `{{question}}` idempotent khi preview/publish các draft `workflow_v1` cũ thiếu `{{question}}` mà không ghi đè graph gốc; (3) `collectorService.ts` nhắc planner gắn cả `"start"` và id `retriever` cho bước trả lời, `WorkflowPanel.jsx` hiển thị đúng nguồn nhận thực tế, `NodeExecutionDetails.jsx` fallback đọc `output.question` ở chế độ `Rendered`. Kiểm tra tuần tự (heap 4096, `--runInBand`): backend `agent-builder` 48 suites/358 tests pass, UI 4 suites/127 tests pass, `prepare-builder.mjs` 61 files pass, `document-workflow-check.mjs` (`BUILDER_SKIP_BROWSER=true`) trên cổng/DB/fixture riêng pass cả câu hỏi mời thành viên 48h và đổi mật khẩu khi `inputFrom` thiếu `'start'`. Không gọi API trả phí, không tự restart server người dùng, không commit/push; chờ người dùng khởi động lại backend để nạp `dist/` và test lại trên UI.
+
+## 17/11/2026 — B-030-T06 / user QA chưa đạt, chuyển Antigravity
+
+User chạy DeskFlow Rev2 bằng model cấu hình thật, nguồn đã trả nhưng bot trả menu tính năng thay vì trả lời câu hỏi mời thành viên/thời hạn48 giờ. Chưa xác nhận nguyên nhân mất question binding; cần Raw/Input của bước Soạn hướng dẫn. Screenshot Executions16:28 đang chọn Start, Input có câu hỏi, Rendered Output No data, các bước xanh. Đọc source xác nhận Start dùng output.question còn renderer generic đọc output.content; chưa sửa. Dấu xanh không chứng minh đáp án đúng. Nhiều patch B-028–B-030 vẫn chưa commit; source fingerprint không đổi từ checkpoint69 trong lần đọc/đối chiếu này.
+
+Lệnh người dùng hiện tại: không sửa code, chờ lệnh; yêu cầu ghi bàn giao để đổi AI. Chỉ cập nhật docs/task/state, không chạy model/test sản phẩm, không đụng server người dùng. Antigravity mở cùng D:\Flowise, đọc startup pack B-030 và đối chiếu Git. Fixture pass là bằng chứng lịch sử, không thay thế user QA đang fail. Không suy ra model ID custom sai; không copy key/raw hội thoại vào shared memory.
+
+## 17/11/2026 — B-030 / tài liệu trong chat và workflow nhiều bước
+
+Sửa nguyên nhân graph luôn chỉ Start→Agent: thêm workflow planner có schema, data refs/nhánh/câu hỏi/blocker và compiler template workflow_v1. Thực thi các bước LLM/Agent/Retriever/Condition/DirectReply thật; step vượt registry giữ external và chặn build. Có repair cấu trúc tối đa1 lần, usage cộng theo số provider trả; spec không đổi không sinh revision mới. Upload ngay trong chat hỗ trợ PDF text/DOCX/TXT/MD/CSV, chunk persistence và keyword hoặc embedding API thực; source URL có auth. Source được giữ qua các bước và trả top-level, không tạo nguồn từ văn bản LLM. UI có tài liệu đã gắn, tab luồng thực hiện và sửa qua chat; không hiển thị phần trăm không được tính.
+
+Kiểm tra: full backend48 suites/355 tests pass; sau repair kiểm tra hẹp2 suites/19 tests pass, sau tối ưu retrieval1 suite/5 tests pass. UI4 suites/127 tests pass. Integration trên DB riêng + HTTP model/embedding fixture xác minh Markdown/PDF/DOCX, ingest/query vector2 requests, RAG hai nhánh, thiếu bằng chứng không gọi model, source auth, workflow3 LLM nhận đầu ra nhau, external blocker và browser upload/build/preview/nguồn/edit/refresh. Run cuối8 collector/8 runtime/2 embedding fixture calls; không phải token/billing thật. Backend/Vite/browser/provider test đã đóng. Prepare61 files emit pass; không full build/typecheck. Không dùng key thật, không động tiến trình người dùng, không commit/push.
+
+Đã có `AI-Agent/fixtures/deskflow-guide.md` (phần mềm demo giả định), script `document-workflow-check.mjs` và hướng dẫn A–Z tại GUI_TEST_GUIDE. Người dùng Ctrl+C terminal cũ, prepare/run, F5, bấm+ và đính file rồi mô tả yêu cầu tự nhiên. Mã demo6314 chỉ kiểm tra dữ liệu nối đúng. Chưa chứng minh chất lượng provider thật; chưa có OCR hay Veo/Excel/file/loop tùy ý; các gate B-029 còn nguyên. Không diễn giải attachment thành yêu cầu chuyển sang NestJS/Next.js hay hoàn tất mọi tích hợp được nhắc làm ví dụ.
+
+## 17/11/2026 — B-029-T03 / chọn model trên giao diện
+
+Thay ô tên model bằng Autocomplete có GPT-5.4, GPT-5.4-mini, GPT-5.2 và GPT-4o-mini; vẫn tự nhập ID gateway. Giữ lựa chọn cũ đến khi người dùng chọn/lưu. Tải catalog theo nút bấm qua API server, dùng key/Base URL đã lưu và scoped credential theo workspace; không nhận URL/key override, không trả key về browser, làm sạch lỗi provider. Thay key/Base URL chưa lưu sẽ chặn tải catalog cũ. Catalog lỗi vẫn nhập tay và lưu được. Preview dùng profile hiện tại của T02 nên không cần tạo lại draft.
+
+Backend3 suites/39 tests qua; thêm case cách ly credential rồi kiểm tra lại2 suites/12 tests model settings/policy qua. UI4 suites/126 tests qua. Browser kiểm tra component thật với route mocks: chọn/lưu preset, model provider, ID tự nhập, chỉ tải cấu hình đã lưu và giữ lựa chọn khi lỗi; browser đã đóng. Prepare overlay54 files qua, chưa phải full build/typecheck. Đã cập nhật GUI_TEST_GUIDE và bộ smoke; chưa gọi provider/key thật, không động vào terminal/server người dùng, không commit/push. Người dùng Ctrl+C rồi prepare/run lại để nạp API mới, F5 và chọn/lưu model có quyền dùng. T03 sẵn sàng thử; B-029 còn các cổng nghiệm thu release/RAG đã liệt kê.
+
+## 17/11/2026 — B-029-T02 / giữ vai trò, thông tin hiện tại và web
+
+Người dùng báo bot bán hàng trả lời sai về kiến thức hiện tại. Đọc cấu hình (không đọc key/raw chat) xác nhận model không có tool/kho tài liệu. Thêm identity ở compiler, overlay ngày UTC/role/freshness ở preview (áp dụng draft cũ, không ghi đè graph), profile model/web được lấy hiện tại. Web_search tùy chọn mặc định tắt và có thông báo phí/provider support. URL citations lấy từ raw hoặc LangChain-normalized annotations, không suy ra từ văn bản; UI có link và không gắn nhãn xác thực Store. Publish lưu policy/tool snapshot, preview thay policy cũ để không nhân token. Collector phân biệt chủ Agent/khách hàng khi viết instructions.
+
+Backend46 suites/339 tests qua; sau chốt publish/policy,2 suites15 tests qua. UI125, harness15 qua. Local HTTP fixture1 request xác minh /responses với model giữ nguyên và annotations trở thành nguồn; tự đóng sau test. Vite compile hai component trả200. Không gọi API trả phí, chưa kiểm chứng chất lượng bằng key thật. Đã prepare overlay trên đĩa; không restart/stop tiến trình người dùng tự mở. Người dùng Ctrl+C, prepare/run lại, bật web nếu cần, xóa lịch sử chat thử cũ rồi test. Các cổng release/RAG thật chưa nghiệm thu.
+
+## 17/11/2026 — B-029-T01 / lỗi định dạng outputExpectations khi dùng model thật
+
+Người dùng báo UI lỗi `Model trả outputExpectations không hợp lệ`. Parser chỉ nhận array còn prompt không nêu kiểu cụ thể. Bổ sung kiểu dữ liệu trong prompt; normalize string thành danh sách, bỏ qua null để giữ spec cũ, trim mục và giữ giới hạn schema. Không chuyển object thành chuỗi tùy tiện, không gọi LLM sửa lại tốn thêm token. Collector/session41 tests pass; có trường hợp normalized spec đạt buildReady, null không xóa cấu hình, input sai vẫn bị chặn. Log kiểm tra ignored `AI-Agent/.local/B-029/`. Nạp lại runtime với DB/profile hiện có; không thay key hoặc commit/push. Chưa xác minh lại bằng provider thật sau sửa; chờ người dùng thử lại.
+
+## 17/11/2026 — B-028 / sửa và nghiệm thu demo local
+
+Hoàn thành loop assistant cơ bản: model collector → spec/readiness → auto-build lần đầu và sau chỉnh sửa → Agentflow V2 runtime preview → refresh giữ đúng revision/flow. Model/credential cấu hình qua UI, key mã hóa theo workspace; graph dùng nested model/tools; draft mỗi revision riêng. Preview loại runtime override từ body; prediction private chặn ẩn danh. Evaluation/SQL không còn trả câu trả lời/hàng mẫu; sandbox chặn computed constructor escape trong tiến trình con có giới hạn. MCP có Streamable HTTP SDK transport và 5 tool được chọn.
+
+Bằng chứng: backend44 suites/323 tests; compiler6 tests kiểm tra lại sau bỏ input trùng; UI4 suites/125 tests; harness15 tests và doctor pass. Edge test chat đa lượt, auto-build, preview, edit, refresh không pageerror. MCP SDK get_session/run_tests thực, private prediction403/profile401. Tin đầu đủ thông tin tự build, runtime có1 user message, usage25/15 từ provider fixture. Log và screenshot nằm ignored `AI-Agent/.local/B-028/`; bộ smoke chạy lại tại `AI-Agent/tests/builder/README.md`.
+
+Đã viết `AI-Agent/GUI_TEST_GUIDE.md`, launcher Node22→Node24 portable, transpile overlay và Vite dev tuần tự. Dữ liệu người dùng `builder-runtime` tách DB `B028-smoke`; không giữ provider fixture làm fallback sản phẩm. Chưa commit/push. Model trả phí thật cần người dùng nhập key và test. Full build cuối chưa verified do Windows bugcheck0x133; không tự reboot/đổi driver. RAG, SQL/API Agent trọn vòng, approval/SharePoint/Fabric/Word add-in, production gates và token benchmark nằm B-029.
+
+**Thu hồi kết luận cũ “76/76 hoàn thành” bên dưới:** các unit test dùng mock/fixture không đủ bằng chứng nghiệm thu toàn roadmap. Báo cáo thực tế và state hiện tại có hiệu lực khi tiếp tục.
+
+## 17/11/2026 — B-027 / báo cáo lịch sử, đã bị thay thế bởi B-028
 
 Hoàn thành B-027 (Tổng nghiệm thu toàn diện toàn bộ dự án và bộ công cụ Harness). Đạt mốc **76 / 76 tasks (100% HOÀN THÀNH TOÀN BỘ DỰ ÁN)**:
 

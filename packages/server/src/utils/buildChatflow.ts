@@ -987,7 +987,12 @@ const checkIfStreamValid = async (
  * @param {Request} req
  * @param {boolean} isInternal
  */
-export const utilBuildChatflow = async (req: Request, isInternal: boolean = false, chatType?: ChatType): Promise<any> => {
+export const utilBuildChatflow = async (
+    req: Request,
+    isInternal: boolean = false,
+    chatType?: ChatType,
+    internalFlowData?: string
+): Promise<any> => {
     const appServer = getRunningExpressApp()
 
     const chatflowid = req.params.id
@@ -998,6 +1003,11 @@ export const utilBuildChatflow = async (req: Request, isInternal: boolean = fals
     })
     if (!chatflow) {
         throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Chatflow ${chatflowid} not found`)
+    }
+    // Trusted server-side preview overlay, never read from req.body/overrideConfig.
+    if (internalFlowData !== undefined) {
+        if (!isInternal) throw new InternalFlowiseError(StatusCodes.FORBIDDEN, 'Flow preview override requires an internal request')
+        chatflow.flowData = internalFlowData
     }
 
     const isAgentFlow = chatflow.type === 'MULTIAGENT'
