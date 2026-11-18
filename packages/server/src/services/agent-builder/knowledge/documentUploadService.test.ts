@@ -4,8 +4,8 @@ import { DocumentUploadService, splitDocument } from './documentUploadService'
 import { BuilderSession } from '../../../database/entities/BuilderSession'
 import { DocumentStore } from '../../../database/entities/DocumentStore'
 import { DocumentStoreFileChunk } from '../../../database/entities/DocumentStoreFileChunk'
-import { retrieveBuilderDocuments } from '../../../../../components/nodes/vectorstores/DocumentStoreVS/builderKnowledge'
 import modelSettingsService from '../modelSettingsService'
+const { retrieveBuilderDocuments } = require('../../../../../components/nodes/vectorstores/DocumentStoreVS/builderKnowledge')
 
 describe('Chat document ingestion and retrieval boundary', () => {
     let records: Map<any, any[]>, ds: any, service: DocumentUploadService

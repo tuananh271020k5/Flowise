@@ -1,5 +1,5 @@
 import { prepareAgentPreview } from './agentBehaviorPolicy'
-import { extractWebCitations } from '../../../../components/nodes/agentflow/webCitations'
+const { extractWebCitations } = require('../../../../components/nodes/agentflow/webCitations')
 
 describe('Agent role, freshness and source policy', () => {
     const original = JSON.stringify({

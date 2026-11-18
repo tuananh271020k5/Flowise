@@ -1,43 +1,33 @@
 {
   "schemaVersion": 1,
-  "revision": 76,
-  "updatedAt": "2026-11-18T06:59:34.713Z",
+  "revision": 78,
+  "updatedAt": "2026-11-18T07:36:08.508Z",
   "authorization": "User explicitly authorized B-028 product fixes, runtime integration, audit remediation and UI run/test guide on 2026-11-17",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
   "currentTask": "B-030",
   "status": "in_progress",
-  "productStage": "b030_xong_confirmation_flow_implemented",
-  "summary": "Hoàn tất luồng trao đổi nhiều lượt và chỉ tự động build khi người dùng nhắn \"xong\" (hoặc bấm nút Xong — Tạo Agent): cập nhật collectorService.ts, sessionService.ts, ChatPane.jsx, WorkflowPanel.jsx, index.jsx. Lượt trả lời đầu luôn hiển thị hướng dẫn chốt bằng \"xong\"; tin nhắn \"xong\" thuần túy kích hoạt build ngay không tốn thêm lượt gọi LLM hay sinh revision rác. 6 backend Jest suites (70 tests), 4 UI suites (127 tests), prepare 61 files và document-workflow-check.mjs đều pass.",
+  "productStage": "b030_docker_tsc_fixed",
+  "summary": "Sửa triệt để lỗi GitHub Actions Docker build (flowise#build exited 2): bổ sung kiểu Express/Multer tại routes/agent-builder/index.ts và bỏ import tĩnh xuyên package sang packages/components trong 2 file test (agentBehaviorPolicy.test.ts, documentUploadService.test.ts). Cả tsc --noEmit trên packages/server và packages/components đều exit 0; Jest 2 suites/13 tests pass.",
   "decisions": [
-    "Không tự gọi autoBuild() trên các tin nhắn mô tả yêu cầu thông thường; chỉ tự build khi người dùng xác nhận \"xong\" (hoặc bấm nút Xong — Tạo Agent) và spec đã buildReady.",
-    "Tin nhắn xác nhận \"xong\" thuần túy không gọi lại LLM planner và không sinh thêm AgentSpecRevision thừa.",
-    "Hiển thị hướng dẫn cách chốt bằng \"xong\" cả ở màn hình mở đầu ChatPane lẫn trong lượt trả lời đầu tiên của Bot."
+    "Dùng kiểu tường minh trên route /sessions/:id/documents và ép kiểu middleware Multer sang express.RequestHandler để tương thích @types/express@4.17.",
+    "Tránh import ES tĩnh vượt ra ngoài packages/server/src sang packages/components trong file test để tsc của server không kéo source của components vào sai tsconfig.",
+    "Theo yêu cầu người dùng, đặt pushDefault sang remote standalone (Flowise-Agent-Builder.git) và chỉ push lên repo này."
   ],
   "changedFiles": [
-    "packages/server/src/services/agent-builder/collectorService.ts",
-    "packages/server/src/services/agent-builder/sessionService.ts",
-    "packages/ui/src/views/agent-builder/ChatPane.jsx",
-    "packages/ui/src/views/agent-builder/WorkflowPanel.jsx",
-    "packages/ui/src/views/agent-builder/index.jsx",
-    "packages/server/src/services/agent-builder/collectorService.test.ts",
-    "packages/server/src/services/agent-builder/sessionService.test.ts",
-    "AI-Agent/tests/builder/document-workflow-check.mjs",
-    "AI-Agent/tasks/B-030.md",
-    "AI-Agent/context/PROJECT_MAP.md",
-    "AI-Agent/state/WORKLOG.md"
+    "packages/server/src/routes/agent-builder/index.ts",
+    "packages/server/src/services/agent-builder/agentBehaviorPolicy.test.ts",
+    "packages/server/src/services/agent-builder/knowledge/documentUploadService.test.ts"
   ],
   "checks": [
-    "Backend Jest (--runInBand, heap 4096): 6 suites / 70 tests PASS (collectorService, sessionService, collectorModel, phase3GateD1Demo, knowledgePipeline, workflow).",
-    "UI Jest (--runInBand, heap 4096): 4 suites / 127 tests PASS.",
-    "node AI-Agent/scripts/prepare-builder.mjs: Prepared 61 backend overlay files PASS.",
-    "BUILDER_SKIP_BROWSER=true document-workflow-check.mjs (DB/cổng/fixture cô lập): PASS luồng chưa build sớm -> nhắn \"xong\" (0 extra LLM calls) -> build & preview thành công."
+    "tsc -p packages/server/tsconfig.json --noEmit: exit 0 (0 errors).",
+    "tsc -p packages/components/tsconfig.json --noEmit: exit 0 (0 errors).",
+    "Jest (--runInBand, heap 4096): agentBehaviorPolicy.test.ts + documentUploadService.test.ts (2 suites / 13 tests PASS).",
+    "node AI-Agent/scripts/prepare-builder.mjs: Prepared 61 backend overlay files PASS."
   ],
-  "blockers": [
-    "Chờ người dùng Ctrl+C và chạy lại run-builder.mjs để nạp dist mới trên server đang chạy."
-  ],
+  "blockers": [],
   "nextActions": [
-    "Người dùng khởi động lại run-builder.mjs và trải nghiệm luồng trao đổi nhiều lượt -> gõ \"xong\" mới build.",
-    "Nếu người dùng muốn mở rộng sang tổng quát hóa toàn bộ node Agentflow V2 / gắn MCP client tools vào bot con, lập kế hoạch task tiếp theo."
+    "Commit và push lên https://github.com/tuananh271020k5/Flowise-Agent-Builder.git, kiểm tra GitHub Actions xanh.",
+    "Sẵn sàng nhận yêu cầu tính năng tiếp theo."
   ],
   "nextTask": "B-030",
   "references": [
@@ -53,8 +43,8 @@
     "verifiedSavings": false
   },
   "snapshot": {
-    "head": "af8b50d5b526458db6aba4f29356ab0564ed1245",
+    "head": "5e9593d3819879b09ea8f2297d54be93a1c92ef2",
     "branch": "main",
-    "sourceFingerprint": "42dbdd2eb85aed68c53ff7c39bbcc08f8fd89ff8aa82b11d18691d3d4616b435"
+    "sourceFingerprint": "56a54fdd2f972ad4e4697dfbb8aa89d72ae82c60bb2219e3dc8e5726035ed2be"
   }
 }

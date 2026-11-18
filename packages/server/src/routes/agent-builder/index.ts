@@ -24,7 +24,7 @@ router.post('/sessions/:id/messages', agentBuilderController.addMessage)
 router.post(
     '/sessions/:id/documents',
     checkAnyPermission('documentStores:create,documentStores:update'),
-    async (req, _res, next) => {
+    async (req: express.Request, _res: express.Response, next: express.NextFunction) => {
         try {
             await sessionService.getSessionById(req.params.id, req.user?.activeWorkspaceId || '')
             next()
@@ -32,10 +32,10 @@ router.post(
             next(error)
         }
     },
-    multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 6, fieldSize: 18000 } }).array(
-        'files',
-        5
-    ),
+    multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 6, fieldSize: 18000 }
+    }).array('files', 5) as unknown as express.RequestHandler,
     agentBuilderController.uploadDocuments
 )
 router.get('/documents/:storeId/chunks/:chunkId', agentBuilderController.readDocumentChunk)
