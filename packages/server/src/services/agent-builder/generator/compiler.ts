@@ -3,6 +3,7 @@ import { AgentPlan, validateAgentPlan } from './agentPlan'
 import { ALLOWED_AGENTFLOW_NODES } from './nodeRegistry'
 import { agentIdentity } from '../agentBehaviorPolicy'
 import { compileWorkflow } from './compileWorkflow'
+import { compileWorkflowV1 } from './compileWorkflowV1'
 
 export interface CompiledFlowGraph {
     templateId: string
@@ -11,14 +12,21 @@ export interface CompiledFlowGraph {
     nodes: AgentflowNode[]
     edges: AgentflowEdge[]
     viewport: { x: number; y: number; zoom: number }
-    flowConfig: { chatflowType: 'AGENTFLOW'; name: string; description: string; category?: string }
+    flowConfig: { chatflowType: 'AGENTFLOW' | 'MULTIAGENT'; name: string; description: string; category?: string }
 }
 
-// V2 models/tools are nested configuration of Agent, not execution nodes.
+export interface CompileOptions {
+    componentNodes?: Record<string, any>
+    modelProfile?: { modelName: string; baseUrl?: string; credentialId?: string }
+}
+
+// V2 models/tools are nested configuration of Agent; V1 (MULTIAGENT) expands all nodes onto /agentcanvas.
 export class AgentflowCompiler {
-    compile(plan: AgentPlan): CompiledFlowGraph {
+    compile(plan: AgentPlan, options: CompileOptions = {}): CompiledFlowGraph {
         const validation = validateAgentPlan(plan)
         if (!validation.valid) throw new Error(`AgentPlan không hợp lệ: ${validation.errors.join('; ')}`)
+        const targetCanvas = plan.spec.canvasVersion || plan.spec.workflow?.canvasVersion
+        if (targetCanvas === 'v1') return compileWorkflowV1(plan, options)
         if (plan.spec.workflow) return compileWorkflow(plan)
         const model = plan.capabilityBindings.find((binding) => binding.type === 'model')
         const dataSources = plan.capabilityBindings.filter((binding) => binding.type === 'datasource')

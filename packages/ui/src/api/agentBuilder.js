@@ -26,6 +26,14 @@ const uploadDocuments = (sessionId, { files, content, clientMessageId, expectedR
         if (value !== undefined) body.append(key, String(value))
     return client.post(`/agent-builder/sessions/${sessionId}/documents`, body, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
+const uploadOfficeFiles = (files) => {
+    const body = new FormData()
+    for (const file of files) body.append('files', file)
+    return client.post('/agent-builder/office-files', body, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+const listOfficeFiles = () => client.get('/agent-builder/office-files')
+const listHelpdeskTickets = () => client.get('/agent-builder/helpdesk/tickets')
+const updateHelpdeskTicket = (ticketId, body) => client.patch(`/agent-builder/helpdesk/tickets/${ticketId}`, body)
 const saveModelProfile = (body) => client.put('/agent-builder/model-profile', body)
 
 const runTestSuite = (sessionId, body) => client.post(`/agent-builder/sessions/${sessionId}/test-suite`, body)
@@ -105,8 +113,24 @@ const listMcpTools = () => client.get('/agent-builder/mcp/tools')
 
 const callMcpTool = (params) => client.post('/agent-builder/mcp/call', params)
 
+const listMcpServers = () => client.get('/agent-builder/mcp-servers')
+
+const createMcpServer = (body) => client.post('/agent-builder/mcp-servers', body)
+
+const refreshMcpServer = (id) => client.post(`/agent-builder/mcp-servers/${id}/refresh`)
+
+const deleteMcpServer = (id) => client.delete(`/agent-builder/mcp-servers/${id}`)
+
 export default {
     uploadDocuments,
+    uploadOfficeFiles,
+    listOfficeFiles,
+    listHelpdeskTickets,
+    updateHelpdeskTicket,
+    listMcpServers,
+    createMcpServer,
+    refreshMcpServer,
+    deleteMcpServer,
     listModels,
     getModelProfile,
     saveModelProfile,

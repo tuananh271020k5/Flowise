@@ -37,14 +37,19 @@ import {
     IconFileText,
     IconChevronDown,
     IconChevronUp,
-    IconUpload
+    IconUpload,
+    IconPaperclip,
+    IconUser,
+    IconCopy
 } from '@tabler/icons-react'
 import agentBuilderApi from '@/api/agentBuilder'
+import chatflowsApi from '@/api/chatflows'
 import { validateAssertions, formatTestMessage, extractPredictionText, extractSourceDocuments } from './testChatHelper'
 
 const TestChatPane = ({
     sessionId,
     flowId,
+    flowType = 'AGENTFLOW',
     flowName,
     revisionNo,
     evaluationExamples = [],
@@ -65,9 +70,56 @@ const TestChatPane = ({
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
     const [isPublishing, setIsPublishing] = useState(false)
     const [isPublished, setIsPublished] = useState(false)
-    const [isPublicAgent, setIsPublicAgent] = useState(false)
+    const [isPublicAgent, setIsPublicAgent] = useState(true)
     const [publishStatusMessage, setPublishStatusMessage] = useState(null)
+    const [copiedPortalLink, setCopiedPortalLink] = useState(false)
+    const [attachedFiles, setAttachedFiles] = useState([])
     const messagesEndRef = useRef(null)
+    const fileInputRef = useRef(null)
+
+    useEffect(() => {
+        if (!flowId) {
+            setIsPublished(false)
+            return
+        }
+        let active = true
+        chatflowsApi
+            .getSpecificChatflow(flowId)
+            .then((res) => {
+                if (!active || !res?.data) return
+                const deployed = Boolean(res.data.deployed)
+                setIsPublished(deployed)
+                if (deployed) setIsPublicAgent(Boolean(res.data.isPublic))
+            })
+            .catch(() => {})
+        return () => {
+            active = false
+        }
+    }, [flowId])
+
+    const portalUrl = flowId ? `${window.location.origin}/support-portal/${flowId}` : ''
+    const handleCopyPortalUrl = async () => {
+        if (!portalUrl) return
+        try {
+            await navigator.clipboard.writeText(portalUrl)
+            setCopiedPortalLink(true)
+            setTimeout(() => setCopiedPortalLink(false), 2000)
+        } catch {
+            // Fallback ignore
+        }
+    }
+
+    const chooseOfficeFiles = (picked) => {
+        const list = Array.from(picked || [])
+        if (!list.length) return
+        const next = [...attachedFiles, ...list]
+        if (next.length > 5 || next.some((file) => file.size > 10 * 1024 * 1024 || !/\.(xlsx|docx)$/i.test(file.name))) {
+            setTestError('Chọn tối đa 5 tệp Excel (.xlsx) hoặc Word (.docx), mỗi tệp tối đa 10 MB.')
+            return
+        }
+        setTestError(null)
+        setAttachedFiles(next)
+    }
 
     const handleOpenPublishDialog = () => {
         setIsPublishDialogOpen(true)
@@ -87,7 +139,11 @@ const TestChatPane = ({
             })
             setIsPublished(true)
             setIsPublishDialogOpen(false)
-            setPublishStatusMessage(res.data?.message || 'Xuất bản thành công!')
+            setPublishStatusMessage(
+                isPublicAgent && portalUrl
+                    ? `Xuất bản thành công! Bấm nút "Cổng User" ở góc trên hoặc sao chép link (${portalUrl}) mở bằng cửa sổ Ẩn danh để đóng vai khách hàng cuối.`
+                    : res.data?.message || 'Xuất bản thành công!'
+            )
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Lỗi khi xuất bản:', err)
@@ -128,6 +184,7 @@ const TestChatPane = ({
     // Xóa hội thoại thử nghiệm (độc lập với hội thoại thiết kế)
     const handleClearChat = () => {
         setTestMessages([])
+        setAttachedFiles([])
         setTestError(null)
     }
 
@@ -150,26 +207,60 @@ const TestChatPane = ({
         }
     }
 
-    // Gửi câu hỏi thử nghiệm tới Agentflow draft
+    // Gửi câu hỏi thử nghiệm tới Agentflow draft (hỗ trợ đính kèm trực tiếp file Excel .xlsx / Word .docx)
     const handleSendTest = async (questionText) => {
-        const text = questionText || input
-        if (!text.trim() || isLoading || !flowId) return
+        const filesToUpload = questionText ? [] : attachedFiles
+        const rawText = (questionText || input).trim()
+        if ((!rawText && filesToUpload.length === 0) || isLoading || !flowId) return
 
-        const userMsg = formatTestMessage('user', text)
-        setTestMessages((prev) => [...prev, userMsg])
-        if (!questionText) setInput('')
+        const displayText = rawText || 'Đọc và kiểm tra nội dung các tệp vừa tải lên.'
         setIsLoading(true)
         setTestError(null)
 
         try {
-            // Chuẩn bị chat history đơn giản
+            let uploadedFiles = []
+            if (filesToUpload.length > 0) {
+                const uploadRes = await agentBuilderApi.uploadOfficeFiles(filesToUpload)
+                uploadedFiles = Array.isArray(uploadRes.data?.files) ? uploadRes.data.files : []
+            }
+
+            let promptContent = displayText
+            if (uploadedFiles.length > 0) {
+                const fileContextLines = uploadedFiles.map((f) =>
+                    f.ext === 'xlsx'
+                        ? `- File Excel "${f.fileName}" | fileId: "${f.fileId}"${
+                              Array.isArray(f.sheetNames) && f.sheetNames.length ? ` | sheets: ${f.sheetNames.join(', ')}` : ''
+                          } (gọi excel_read_workbook hoặc excel_append_rows với đúng fileId này)`
+                        : `- File Word "${f.fileName}" | fileId: "${f.fileId}" (gọi word_read_document hoặc word_append_section với đúng fileId này)`
+                )
+                promptContent =
+                    `[Tệp văn phòng người dùng vừa tải lên kho Workspace — dùng đúng fileId bên dưới với công cụ Excel/Word:]\n` +
+                    `${fileContextLines.join('\n')}\n\n` +
+                    `Yêu cầu của người dùng:\n${displayText}`
+            }
+
+            const userMsg = formatTestMessage('user', displayText, {
+                promptContent,
+                attachedFiles: uploadedFiles.map((f) => ({
+                    fileId: f.fileId,
+                    fileName: f.fileName,
+                    ext: f.ext,
+                    downloadUrl: f.downloadUrl
+                }))
+            })
             const history = testMessages.map((m) => ({
                 role: m.role === 'user' ? 'userMessage' : 'apiMessage',
-                content: m.content
+                content: m.promptContent || m.content
             }))
 
+            setTestMessages((prev) => [...prev, userMsg])
+            if (!questionText) {
+                setInput('')
+                setAttachedFiles([])
+            }
+
             const res = await agentBuilderApi.testPrediction(flowId, {
-                question: text,
+                question: promptContent,
                 history
             })
 
@@ -177,7 +268,7 @@ const TestChatPane = ({
             const sourceDocuments = extractSourceDocuments(res.data)
 
             // Kiểm tra các assertions từ evaluationExamples nếu câu hỏi này khớp
-            const matchedExample = evaluationExamples.find((ex) => ex.input && ex.input.trim().toLowerCase() === text.trim().toLowerCase())
+            const matchedExample = evaluationExamples.find((ex) => ex.input && ex.input.trim().toLowerCase() === displayText.toLowerCase())
             let assertionResult = null
             if (matchedExample?.assertions?.length) {
                 assertionResult = validateAssertions(replyContent, matchedExample.assertions)
@@ -266,7 +357,7 @@ const TestChatPane = ({
     if (!flowId) {
         return (
             <Paper
-                variant='outlined'
+                elevation={0}
                 sx={{
                     p: 4,
                     height: '100%',
@@ -275,16 +366,15 @@ const TestChatPane = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     textAlign: 'center',
-                    borderRadius: 2,
-                    backgroundColor: theme.palette.grey[50]
+                    backgroundColor: 'transparent'
                 }}
             >
                 <Typography variant='h4' gutterBottom color='textSecondary'>
-                    Chưa Có Bản Draft Chạy Thử
+                    Chưa Có Bản Chạy Thử
                 </Typography>
-                <Typography variant='body2' color='textSecondary' sx={{ maxWidth: 380, mb: 3 }}>
-                    Vui lòng hoàn thiện cấu hình ở tab <strong>Cấu hình Agent</strong> và nhấn nút{' '}
-                    <strong>&quot;Tạo Agentflow V2&quot;</strong> để biên dịch đồ thị và bắt đầu chat thử nghiệm.
+                <Typography variant='body2' color='textSecondary' sx={{ maxWidth: 360, mb: 2 }}>
+                    Trao đổi yêu cầu ở khung chat bên trái rồi nhắn <strong>&quot;xong&quot;</strong> (hoặc bấm nút{' '}
+                    <strong>Biên dịch &amp; Tạo Agent</strong> ở tab Cấu hình) để tạo và chạy thử trợ lý tại đây.
                 </Typography>
             </Paper>
         )
@@ -292,13 +382,12 @@ const TestChatPane = ({
 
     // 4. Giao diện Chat Thử Nghiệm với Agent Draft
     return (
-        <Paper
-            variant='outlined'
+        <Box
             sx={{
                 height: '100%',
+                minHeight: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                borderRadius: 2,
                 overflow: 'hidden'
             }}
         >
@@ -344,26 +433,55 @@ const TestChatPane = ({
                         </Button>
                     )}
                     {sessionId && isPublished && (
-                        <Button
-                            size='small'
-                            variant='outlined'
-                            color='warning'
-                            onClick={handleUnpublish}
-                            sx={{ fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5 }}
-                        >
-                            Thu hồi
-                        </Button>
+                        <>
+                            {isPublicAgent && (
+                                <Tooltip title='Mở giao diện Cổng Khách Hàng (có thể mở ở cửa sổ Ẩn danh để test vai trò User)'>
+                                    <Button
+                                        size='small'
+                                        variant='contained'
+                                        color='primary'
+                                        startIcon={<IconUser size={15} />}
+                                        onClick={() => window.open(`/support-portal/${flowId}`, '_blank', 'noopener,noreferrer')}
+                                        sx={{ fontSize: '0.73rem', textTransform: 'none', px: 1.25, py: 0.5 }}
+                                    >
+                                        Cổng User
+                                    </Button>
+                                </Tooltip>
+                            )}
+                            {isPublicAgent && (
+                                <Tooltip title={copiedPortalLink ? 'Đã sao chép đường dẫn!' : 'Sao chép link mở ở cửa sổ Ẩn danh'}>
+                                    <IconButton size='small' color={copiedPortalLink ? 'success' : 'default'} onClick={handleCopyPortalUrl}>
+                                        {copiedPortalLink ? <IconCheck size={17} /> : <IconCopy size={17} />}
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                            <Button
+                                size='small'
+                                variant='outlined'
+                                color='warning'
+                                onClick={handleUnpublish}
+                                sx={{ fontSize: '0.75rem', textTransform: 'none', px: 1.5, py: 0.5 }}
+                            >
+                                Thu hồi
+                            </Button>
+                        </>
                     )}
                     <Tooltip title='Xóa lịch sử chat thử'>
                         <IconButton size='small' onClick={handleClearChat} disabled={testMessages.length === 0}>
                             <IconTrash size={18} />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title='Mở trên Flowise Canvas'>
+                    <Tooltip title={flowType === 'MULTIAGENT' ? 'Mở trên Flowise V1 Canvas (Đầy đủ Node)' : 'Mở trên Flowise V2 Canvas'}>
                         <IconButton
                             size='small'
                             color='primary'
-                            onClick={() => window.open(`/v2/agentcanvas/${flowId}`, '_blank', 'noopener,noreferrer')}
+                            onClick={() =>
+                                window.open(
+                                    flowType === 'MULTIAGENT' ? `/agentcanvas/${flowId}` : `/v2/agentcanvas/${flowId}`,
+                                    '_blank',
+                                    'noopener,noreferrer'
+                                )
+                            }
                         >
                             <IconExternalLink size={18} />
                         </IconButton>
@@ -387,6 +505,11 @@ const TestChatPane = ({
 
             {/* Danh sách tin nhắn test */}
             <Box
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                    e.preventDefault()
+                    if (!isLoading && !isRunningSuite) chooseOfficeFiles(e.dataTransfer.files)
+                }}
                 sx={{
                     flex: 1,
                     overflowY: 'auto',
@@ -401,7 +524,9 @@ const TestChatPane = ({
                         <Typography variant='body2' gutterBottom>
                             Đây là môi trường chạy thử nghiệm độc lập với trợ lý thật.
                         </Typography>
-                        <Typography variant='caption'>Gõ câu hỏi bên dưới để bắt đầu tương tác với Agent draft.</Typography>
+                        <Typography variant='caption'>
+                            Gõ câu hỏi hoặc đính kèm tệp Excel (.xlsx) / Word (.docx) bên dưới để tương tác với Agent draft.
+                        </Typography>
                     </Box>
                 )}
 
@@ -425,9 +550,31 @@ const TestChatPane = ({
                             }}
                         >
                             {msg.role === 'user' ? (
-                                <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                                    {msg.content}
-                                </Typography>
+                                <Box>
+                                    {Array.isArray(msg.attachedFiles) && msg.attachedFiles.length > 0 && (
+                                        <Stack direction='row' spacing={0.5} flexWrap='wrap' useFlexGap sx={{ mb: 0.75 }}>
+                                            {msg.attachedFiles.map((f) => (
+                                                <Chip
+                                                    key={f.fileId}
+                                                    size='small'
+                                                    icon={<IconFileText size={13} color='#fff' />}
+                                                    label={f.fileName}
+                                                    sx={{
+                                                        height: 22,
+                                                        fontSize: '0.7rem',
+                                                        color: '#fff',
+                                                        borderColor: 'rgba(255,255,255,0.55)',
+                                                        backgroundColor: 'rgba(255,255,255,0.16)'
+                                                    }}
+                                                    variant='outlined'
+                                                />
+                                            ))}
+                                        </Stack>
+                                    )}
+                                    <Typography variant='body2' sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                        {msg.content}
+                                    </Typography>
+                                </Box>
                             ) : (
                                 <MemoizedReactMarkdown>{msg.content}</MemoizedReactMarkdown>
                             )}
@@ -603,7 +750,7 @@ const TestChatPane = ({
 
             <Divider />
 
-            {/* Form gửi tin nhắn test */}
+            {/* Form gửi tin nhắn test (hỗ trợ đính kèm file Excel .xlsx / Word .docx) */}
             <Box
                 component='form'
                 onSubmit={(e) => {
@@ -613,23 +760,69 @@ const TestChatPane = ({
                 sx={{
                     p: 1.5,
                     display: 'flex',
-                    alignItems: 'center',
+                    flexDirection: 'column',
                     gap: 1,
                     backgroundColor: theme.palette.background.paper
                 }}
             >
-                <TextField
-                    fullWidth
-                    size='small'
-                    placeholder='Nhập câu hỏi để thử nghiệm với Agent...'
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={isLoading || isRunningSuite}
-                    variant='outlined'
-                />
-                <IconButton color='primary' type='submit' disabled={!input.trim() || isLoading || isRunningSuite}>
-                    <IconSend size={20} />
-                </IconButton>
+                {attachedFiles.length > 0 && (
+                    <Stack direction='row' spacing={0.75} flexWrap='wrap' useFlexGap>
+                        {attachedFiles.map((file, idx) => (
+                            <Chip
+                                key={`${file.name}-${idx}`}
+                                size='small'
+                                variant='outlined'
+                                color='primary'
+                                icon={<IconFileText size={14} />}
+                                label={`${file.name} · ${Math.max(1, Math.ceil(file.size / 1024))} KB`}
+                                disabled={isLoading || isRunningSuite}
+                                onDelete={() => setAttachedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                            />
+                        ))}
+                    </Stack>
+                )}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                        ref={fileInputRef}
+                        type='file'
+                        hidden
+                        multiple
+                        accept='.xlsx,.docx'
+                        aria-label='Đính kèm tệp Excel hoặc Word'
+                        onChange={(e) => {
+                            chooseOfficeFiles(e.target.files)
+                            e.target.value = ''
+                        }}
+                    />
+                    <Tooltip title='Đính kèm tệp Excel (.xlsx) hoặc Word (.docx) để Agent đọc và xử lý'>
+                        <span>
+                            <IconButton
+                                size='small'
+                                color={attachedFiles.length ? 'primary' : 'default'}
+                                disabled={isLoading || isRunningSuite}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <IconPaperclip size={19} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <TextField
+                        fullWidth
+                        size='small'
+                        placeholder='Nhập câu hỏi hoặc đính kèm tệp .xlsx / .docx để thử nghiệm...'
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        disabled={isLoading || isRunningSuite}
+                        variant='outlined'
+                    />
+                    <IconButton
+                        color='primary'
+                        type='submit'
+                        disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || isRunningSuite}
+                    >
+                        <IconSend size={20} />
+                    </IconButton>
+                </Box>
             </Box>
 
             {/* Dialog Báo Cáo Kết Quả Kiểm Thử (PH3-T03) */}
@@ -729,7 +922,7 @@ const TestChatPane = ({
                     </Alert>
                     <FormControlLabel
                         control={<Checkbox checked={isPublicAgent} onChange={(e) => setIsPublicAgent(e.target.checked)} color='primary' />}
-                        label='Cho phép truy cập công khai trong tổ chức (isPublic)'
+                        label='Mở Cổng Người Dùng Cuối công khai (/support-portal/:id) để khách hàng truy cập không cần tài khoản Admin'
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
@@ -747,13 +940,14 @@ const TestChatPane = ({
                     </Button>
                 </DialogActions>
             </Dialog>
-        </Paper>
+        </Box>
     )
 }
 
 TestChatPane.propTypes = {
     sessionId: PropTypes.string,
     flowId: PropTypes.string,
+    flowType: PropTypes.string,
     flowName: PropTypes.string,
     revisionNo: PropTypes.number,
     evaluationExamples: PropTypes.array,

@@ -237,7 +237,13 @@ export class App {
                     const isWhitelisted = whitelistURLs.some((url) => req.path.startsWith(url))
                     if (isWhitelisted) {
                         next()
-                    } else if (req.headers['x-request-from'] === 'internal') {
+                    } else if (
+                        req.headers['x-request-from'] === 'internal' ||
+                        (req.method === 'GET' &&
+                            req.path.startsWith('/api/v1/agent-builder/exports/') &&
+                            !req.headers.authorization &&
+                            Boolean(req.headers.cookie))
+                    ) {
                         verifyToken(req, res, next)
                     } else {
                         const isAPIKeyBlacklistedURLS = API_KEY_BLACKLIST_URLS.some((url) => req.path.startsWith(url))

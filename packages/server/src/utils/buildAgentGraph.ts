@@ -944,8 +944,47 @@ const compileSeqAgentsGraph = async (params: SeqAgentsGraphParams) => {
         }
     }
 
+    /*** Support chained Condition / ConditionAgent -> Condition / ConditionAgent nodes ***/
+    const relayNodesAdded = new Set<string>()
+    let addedChainedCondition = true
+    while (addedChainedCondition) {
+        addedChainedCondition = false
+        for (const conditionNodeId of Object.keys(conditionalEdges)) {
+            if (relayNodesAdded.has(conditionNodeId)) continue
+            const incomingEdges = reactFlowEdges.filter((edge) => edge.target === conditionNodeId)
+            const hasConditionParent = incomingEdges.some((edge) => {
+                const parent = reactFlowNodes.find((node) => node.id === edge.source)
+                return Boolean(parent?.data?.name?.includes('seqCondition'))
+            })
+            if (!hasConditionParent) continue
+            const relayName = `__cond_relay_${conditionNodeId}`
+            relayNodesAdded.add(conditionNodeId)
+            seqGraph.addNode(relayName, async () => ({}))
+            prepareConditionalEdges(conditionNodeId, { name: relayName } as ISeqAgentNode)
+            for (const edge of incomingEdges) {
+                const parent = reactFlowNodes.find((node) => node.id === edge.source)
+                if (!parent || parent.data.name.includes('seqCondition')) continue
+                const parentName = parent.data.name === 'seqStart' ? START : parent.data.instance?.name
+                if (parentName) {
+                    //@ts-ignore
+                    seqGraph.addEdge(parentName, relayName)
+                }
+            }
+            addedChainedCondition = true
+        }
+    }
+
     /*** Add conditional edges to graph for condition nodes ***/
     for (const conditionNodeId in conditionalEdges) {
+        if (relayNodesAdded.has(conditionNodeId)) {
+            const relayName = `__cond_relay_${conditionNodeId}`
+            seqGraph.addConditionalEdges(
+                relayName as any,
+                conditionalEdges[conditionNodeId].func,
+                conditionalEdges[conditionNodeId].nodes as any
+            )
+            continue
+        }
         const startConditionEdges = reactFlowEdges.filter((edge) => edge.target === conditionNodeId)
         if (!startConditionEdges.length) continue
 

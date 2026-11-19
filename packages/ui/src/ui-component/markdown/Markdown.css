@@ -1,23 +1,70 @@
+.react-markdown {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    overflow-wrap: break-word;
+}
+
+.react-markdown .markdown-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    border-radius: 8px;
+}
+
 .react-markdown table {
     border-spacing: 0 !important;
     border-collapse: collapse !important;
-    border-color: inherit !important;
-    display: block !important;
-    width: max-content !important;
-    max-width: 100% !important;
-    overflow: auto !important;
+    width: 100% !important;
+    min-width: max-content !important;
+    font-size: 0.82rem;
+    line-height: 1.45;
 }
 
-.react-markdown tbody,
-.react-markdown td,
-.react-markdown tfoot,
-.react-markdown th,
-.react-markdown thead,
-.react-markdown tr {
-    border-color: inherit !important;
-    border-style: solid !important;
-    border-width: 1px !important;
-    padding: 10px !important;
+.react-markdown thead th {
+    background-color: rgba(148, 163, 184, 0.14);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    padding: 8px 12px !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35) !important;
+    border-right: 1px solid rgba(148, 163, 184, 0.18) !important;
+}
+
+.react-markdown thead th:last-child,
+.react-markdown tbody td:last-child {
+    border-right: none !important;
+}
+
+.react-markdown tbody td {
+    padding: 7px 12px !important;
+    vertical-align: top;
+    border: none !important;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-right: 1px solid rgba(148, 163, 184, 0.14) !important;
+    max-width: 260px;
+    word-break: break-word;
+}
+
+.react-markdown tbody td:first-child,
+.react-markdown tbody td:nth-child(2) {
+    white-space: nowrap;
+}
+
+.react-markdown tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+.react-markdown tbody tr:nth-child(even) {
+    background-color: rgba(148, 163, 184, 0.06);
+}
+
+.react-markdown tbody tr:hover {
+    background-color: rgba(59, 130, 246, 0.06);
 }
 
 .react-markdown h1,
@@ -27,39 +74,86 @@
 .react-markdown h5,
 .react-markdown h6 {
     line-height: 1.4;
-    margin: 0.8em 0 0.4em 0;
+    margin: 0.9em 0 0.45em 0;
     font-weight: 600;
 }
 
 .react-markdown h1 {
-    font-size: 1.8em;
+    font-size: 1.35em;
 }
 
 .react-markdown h2 {
-    font-size: 1.5em;
+    font-size: 1.2em;
 }
 
 .react-markdown h3 {
-    font-size: 1.3em;
+    font-size: 1.08em;
 }
 
 .react-markdown h4 {
-    font-size: 1.1em;
+    font-size: 1em;
 }
 
 .react-markdown h5 {
-    font-size: 1em;
+    font-size: 0.95em;
     font-weight: 700;
 }
 
 .react-markdown h6 {
-    font-size: 0.9em;
+    font-size: 0.88em;
     font-weight: 700;
 }
 
 .react-markdown p {
-    line-height: 1.6;
-    margin: 0.5em 0;
+    line-height: 1.65;
+    margin: 0.45em 0;
+}
+
+.react-markdown p:first-child {
+    margin-top: 0;
+}
+
+.react-markdown p:last-child {
+    margin-bottom: 0;
+}
+
+.react-markdown ul,
+.react-markdown ol {
+    margin: 0.45em 0;
+    padding-left: 1.35rem;
+}
+
+.react-markdown li {
+    margin: 0.25em 0;
+}
+
+.react-markdown blockquote {
+    margin: 0.6em 0;
+    padding: 0.4em 0.9em;
+    border-left: 3px solid rgba(59, 130, 246, 0.55);
+    background-color: rgba(148, 163, 184, 0.08);
+    border-radius: 0 6px 6px 0;
+}
+
+.react-markdown a[href^='/api/v1/agent-builder/exports/'] {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 6px 4px 0 !important;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background-color: rgba(25, 118, 210, 0.1);
+    border: 1px solid rgba(25, 118, 210, 0.32);
+    color: #1565c0 !important;
+    font-weight: 600;
+    font-size: 0.84rem;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.react-markdown a[href^='/api/v1/agent-builder/exports/']:hover {
+    background-color: rgba(25, 118, 210, 0.18);
+    opacity: 1 !important;
 }
 
 .react-markdown img {

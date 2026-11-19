@@ -20,10 +20,12 @@ import sqlExecutorService from '../../services/agent-builder/sql/sqlExecutorServ
 import customToolSandboxService from '../../services/agent-builder/custom-tools/customToolSandboxService'
 import builderWebhookService from '../../services/agent-builder/webhooks/builderWebhookService'
 import builderMcpService from '../../services/agent-builder/mcp/builderMcpService'
+import workspaceMcpRegistryService from '../../services/agent-builder/mcp/workspaceMcpRegistryService'
+import nativeToolCatalogService from '../../services/agent-builder/tools/nativeToolCatalogService'
 import { AgentSpec } from '../../services/agent-builder/types'
 import modelSettingsService from '../../services/agent-builder/modelSettingsService'
 import { predictDraft } from '../../services/agent-builder/runtimePredictionService'
-import documentUploadService from '../../services/agent-builder/knowledge/documentUploadService'
+import documentUploadService, { DOCUMENT_LIMITS } from '../../services/agent-builder/knowledge/documentUploadService'
 import { DocumentStoreFileChunk } from '../../database/entities/DocumentStoreFileChunk'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 
@@ -45,7 +47,8 @@ const createSession = async (req: Request, res: Response, next: NextFunction) =>
         const workspaceId = getWorkspaceId(req)
         const organizationId = getOrganizationId(req)
         const userId = getUserId(req)
-        const { title, initialGoal } = req.body || {}
+        const { title, initialGoal, canvasVersion } = req.body || {}
+        const safeCanvasVersion = canvasVersion === 'v1' || canvasVersion === 'v2' ? canvasVersion : undefined
 
         try {
             rateLimiter.enforceLimit(workspaceId, 'session_create')
@@ -59,7 +62,8 @@ const createSession = async (req: Request, res: Response, next: NextFunction) =>
             organizationId,
             userId,
             title,
-            initialGoal
+            initialGoal,
+            canvasVersion: safeCanvasVersion
         })
 
         metricsService.recordSessionCreated()
@@ -159,7 +163,8 @@ const buildSession = async (req: Request, res: Response, next: NextFunction) => 
             throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, 'Session ID is required')
         }
         const workspaceId = getWorkspaceId(req)
-        const { specRevisionId, customBuildKey } = req.body || {}
+        const { specRevisionId, customBuildKey, canvasVersion } = req.body || {}
+        const safeCanvasVersion = canvasVersion === 'v1' || canvasVersion === 'v2' ? canvasVersion : undefined
 
         try {
             rateLimiter.enforceLimit(workspaceId, 'build')
@@ -172,7 +177,8 @@ const buildSession = async (req: Request, res: Response, next: NextFunction) => 
             sessionId: req.params.id,
             workspaceId,
             specRevisionId,
-            customBuildKey
+            customBuildKey,
+            canvasVersion: safeCanvasVersion
         })
 
         const durationMs = Date.now() - startTime
@@ -919,7 +925,8 @@ const uploadDocuments = async (req: Request, res: Response, next: NextFunction) 
         )
         const previous = snapshot.currentSpecRevision ? JSON.parse(snapshot.currentSpecRevision.spec).dataSources || [] : []
         const merged = [...new Map([...previous, ...sources].map((source: any) => [source.id, source])).values()]
-        if (merged.length > 10) throw new InternalFlowiseError(400, 'Mỗi Agent tối đa 10 nguồn tài liệu.')
+        if (merged.length > DOCUMENT_LIMITS.maxPerSession)
+            throw new InternalFlowiseError(400, `Mỗi Agent tối đa ${DOCUMENT_LIMITS.maxPerSession} nguồn tài liệu.`)
         const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
         return res.json(
             await sessionService.addMessage(req.params.id, workspaceId, {
@@ -953,9 +960,137 @@ const readDocumentChunk = async (req: Request, res: Response, next: NextFunction
     }
 }
 
+const listWorkspaceMcpServers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.status(StatusCodes.OK).json(await workspaceMcpRegistryService.listWorkspaceMcpServers(getWorkspaceId(req)))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const registerWorkspaceMcpServer = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const created = await workspaceMcpRegistryService.registerWorkspaceMcpServer(
+            getWorkspaceId(req),
+            getOrganizationId(req),
+            req.body || {}
+        )
+        return res.status(StatusCodes.CREATED).json(created)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const refreshWorkspaceMcpServer = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const refreshed = await workspaceMcpRegistryService.refreshWorkspaceMcpServer(req.params.id, getWorkspaceId(req))
+        return res.status(StatusCodes.OK).json(refreshed)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const deleteWorkspaceMcpServer = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const deleted = await workspaceMcpRegistryService.deleteWorkspaceMcpServer(req.params.id, getWorkspaceId(req))
+        return res.status(StatusCodes.OK).json(deleted)
+    } catch (error) {
+        next(error)
+    }
+}
+
+const listWorkspaceNativeTools = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        return res.status(StatusCodes.OK).json(await nativeToolCatalogService.listWorkspaceNativeTools(getWorkspaceId(req)))
+    } catch (error) {
+        next(error)
+    }
+}
+
+const uploadOfficeFiles = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const files = Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : []
+        if (files.length === 0) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                code: 'NO_FILES_UPLOADED',
+                message: 'Vui lòng chọn ít nhất 1 tệp Excel (.xlsx) hoặc Word (.docx).'
+            })
+        }
+        const uploaded = files.map((file) =>
+            nativeToolCatalogService.saveUploadedOfficeFile(workspaceId, {
+                originalname: file.originalname,
+                buffer: file.buffer,
+                mimetype: file.mimetype
+            })
+        )
+        return res.status(StatusCodes.CREATED).json({ files: uploaded })
+    } catch (error) {
+        next(error)
+    }
+}
+
+const listOfficeFiles = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const files = nativeToolCatalogService.listWorkspaceOfficeFiles(getWorkspaceId(req))
+        return res.status(StatusCodes.OK).json({ files })
+    } catch (error) {
+        next(error)
+    }
+}
+
+const listHelpdeskTickets = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const tickets = nativeToolCatalogService.listWorkspaceHelpdeskTickets(getWorkspaceId(req))
+        return res.status(StatusCodes.OK).json({ tickets })
+    } catch (error) {
+        next(error)
+    }
+}
+
+const updateHelpdeskTicket = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const workspaceId = getWorkspaceId(req)
+        const { ticketId } = req.params
+        const { status, assignedGroup, note } = req.body || {}
+        const author = req.user?.name || req.user?.email || 'Quản trị viên CSKH'
+        const ticket = nativeToolCatalogService.updateWorkspaceHelpdeskTicket(workspaceId, ticketId, {
+            status,
+            assignedGroup,
+            note,
+            author
+        })
+        return res.status(StatusCodes.OK).json({ ticket })
+    } catch (error) {
+        next(error)
+    }
+}
+
+const downloadExportedFile = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const resolved = nativeToolCatalogService.resolveExportedFileForDownload(getWorkspaceId(req), req.params.fileId)
+        res.setHeader('Content-Type', resolved.mimeType)
+        res.setHeader('X-Content-Type-Options', 'nosniff')
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(resolved.fileName)}`)
+        return res.sendFile(resolved.filePath)
+    } catch (error) {
+        next(error)
+    }
+}
+
 export default {
     uploadDocuments,
     readDocumentChunk,
+    listWorkspaceNativeTools,
+    uploadOfficeFiles,
+    listOfficeFiles,
+    listHelpdeskTickets,
+    updateHelpdeskTicket,
+    downloadExportedFile,
+    listWorkspaceMcpServers,
+    registerWorkspaceMcpServer,
+    refreshWorkspaceMcpServer,
+    deleteWorkspaceMcpServer,
     listModels,
     getModelProfile,
     saveModelProfile,

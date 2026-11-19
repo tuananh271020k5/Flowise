@@ -6,6 +6,7 @@ import MinimalLayout from '@/layout/MinimalLayout'
 
 // canvas routing
 const ChatbotFull = Loadable(lazy(() => import('@/views/chatbot')))
+const SupportPortal = Loadable(lazy(() => import('@/views/chatbot/SupportPortal')))
 
 // ==============================|| CANVAS ROUTING ||============================== //
 
@@ -16,6 +17,10 @@ const ChatbotRoutes = {
         {
             path: '/chatbot/:id',
             element: <ChatbotFull />
+        },
+        {
+            path: '/support-portal/:id',
+            element: <SupportPortal />
         }
     ]
 }

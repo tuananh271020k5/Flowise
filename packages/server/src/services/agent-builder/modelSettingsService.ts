@@ -3,6 +3,7 @@ import { Variable } from '../../database/entities/Variable'
 import { Credential } from '../../database/entities/Credential'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { AdapterError } from './errors/builderErrors'
+import { requiresNoneReasoningForFunctionTools } from './agentBehaviorPolicy'
 
 export interface BuilderModelProfile {
     nodeName: 'chatOpenAI'
@@ -93,6 +94,7 @@ export class ModelSettingsService {
         if (!node?.filePath) throw new Error('Flowise chưa nạp node ChatOpenAI')
         const module = await import(node.filePath)
         const { databaseEntities } = await import('../../utils')
+        const useLowCollectorReasoning = requiresNoneReasoningForFunctionTools(profile.modelName)
         return new module.nodeClass().init(
             {
                 id: 'builder_collector',
@@ -101,7 +103,8 @@ export class ModelSettingsService {
                     modelName: profile.modelName,
                     temperature: 0,
                     streaming: false,
-                    timeout: 30000,
+                    timeout: 120000,
+                    ...(useLowCollectorReasoning ? { reasoningEffort: 'low' } : {}),
                     basepath: profile.baseUrl
                 }
             },

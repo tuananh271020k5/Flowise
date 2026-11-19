@@ -8,6 +8,7 @@ import { ChatFlow } from '../../../database/entities/ChatFlow'
 import { DocumentStore } from '../../../database/entities/DocumentStore'
 import { getRunningExpressApp } from '../../../utils/getRunningExpressApp'
 import { AgentSpec } from '../types'
+import { computeReadiness } from '../readiness'
 import { createAgentPlan, validateAgentPlan } from '../generator/agentPlan'
 import compiler from '../generator/compiler'
 import { validateFlowGraph } from '../generator/flowValidator'
@@ -21,6 +22,7 @@ export interface BuildExecutionResult {
     success: boolean
     isExisting: boolean
     flowId: string
+    flowType?: 'AGENTFLOW' | 'MULTIAGENT'
     draftRevisionId: string
     buildKey: string
     flowName: string
@@ -121,8 +123,9 @@ export class BuildPipelineService {
         workspaceId: string
         specRevisionId?: string
         customBuildKey?: string
+        canvasVersion?: 'v1' | 'v2'
     }): Promise<BuildExecutionResult> {
-        const { sessionId, workspaceId, specRevisionId, customBuildKey } = params
+        const { sessionId, workspaceId, specRevisionId, customBuildKey, canvasVersion } = params
 
         if (!sessionId) {
             throw new AdapterError('SESSION_ID_REQUIRED', 'Session ID is required', StatusCodes.BAD_REQUEST)
@@ -159,17 +162,29 @@ export class BuildPipelineService {
             throw new BuildPipelineError('NO_SPEC_REVISION', 'Không tìm thấy bản đặc tả nào trong phiên này', StatusCodes.NOT_FOUND)
         }
 
-        // 3. Kiểm tra tính sẵn sàng (Readiness check)
+        // 3. Kiểm tra tính sẵn sàng (Readiness check — tự đánh giá lại nếu revision cũ từng bị chặn bởi rule schema cũ đã sửa)
         if (!targetRevision.buildReady) {
-            throw new BuildPipelineError(
-                'SPEC_NOT_READY_FOR_BUILD',
-                'Bản đặc tả chưa sẵn sàng để biên dịch (buildReady: false). Vui lòng cung cấp đầy đủ thông tin bắt buộc.',
-                StatusCodes.BAD_REQUEST
-            )
+            let liveReady = false
+            try {
+                liveReady = computeReadiness(JSON.parse(targetRevision.spec)).buildReady
+            } catch {
+                liveReady = false
+            }
+            if (liveReady) {
+                targetRevision.buildReady = true
+                await this.revisionRepo.save(targetRevision)
+            } else {
+                throw new BuildPipelineError(
+                    'SPEC_NOT_READY_FOR_BUILD',
+                    'Bản đặc tả chưa sẵn sàng để biên dịch (buildReady: false). Vui lòng cung cấp đầy đủ thông tin bắt buộc.',
+                    StatusCodes.BAD_REQUEST
+                )
+            }
         }
 
         // 4. Kiểm tra Idempotency thông qua buildKey & BuildJob (PH2-T09)
-        const buildKey = customBuildKey || `${sessionId}:${targetRevision.id}`
+        const buildKey =
+            customBuildKey || (canvasVersion ? `${sessionId}:${targetRevision.id}:${canvasVersion}` : `${sessionId}:${targetRevision.id}`)
         const { job, isNew } = await this.jobManager.createOrGetJob({
             sessionId,
             workspaceId,
@@ -187,6 +202,7 @@ export class BuildPipelineService {
                     success: true,
                     isExisting: true,
                     flowId: existingDraftRevision.flowId,
+                    flowType: existingDraft.chatflow.type === 'MULTIAGENT' ? 'MULTIAGENT' : 'AGENTFLOW',
                     draftRevisionId: existingDraftRevision.id,
                     buildKey,
                     flowName: existingDraft.chatflow.name,
@@ -225,6 +241,9 @@ export class BuildPipelineService {
             } catch (e: any) {
                 throw new BuildPipelineError('INVALID_SPEC_JSON', `Dữ liệu spec không phải JSON hợp lệ: ${e.message}`)
             }
+            if (canvasVersion) {
+                spec.canvasVersion = canvasVersion
+            }
 
             // 5.5. Nối kho tài liệu trong spec với DocumentStore thật của workspace theo tên (B-029/PH4).
             // Collector chỉ trích được tên kho từ hội thoại; ID thật mới giúp Agent truy xuất được tài liệu.
@@ -237,10 +256,20 @@ export class BuildPipelineService {
                 throw new CompilerError('COMPILER_INVALID_PLAN', `Kế hoạch biên dịch không hợp lệ: ${planValidation.errors.join('; ')}`)
             }
 
-            // 7. Biên dịch Graph tất định
-            const compiledGraph = compiler.compile(plan)
+            // 7. Biên dịch Graph tất định (hỗ trợ cả V1 MULTIAGENT đầy đủ node rời và V2 AGENTFLOW)
+            let liveComponentNodes: Record<string, any> | undefined
+            let liveModelProfile: { modelName: string; baseUrl?: string; credentialId?: string } | undefined
             if (!this.customDataSource) {
-                const profile = await modelSettingsService.getProfile(workspaceId)
+                liveModelProfile = await modelSettingsService.getProfile(workspaceId)
+                const app = getRunningExpressApp()
+                liveComponentNodes = app.nodesPool?.componentNodes
+            }
+            const compiledGraph = compiler.compile(plan, {
+                componentNodes: liveComponentNodes,
+                modelProfile: liveModelProfile
+            })
+            if (!this.customDataSource && compiledGraph.flowConfig.chatflowType !== 'MULTIAGENT') {
+                const profile = liveModelProfile!
                 const app = getRunningExpressApp()
                 for (const node of compiledGraph.nodes) {
                     const metadata = app.nodesPool.componentNodes[node.data.name]
@@ -249,21 +278,23 @@ export class BuildPipelineService {
                     node.data.inputParams = metadata.inputs || []
                     if (node.data.name === 'agentAgentflow')
                         node.data.inputs.agentModelConfig = {
+                            ...((node.data.inputs.agentModelConfig as Record<string, unknown>) || {}),
                             modelName: profile.modelName,
                             basepath: profile.baseUrl,
                             FLOWISE_CREDENTIAL_ID: profile.credentialId,
                             temperature: 0.3,
                             streaming: false,
-                            timeout: 30000
+                            timeout: 120000
                         }
                     if (node.data.name === 'llmAgentflow')
                         node.data.inputs.llmModelConfig = {
+                            ...((node.data.inputs.llmModelConfig as Record<string, unknown>) || {}),
                             modelName: profile.modelName,
                             basepath: profile.baseUrl,
                             FLOWISE_CREDENTIAL_ID: profile.credentialId,
                             temperature: 0.3,
                             streaming: false,
-                            timeout: 30000
+                            timeout: 120000
                         }
                 }
             }
@@ -341,6 +372,7 @@ export class BuildPipelineService {
                 type: 'build_completed',
                 data: {
                     flowId: targetFlow.id,
+                    flowType: targetFlow.type === 'MULTIAGENT' ? 'MULTIAGENT' : 'AGENTFLOW',
                     buildKey,
                     flowName: targetFlow.name,
                     revisionNo: targetRevision.revisionNo,
@@ -353,6 +385,7 @@ export class BuildPipelineService {
                 success: true,
                 isExisting: false,
                 flowId: targetFlow.id,
+                flowType: targetFlow.type === 'MULTIAGENT' ? 'MULTIAGENT' : 'AGENTFLOW',
                 draftRevisionId: savedDraftRevision.id,
                 buildKey,
                 flowName: targetFlow.name,
@@ -382,7 +415,7 @@ export class BuildPipelineService {
     /**
      * Lấy lịch sử draft mappings theo sessionId.
      */
-    async getDraftHistory(sessionId: string, workspaceId: string): Promise<AgentDraftRevision[]> {
+    async getDraftHistory(sessionId: string, workspaceId: string): Promise<Array<AgentDraftRevision & { flowType?: string }>> {
         const session = await this.sessionRepo.findOneBy({ id: sessionId })
         if (!session) {
             throw new AdapterError('SESSION_NOT_FOUND', `Phiên thiết kế ${sessionId} không tồn tại`, StatusCodes.NOT_FOUND)
@@ -391,10 +424,22 @@ export class BuildPipelineService {
             throw new AdapterError('WORKSPACE_MISMATCH', 'Từ chối quyền truy cập: Khác workspace', StatusCodes.FORBIDDEN)
         }
 
-        return this.draftRevisionRepo.find({
+        const drafts = await this.draftRevisionRepo.find({
             where: { sessionId },
             order: { createdDate: 'ASC' }
         })
+        if (drafts.length === 0) return []
+        try {
+            const flowRepo = this.ds.getRepository(ChatFlow)
+            return await Promise.all(
+                drafts.map(async (draft) => {
+                    const cf = await flowRepo.findOneBy({ id: draft.flowId })
+                    return Object.assign(draft, { flowType: cf?.type || 'AGENTFLOW' })
+                })
+            )
+        } catch {
+            return drafts
+        }
     }
 }
 

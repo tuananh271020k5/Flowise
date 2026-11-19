@@ -40,6 +40,13 @@ export interface ApiConnectorRef {
     allowedOperations?: string[]
 }
 
+export interface McpServerRef {
+    id: string
+    name: string
+    actions: string[]
+    description?: string
+}
+
 export interface SqlAgentConfig {
     databaseType: 'sqlite' | 'postgres' | 'mysql'
     databaseName?: string
@@ -60,10 +67,12 @@ export interface AgentSpec {
     modelProfileRef: string
     dataSources: DataSourceRef[]
     tools: ToolRef[]
+    mcpServers?: McpServerRef[]
     apiConnectors?: ApiConnectorRef[]
     sqlConfig?: SqlAgentConfig
     policy: AgentPolicy
     evaluationExamples: EvaluationExample[]
+    canvasVersion?: 'v1' | 'v2'
     workflow?: import('./workflow').WorkflowSpec
 }
 
@@ -72,6 +81,7 @@ export type PartialAgentSpec = Partial<Omit<AgentSpec, 'policy' | 'evaluationExa
     evaluationExamples?: EvaluationExample[]
     dataSources?: DataSourceRef[]
     tools?: ToolRef[]
+    mcpServers?: McpServerRef[]
     apiConnectors?: ApiConnectorRef[]
     sqlConfig?: Partial<SqlAgentConfig>
     schemaVersion?: string

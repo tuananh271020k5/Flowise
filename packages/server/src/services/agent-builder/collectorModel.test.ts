@@ -1,6 +1,11 @@
 jest.mock('./modelSettingsService', () => ({ __esModule: true, default: { getProfile: jest.fn(), getModel: jest.fn() } }))
 import settings from './modelSettingsService'
-import { CollectorService } from './collectorService'
+import {
+    bindDataSourcesToExistingWorkflow,
+    CollectorService,
+    isPureDocumentAttachmentMessage,
+    reconcileWorkflowDataSourceIds
+} from './collectorService'
 import { computeReadiness } from './readiness'
 
 describe('Model collector patch boundary', () => {
@@ -127,5 +132,107 @@ describe('Model collector patch boundary', () => {
     it('propagates model failure instead of pretending a patch was extracted', async () => {
         invoke.mockRejectedValue(new Error('Provider offline'))
         await expect(collector.extractWithModel('hello', {}, 'ws')).rejects.toThrow('Provider offline')
+    })
+    it('deterministically binds attached data sources into an existing retriever workflow and recovers from partial model patches', async () => {
+        const existingWorkflow = {
+            summary: 'Hỗ trợ CSKH 3 tầng',
+            steps: [
+                {
+                    id: 'retriever_l1',
+                    type: 'retriever' as const,
+                    label: 'Tìm kiếm Sổ tay CSKH',
+                    instruction: 'Tra cứu Sổ tay CSKH.',
+                    inputFrom: ['start'],
+                    sourceIds: []
+                },
+                {
+                    id: 'answer_l1',
+                    type: 'llm' as const,
+                    label: 'Trả lời L1',
+                    instruction: 'Trả lời theo tài liệu.',
+                    inputFrom: ['start', 'retriever_l1']
+                }
+            ],
+            edges: [
+                { source: 'start', target: 'retriever_l1' },
+                { source: 'retriever_l1', target: 'answer_l1' }
+            ],
+            questions: [],
+            blockers: ['Thiếu tài liệu Sổ tay CSKH cho bước tra cứu L1 (retriever_l1). Vui lòng đính kèm tài liệu.']
+        }
+        const attached = [{ id: 'store-cskh-1', type: 'documentStore', name: 'So_Tay_CSKH.docx' }]
+        expect(
+            isPureDocumentAttachmentMessage('Dùng các tài liệu đính kèm làm nguồn cho Agent.\n\nTài liệu đính kèm: So_Tay_CSKH.docx')
+        ).toBe(true)
+        const bound = bindDataSourcesToExistingWorkflow(existingWorkflow, attached)
+        expect(bound.steps[0].sourceIds).toEqual(['store-cskh-1'])
+        expect(bound.blockers).toEqual([])
+
+        // Simulate a provider (e.g. Gemini) returning a partial workflow fragment on a doc-attachment turn
+        invoke.mockResolvedValueOnce({
+            content: JSON.stringify({ workflow: { steps: [{ id: 'retriever_l1', sourceIds: ['store-cskh-1'] }] } })
+        })
+        invoke.mockResolvedValueOnce({ content: JSON.stringify({ steps: [{ id: 'retriever_l1' }] }) })
+        const recovered = await collector.extractWithModel(
+            'Dùng các tài liệu đính kèm làm nguồn cho Agent.\n\nTài liệu đính kèm: So_Tay_CSKH.docx',
+            { dataSources: attached, workflow: existingWorkflow },
+            'ws'
+        )
+        expect(recovered.patch.workflow?.steps).toHaveLength(2)
+        expect(recovered.patch.workflow?.steps[0].sourceIds).toEqual(['store-cskh-1'])
+        expect(recovered.patch.workflow?.blockers).toEqual([])
+    })
+    it('auto-corrects LLM 1-character UUID typos and filename references in retriever sourceIds so readiness passes', async () => {
+        const realId = '30d19c38-e383-48d8-a37e-8b73385bbb8c'
+        const typoId = '30d19c38-e383-48d8-a37e-8b73383bbb8c'
+        const sources = [{ id: realId, type: 'documentStore', name: 'So_Tay_CSKH_Dien_Thoai_SmartMobile_2026.docx' }]
+        const wf = {
+            summary: 'Hỗ trợ CSKH theo sổ tay',
+            steps: [
+                {
+                    id: 'retriever_l1',
+                    type: 'retriever' as const,
+                    label: 'Tra cứu Sổ tay',
+                    instruction: 'Tra cứu sổ tay.',
+                    inputFrom: ['start'],
+                    sourceIds: [typoId, 'So_Tay_CSKH_Dien_Thoai_SmartMobile_2026.docx', 'unknown-fake-id']
+                },
+                {
+                    id: 'answer_l1',
+                    type: 'llm' as const,
+                    label: 'Trả lời',
+                    instruction: 'Trả lời từ sổ tay.',
+                    inputFrom: ['start', 'retriever_l1']
+                }
+            ],
+            edges: [
+                { source: 'start', target: 'retriever_l1' },
+                { source: 'retriever_l1', target: 'answer_l1' }
+            ],
+            questions: [],
+            blockers: []
+        }
+        const reconciled = reconcileWorkflowDataSourceIds(wf, sources)
+        expect(reconciled.steps[0].sourceIds).toEqual([realId])
+
+        invoke.mockResolvedValueOnce({ content: JSON.stringify({ workflow: wf, dataSources: [typoId] }) })
+        const extracted = await collector.extractWithModel(
+            'Tạo trợ lý CSKH theo tài liệu đính kèm',
+            { name: 'SmartMobile CSKH', goal: 'Giải đáp CSKH', instructions: 'Trả lời theo tài liệu', dataSources: sources },
+            'ws'
+        )
+        expect(extracted.patch.workflow?.steps[0].sourceIds).toEqual([realId])
+        expect(extracted.patch.dataSources?.map((s) => s.id)).toEqual([realId])
+        const readiness = computeReadiness({
+            schemaVersion: '1.0',
+            kind: 'knowledge',
+            name: 'SmartMobile CSKH',
+            goal: 'Giải đáp CSKH theo tài liệu',
+            instructions: 'Trả lời theo tài liệu đính kèm.',
+            dataSources: sources,
+            workflow: extracted.patch.workflow
+        })
+        expect(readiness.buildReady).toBe(true)
+        expect(readiness.errors || []).toEqual([])
     })
 })

@@ -1,6 +1,6 @@
 jest.mock('../modelSettingsService', () => ({ __esModule: true, default: { getEmbeddingModel: jest.fn() } }))
 jest.mock('../../../utils/getRunningExpressApp', () => ({ getRunningExpressApp: jest.fn() }))
-import { DocumentUploadService, splitDocument } from './documentUploadService'
+import { DOCUMENT_LIMITS, DocumentUploadService, splitDocument } from './documentUploadService'
 import { BuilderSession } from '../../../database/entities/BuilderSession'
 import { DocumentStore } from '../../../database/entities/DocumentStore'
 import { DocumentStoreFileChunk } from '../../../database/entities/DocumentStoreFileChunk'
@@ -94,7 +94,9 @@ describe('Chat document ingestion and retrieval boundary', () => {
     })
     it('bounds file type, size, encoding and chunks before persisting', async () => {
         await expect(service.ingest('session', 'ws', [file('file.exe')], 'lexical', '')).rejects.toMatchObject({ code: 'INVALID_FILE' })
-        await expect(service.ingest('session', 'ws', [file('huge.md', 'x'.repeat(200001))], 'lexical', '')).rejects.toMatchObject({
+        await expect(
+            service.ingest('session', 'ws', [file('huge.md', 'x'.repeat(DOCUMENT_LIMITS.characters + 1))], 'lexical', '')
+        ).rejects.toMatchObject({
             code: 'DOCUMENT_TOO_LARGE'
         })
         await expect(

@@ -5,8 +5,39 @@ import { AgentSpecRevision } from '../../database/entities/AgentSpecRevision'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { utilBuildChatflow } from '../../utils/buildChatflow'
 import modelSettingsService from './modelSettingsService'
-import { AdapterError } from './errors/builderErrors'
+import { AdapterError, sanitizeErrorMessage } from './errors/builderErrors'
 import { prepareAgentPreview } from './agentBehaviorPolicy'
+
+function appendMissingExportLinks(result: any): any {
+    if (result && typeof result.text === 'string') {
+        const traceSources = [result.agentFlowExecutedData, result.usedTools, result.agentReasoning].filter(Boolean)
+        if (traceSources.length === 0) return result
+        const rawTrace = JSON.stringify(traceSources)
+        const exportMatches = [
+            ...rawTrace.matchAll(/\[Tải xuống [^\]]+\]\((\/api\/v1\/agent-builder\/exports\/[0-9a-f-]{36}\/[^)"\s]+)\)/gi)
+        ]
+        const missingLinks: string[] = []
+        const seenUrls = new Set<string>()
+        for (const match of exportMatches) {
+            const fullMarkdownLink = match[0]
+            const url = match[1]
+            if (!seenUrls.has(url) && !result.text.includes(url)) {
+                seenUrls.add(url)
+                missingLinks.push(fullMarkdownLink)
+            }
+        }
+        if (missingLinks.length > 0) {
+            result.text = `${result.text.trim()}\n\n**Tệp đã tạo:** ${missingLinks.join(' · ')}`
+        }
+    }
+    return result
+}
+
+function extractErrorDetail(error: unknown): string {
+    if (!error) return ''
+    const raw = typeof (error as any)?.message === 'string' ? (error as any).message : String(error)
+    return sanitizeErrorMessage(raw).trim()
+}
 
 export async function predictDraft(flowId: string, workspaceId: string, input: { question: string; chatId?: string; history?: unknown[] }) {
     const app = getRunningExpressApp()
@@ -53,23 +84,32 @@ export async function predictDraft(flowId: string, workspaceId: string, input: {
             // Fallback message in prepareAgentPreview will still replace unresolved placeholders.
         }
     }
-    const previewFlowData = prepareAgentPreview(
-        flow.flowData,
-        flow.name,
-        Boolean(profile.webSearchEnabled),
-        new Date(),
-        profile,
-        workflowSteps
-    )
+    const isV1MultiAgent = flow.type === 'MULTIAGENT'
+    const effectiveWebSearch = isV1MultiAgent ? false : Boolean(profile.webSearchEnabled)
+    const previewFlowData = prepareAgentPreview(flow.flowData, flow.name, effectiveWebSearch, new Date(), profile, workflowSteps)
+    const hasExplicitFunctionTools = /"agentSelectedTool"\s*:/.test(flow.flowData)
     try {
-        return await utilBuildChatflow(request as any, true, undefined, previewFlowData)
+        const result: any = await utilBuildChatflow(request as any, true, undefined, previewFlowData)
+        return appendMissingExportLinks(result)
     } catch (error) {
-        if (profile.webSearchEnabled)
+        if (effectiveWebSearch) {
+            const detail = extractErrorDetail(error)
+            if (
+                hasExplicitFunctionTools &&
+                /(?:web_search|\/responses|responses api|built-?in tool|unsupported|not found|404|405|501|reasoning_effort)/i.test(detail)
+            ) {
+                const toolOnlyFlowData = prepareAgentPreview(flow.flowData, flow.name, false, new Date(), profile, workflowSteps)
+                const retryResult: any = await utilBuildChatflow(request as any, true, undefined, toolOnlyFlowData)
+                return appendMissingExportLinks(retryResult)
+            }
             throw new AdapterError(
                 'WEB_SEARCH_EXECUTION_FAILED',
-                'Chat thử không thực hiện được khi bật tra cứu web. Kiểm tra model, key và endpoint có hỗ trợ OpenAI Responses + web_search; không có câu trả lời thay thế khi provider lỗi.',
+                detail
+                    ? `Chat thử không thực hiện được khi bật tra cứu web. Kiểm tra model, key và endpoint có hỗ trợ OpenAI Responses + web_search; không có câu trả lời thay thế khi provider lỗi. (Chi tiết: ${detail})`
+                    : 'Chat thử không thực hiện được khi bật tra cứu web. Kiểm tra model, key và endpoint có hỗ trợ OpenAI Responses + web_search; không có câu trả lời thay thế khi provider lỗi.',
                 502
             )
+        }
         throw error
     }
 }

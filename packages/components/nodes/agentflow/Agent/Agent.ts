@@ -919,7 +919,14 @@ class Agent_Agentflow implements INode {
 
             const isStructuredOutput = _agentStructuredOutput && Array.isArray(_agentStructuredOutput) && _agentStructuredOutput.length > 0
 
-            const agentToolsBuiltInOpenAI = convertMultiOptionsToStringArray(nodeData.inputs?.agentToolsBuiltInOpenAI)
+            const toBuiltInToolList = (rawValue: unknown): string[] =>
+                Array.isArray(rawValue)
+                    ? rawValue.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+                    : typeof rawValue === 'string'
+                    ? convertMultiOptionsToStringArray(rawValue)
+                    : []
+
+            const agentToolsBuiltInOpenAI = toBuiltInToolList(nodeData.inputs?.agentToolsBuiltInOpenAI)
             if (agentToolsBuiltInOpenAI && agentToolsBuiltInOpenAI.length > 0) {
                 for (const tool of agentToolsBuiltInOpenAI) {
                     const builtInTool: ICommonObject = {
@@ -939,7 +946,7 @@ class Agent_Agentflow implements INode {
                 }
             }
 
-            const agentToolsBuiltInGemini = convertMultiOptionsToStringArray(nodeData.inputs?.agentToolsBuiltInGemini)
+            const agentToolsBuiltInGemini = toBuiltInToolList(nodeData.inputs?.agentToolsBuiltInGemini)
             if (agentToolsBuiltInGemini && agentToolsBuiltInGemini.length > 0) {
                 for (const tool of agentToolsBuiltInGemini) {
                     const builtInTool: ICommonObject = {
@@ -956,7 +963,7 @@ class Agent_Agentflow implements INode {
                 }
             }
 
-            const agentToolsBuiltInAnthropic = convertMultiOptionsToStringArray(nodeData.inputs?.agentToolsBuiltInAnthropic)
+            const agentToolsBuiltInAnthropic = toBuiltInToolList(nodeData.inputs?.agentToolsBuiltInAnthropic)
             if (agentToolsBuiltInAnthropic && agentToolsBuiltInAnthropic.length > 0) {
                 for (const tool of agentToolsBuiltInAnthropic) {
                     // split _ to get the tool name by removing the last part (date)

@@ -143,4 +143,50 @@ describe('Agent role, freshness and source policy', () => {
         expect(withoutSpec.nodes[0].data.inputs.directReplyMessage).toContain('nằm ngoài phạm vi')
         expect(withoutSpec.nodes[0].data.inputs.directReplyMessage).not.toContain('{{conditionAgentflow_')
     })
+    it('sets reasoningEffort="none" on gpt-5.1+/gpt-6 models when function tools are bound so /v1/chat/completions succeeds', () => {
+        const officeDraft = JSON.stringify({
+            nodes: [
+                {
+                    data: {
+                        name: 'agentAgentflow',
+                        inputs: {
+                            agentModel: 'chatOpenAI',
+                            agentMessages: [{ role: 'system', content: 'Thư ký Dự án' }],
+                            agentTools: [
+                                { agentSelectedTool: 'excelOfficeTool', agentSelectedToolConfig: {} },
+                                { agentSelectedTool: 'wordOfficeTool', agentSelectedToolConfig: {} }
+                            ]
+                        }
+                    }
+                }
+            ],
+            edges: []
+        })
+        const gpt56 = JSON.parse(
+            prepareAgentPreview(officeDraft, 'Thư ký Dự án', false, new Date(), {
+                modelName: 'gpt-5.6-luna',
+                baseUrl: 'https://gateway.example/v1',
+                credentialId: 'cred-1'
+            })
+        )
+        expect(gpt56.nodes[0].data.inputs.agentModelConfig.reasoningEffort).toBe('none')
+
+        const gpt6 = JSON.parse(
+            prepareAgentPreview(officeDraft, 'Thư ký Dự án', false, new Date(), {
+                modelName: 'gpt-6-luna',
+                baseUrl: 'https://gateway.example/v1',
+                credentialId: 'cred-1'
+            })
+        )
+        expect(gpt6.nodes[0].data.inputs.agentModelConfig.reasoningEffort).toBe('none')
+
+        const gpt4o = JSON.parse(
+            prepareAgentPreview(officeDraft, 'Thư ký Dự án', false, new Date(), {
+                modelName: 'gpt-4o-mini',
+                baseUrl: 'https://gateway.example/v1',
+                credentialId: 'cred-1'
+            })
+        )
+        expect(gpt4o.nodes[0].data.inputs.agentModelConfig.reasoningEffort).toBeUndefined()
+    })
 })

@@ -7,11 +7,15 @@ import { BuilderSession } from '../../database/entities/BuilderSession'
 import { InternalFlowiseError } from '../../errors/internalFlowiseError'
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import collectorService, {
+    bindDataSourcesToExistingWorkflow,
     CollectorService,
     isBuildConfirmationMessage,
     isPureBuildConfirmation,
+    isPureDocumentAttachmentMessage,
+    reconcileWorkflowDataSourceIds,
     stripAttachmentNotice
 } from './collectorService'
+import { workflowProblems } from './workflow'
 import { BuildPipelineService } from './pipeline/buildPipelineService'
 import { computeReadiness } from './readiness'
 import { computeSpecDiff, SpecDiffResult } from './specDiffService'
@@ -25,6 +29,7 @@ export interface CreateSessionDTO {
     userId: string
     title?: string
     initialGoal?: string
+    canvasVersion?: 'v1' | 'v2'
 }
 
 export interface AddMessageDTO {
@@ -33,6 +38,7 @@ export interface AddMessageDTO {
     role?: 'user' | 'assistant'
     expectedRevision?: number
     specPatch?: Partial<AgentSpec>
+    canvasVersion?: 'v1' | 'v2'
 }
 
 export interface SessionSnapshot {
@@ -159,6 +165,7 @@ export class BuilderSessionService {
                 goal: patchResult.patch.goal || goalText,
                 language: patchResult.patch.language || 'vi',
                 modelProfileRef: 'default-builder-model',
+                ...(data.canvasVersion ? { canvasVersion: data.canvasVersion } : {}),
                 ...patchResult.patch
             }
             if (patchResult.usage)
@@ -325,23 +332,7 @@ export class BuilderSessionService {
             )
         }
 
-        // 3. Save User Message
-        const userMsg = this.messageRepo.create({
-            sessionId,
-            role: data.role || 'user',
-            clientMessageId: data.clientMessageId,
-            content: data.content.trim()
-        })
-        const savedUserMsg = await this.messageRepo.save(userMsg)
-
-        // Phát sự kiện SSE: user message
-        this.collector.broadcastSSE(sessionId, {
-            type: 'message',
-            data: savedUserMsg,
-            timestamp: new Date().toISOString()
-        })
-
-        // 4. Load Base Spec & kiểm tra đây có phải lượt trả lời đầu tiên của assistant không
+        // 3. Load Base Spec & kiểm tra đây có phải lượt trả lời đầu tiên của assistant không
         const priorAssistantMessage = await this.messageRepo.findOneBy({ sessionId, role: 'assistant' })
         const isFirstReply = !priorAssistantMessage
 
@@ -365,20 +356,57 @@ export class BuilderSessionService {
             }
         }
 
-        // 5. Trích xuất Patch từ nội dung chat (bỏ qua gọi LLM khi tin nhắn chỉ là xác nhận "xong" thuần túy)
+        // 4. Trích xuất Patch từ nội dung chat (bỏ qua gọi LLM khi chỉ xác nhận "xong" hoặc chỉ đính kèm thêm tài liệu vào luồng đã hợp lệ)
         const cleanUserText = stripAttachmentNotice(data.content)
         const hasExplicitPatch = Boolean(data.specPatch && Object.keys(data.specPatch).length > 0)
         const pureConfirm = isPureBuildConfirmation(cleanUserText) && !hasExplicitPatch && Boolean(currentRevision)
         const confirmedToBuild = isBuildConfirmationMessage(cleanUserText)
+        const hasExistingValidWorkflow =
+            Boolean(baseSpec.workflow?.steps?.length) && workflowProblems(baseSpec.workflow, false).length === 0
+        const pureDocAttachment =
+            isPureDocumentAttachmentMessage(cleanUserText) && Boolean(data.specPatch?.dataSources?.length) && hasExistingValidWorkflow
 
         const extracted = pureConfirm
             ? { patch: {}, extractedFields: [], changeSummary: 'Người dùng xác nhận hoàn tất yêu cầu' }
+            : pureDocAttachment
+            ? {
+                  patch: {
+                      workflow: bindDataSourcesToExistingWorkflow(baseSpec.workflow!, data.specPatch!.dataSources!)
+                  },
+                  extractedFields: ['dataSources', 'workflow'],
+                  changeSummary: 'Đã gắn tài liệu đính kèm vào luồng tra cứu'
+              }
             : this.customDataSource
             ? this.collector.extractPatch(data.content, baseSpec)
             : await this.collector.extractWithModel(data.content, { ...baseSpec, ...(data.specPatch || {}) }, workspaceId)
+
+        // 5. Lưu User Message sau khi trích xuất thành công để tránh để lại tin nhắn treo khi model lỗi
+        const userMsg = this.messageRepo.create({
+            sessionId,
+            role: data.role || 'user',
+            clientMessageId: data.clientMessageId,
+            content: data.content.trim()
+        })
+        const savedUserMsg = await this.messageRepo.save(userMsg)
+
+        // Phát sự kiện SSE: user message
+        this.collector.broadcastSSE(sessionId, {
+            type: 'message',
+            data: savedUserMsg,
+            timestamp: new Date().toISOString()
+        })
         const mergedPatch: Partial<AgentSpec> = {
             ...extracted.patch,
+            ...(data.canvasVersion ? { canvasVersion: data.canvasVersion } : {}),
             ...(data.specPatch || {})
+        }
+        const effectiveSources = mergedPatch.dataSources ?? baseSpec.dataSources ?? []
+        const candidateWorkflow = mergedPatch.workflow ?? baseSpec.workflow
+        if (effectiveSources.length > 0 && candidateWorkflow?.steps?.some((step) => step.type === 'retriever')) {
+            const reconciledWorkflow = reconcileWorkflowDataSourceIds(candidateWorkflow, effectiveSources)
+            if (JSON.stringify(reconciledWorkflow) !== JSON.stringify(candidateWorkflow)) {
+                mergedPatch.workflow = reconciledWorkflow
+            }
         }
         if (!pureConfirm && !this.customDataSource && !mergedPatch.workflow && !baseSpec.workflow)
             mergedPatch.workflow = {
@@ -445,7 +473,15 @@ export class BuilderSessionService {
             })
         } else if (currentRevision) {
             try {
-                readiness = computeReadiness(JSON.parse(currentRevision.spec))
+                const parsedSpec = JSON.parse(currentRevision.spec)
+                readiness = computeReadiness(parsedSpec)
+                if (readiness.buildReady && !currentRevision.buildReady) {
+                    currentRevision.specReady = readiness.specReady
+                    currentRevision.buildReady = true
+                    currentRevision.missingFields = JSON.stringify(readiness.missingFields)
+                    currentRevision.reasonCodes = JSON.stringify(readiness.reasonCodes)
+                    currentRevision = await this.revisionRepo.save(currentRevision)
+                }
             } catch {
                 readiness = null
             }

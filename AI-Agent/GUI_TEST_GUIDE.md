@@ -75,7 +75,14 @@ Sau cập nhật mã, nhấn Ctrl+C ở terminal của bạn, chạy lại prepa
 
    Kiểm tra kế hoạch có bước mới và kết nối tương ứng, revision tăng và draft mới được tạo. Chat thử lại, rồi **F5**: tài liệu, kế hoạch và draft hiện tại vẫn phải đúng.
 
-Giới hạn hiện tại: PDF có văn bản, DOCX, TXT/MD/CSV UTF-8; tối đa 5 MB/file, 5 file/lần, 10 nguồn/phiên và 200.000 ký tự/file. PDF ảnh quét cần OCR trước; không có OCR tự động. Kế hoạch hỗ trợ tối đa 12 bước xử lý bằng LLM, Agent, Retriever, Condition và Direct Reply. Các bước xuất Excel/file, Veo/video, vòng lặp hoặc kết nối ngoài chưa tích hợp phải xuất hiện là **còn thiếu tích hợp**, chặn build; không được nói đã tạo video/file khi chưa thực hiện. Tài liệu đính kèm là dữ liệu tham khảo, không phải lệnh quản trị hệ thống.
+Giới hạn và khả năng hiện tại (B-031): PDF có văn bản, DOCX, TXT/MD/CSV UTF-8; tối đa 5 MB/file, 5 file/lần, 10 nguồn/phiên và 200.000 ký tự/file (PDF ảnh quét cần OCR trước). Kế hoạch `workflow_v1` hỗ trợ tối đa **16 bước** trên bộ node điều khiển đầy đủ của Agentflow V2: **LLM**, **Agent**, **Retriever**, **Condition**, **ConditionAgent** (AI tự phân nhánh ngữ nghĩa), **Loop** (vòng lặp tự sửa sai như mẫu *Agentic RAG* kèm biến trạng thái **Flow State**), **Iteration** (lặp qua danh sách mảng JSON), **HTTP** (gọi API Connector của Workspace), **HumanInput** (chờ người dùng phê duyệt) và **Direct Reply**. Bot chỉ tiến hành tạo graph khi bạn nhắn **`"xong"`** (hoặc bấm nút **Xong — Tạo Agent**).
+
+## Kết nối MCP Server (Google Drive, Excel/Sheets, Word/OneDrive, Slack, nội bộ...)
+
+1. Trên thanh công cụ đầu trang `/agent-builder` (cạnh nút **Cấu hình model**), bấm **Kết nối MCP**.
+2. Nhập **Tên gợi nhớ**, **URL MCP Server** (Streamable HTTP hoặc SSE — ví dụ URL MCP từ Pipedream/Composio cho Google Drive, Google Sheets/Excel, Word/OneDrive, Gmail, Slack, GitHub hoặc MCP nội bộ công ty) và **Bearer Token / Custom Headers** (nếu cần), rồi bấm **Kết nối & Quét công cụ MCP**.
+3. Server tự bắt tay MCP, lưu mã hóa token trong Workspace (không bao giờ gửi ngược token về trình duyệt) và liệt kê các tool tìm thấy.
+4. Quay lại khung chat thiết kế, mô tả tự nhiên quy trình (ví dụ: *"Đọc báo cáo trên Google Drive, tóm tắt các ý chính rồi ghi vào bảng tổng hợp Excel"*), trao đổi đến khi ưng ý rồi nhắn **`"xong"`** — Bot sẽ tự gắn đúng `customMcpServerTool` vào bước Agent tương ứng.
 
 ## Kịch bản demo cơ bản cũ
 

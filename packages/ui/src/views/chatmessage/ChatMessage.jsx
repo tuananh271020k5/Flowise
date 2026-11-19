@@ -75,6 +75,7 @@ import chatmessagefeedbackApi from '@/api/chatmessagefeedback'
 import leadsApi from '@/api/lead'
 import executionsApi from '@/api/executions'
 import ttsApi from '@/api/tts'
+import agentBuilderApi from '@/api/agentBuilder'
 
 // Hooks
 import useApi from '@/hooks/useApi'
@@ -253,6 +254,8 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
     // drag & drop and file input
     const imgUploadRef = useRef(null)
     const fileUploadRef = useRef(null)
+    const officeFileUploadRef = useRef(null)
+    const [pendingOfficeFiles, setPendingOfficeFiles] = useState([])
     const [isChatFlowAvailableForImageUploads, setIsChatFlowAvailableForImageUploads] = useState(false)
     const [isChatFlowAvailableForFileUploads, setIsChatFlowAvailableForFileUploads] = useState(false)
     const [isChatFlowAvailableForRAGFileUploads, setIsChatFlowAvailableForRAGFileUploads] = useState(false)
@@ -1006,11 +1009,26 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
         return uploads
     }
 
+    const handleOfficeFileSelect = (event) => {
+        const picked = Array.from(event.target.files || [])
+        event.target.value = ''
+        if (!picked.length) return
+        const next = [...pendingOfficeFiles, ...picked]
+        if (next.length > 5 || next.some((file) => file.size > 10 * 1024 * 1024 || !/\.(xlsx|docx)$/i.test(file.name))) {
+            enqueueSnackbar({
+                message: 'Chỉ hỗ trợ tối đa 5 tệp Excel (.xlsx) hoặc Word (.docx), mỗi tệp tối đa 10 MB.',
+                options: { key: new Date().getTime() + Math.random(), variant: 'error' }
+            })
+            return
+        }
+        setPendingOfficeFiles(next)
+    }
+
     // Handle form submission
     const handleSubmit = async (e, selectedInput, action, humanInput) => {
         if (e) e.preventDefault()
 
-        if (!selectedInput && userInput.trim() === '') {
+        if (!selectedInput && userInput.trim() === '' && pendingOfficeFiles.length === 0) {
             const containsFile = previews.filter((item) => !item.mime.startsWith('image') && item.type !== 'audio').length > 0
             if (!previews.length || (previews.length && containsFile)) {
                 return
@@ -1018,6 +1036,9 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
         }
 
         let input = userInput
+        if (!selectedInput && input.trim() === '' && pendingOfficeFiles.length > 0) {
+            input = 'Đọc và kiểm tra nội dung các tệp vừa tải lên.'
+        }
 
         if (typeof selectedInput === 'string') {
             if (selectedInput !== undefined && selectedInput.trim() !== '') input = selectedInput
@@ -1050,13 +1071,43 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
             return
         }
 
+        let uploadedOfficeFiles = []
+        if (pendingOfficeFiles.length > 0) {
+            try {
+                const uploadRes = await agentBuilderApi.uploadOfficeFiles(pendingOfficeFiles)
+                uploadedOfficeFiles = Array.isArray(uploadRes.data?.files) ? uploadRes.data.files : []
+                setPendingOfficeFiles([])
+            } catch (error) {
+                handleError(error?.response?.data?.message || 'Không thể tải tệp Excel/Word lên kho Workspace')
+                return
+            }
+        }
+
+        let displayInput = input
+        let promptInput = input
+        if (uploadedOfficeFiles.length > 0) {
+            const fileLabels = uploadedOfficeFiles.map((f) => f.fileName).join(', ')
+            displayInput = `[Tệp đính kèm: ${fileLabels}]\n${input}`
+            const fileContextLines = uploadedOfficeFiles.map((f) =>
+                f.ext === 'xlsx'
+                    ? `- File Excel "${f.fileName}" | fileId: "${f.fileId}"${
+                          Array.isArray(f.sheetNames) && f.sheetNames.length ? ` | sheets: ${f.sheetNames.join(', ')}` : ''
+                      } (gọi excel_read_workbook hoặc excel_append_rows với đúng fileId này)`
+                    : `- File Word "${f.fileName}" | fileId: "${f.fileId}" (gọi word_read_document hoặc word_append_section với đúng fileId này)`
+            )
+            promptInput =
+                `[Tệp văn phòng người dùng vừa tải lên kho Workspace — dùng đúng fileId bên dưới với công cụ Excel/Word:]\n` +
+                `${fileContextLines.join('\n')}\n\n` +
+                `Yêu cầu của người dùng:\n${input}`
+        }
+
         clearPreviews()
-        setMessages((prevMessages) => [...prevMessages, { message: input, type: 'userMessage', fileUploads: uploads }])
+        setMessages((prevMessages) => [...prevMessages, { message: displayInput, type: 'userMessage', fileUploads: uploads }])
 
         // Send user question to Prediction Internal API
         try {
             const params = {
-                question: input,
+                question: promptInput,
                 chatId
             }
             if (typeof selectedInput === 'object') {
@@ -1243,8 +1294,8 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
             e.preventDefault()
             const nextInput = inputHistory.getNextInput()
             setUserInput(nextInput)
-        } else if (e.key === 'Enter' && userInput && !isIMEComposition) {
-            if (!e.shiftKey && userInput) {
+        } else if (e.key === 'Enter' && (userInput || pendingOfficeFiles.length > 0) && !isIMEComposition) {
+            if (!e.shiftKey && (userInput || pendingOfficeFiles.length > 0)) {
                 handleSubmit(e)
             }
         } else if (e.key === 'Enter') {
@@ -2499,7 +2550,8 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
                                         style={{
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            width: '100%'
+                                            flex: 1,
+                                            minWidth: 0
                                         }}
                                     >
                                         {message.fileUploads && message.fileUploads.length > 0 && (
@@ -3021,6 +3073,22 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
                     </>
                 ) : (
                     <form style={{ width: '100%' }} onSubmit={handleSubmit}>
+                        {pendingOfficeFiles.length > 0 && (
+                            <Stack direction='row' spacing={0.75} flexWrap='wrap' useFlexGap sx={{ mb: 1 }}>
+                                {pendingOfficeFiles.map((file, idx) => (
+                                    <Chip
+                                        key={`${file.name}-${idx}`}
+                                        size='small'
+                                        variant='outlined'
+                                        color='primary'
+                                        icon={<IconPaperclip size={14} />}
+                                        label={`${file.name} · ${Math.max(1, Math.ceil(file.size / 1024))} KB`}
+                                        disabled={getInputDisabled()}
+                                        onDelete={() => setPendingOfficeFiles((prev) => prev.filter((_, i) => i !== idx))}
+                                    />
+                                ))}
+                            </Stack>
+                        )}
                         <OutlinedInput
                             inputRef={inputRef}
                             // eslint-disable-next-line
@@ -3090,7 +3158,29 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
                                             </IconButton>
                                         </InputAdornment>
                                     )}
-                                    {!isChatFlowAvailableForImageUploads && !isChatFlowAvailableForFileUploads && <Box sx={{ pl: 1 }} />}
+                                    {!isChatFlowAvailableForFileUploads && (
+                                        <InputAdornment position='start' sx={{ ml: isChatFlowAvailableForImageUploads ? 0 : 2 }}>
+                                            <IconButton
+                                                onClick={() => officeFileUploadRef.current?.click()}
+                                                type='button'
+                                                disabled={getInputDisabled()}
+                                                edge='start'
+                                                title='Đính kèm tệp Excel (.xlsx) hoặc Word (.docx)'
+                                            >
+                                                <IconPaperclip
+                                                    color={
+                                                        getInputDisabled()
+                                                            ? '#9e9e9e'
+                                                            : pendingOfficeFiles.length > 0
+                                                            ? '#1565c0'
+                                                            : customization.isDarkMode
+                                                            ? 'white'
+                                                            : '#1e88e5'
+                                                    }
+                                                />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    )}
                                 </>
                             }
                             endAdornment={
@@ -3189,6 +3279,14 @@ const ChatMessage = ({ open, chatflowid, isAgentCanvas, isDialog, previews, setP
                                 accept={getFileUploadAllowedTypes()}
                             />
                         )}
+                        <input
+                            style={{ display: 'none' }}
+                            multiple
+                            ref={officeFileUploadRef}
+                            type='file'
+                            onChange={handleOfficeFileSelect}
+                            accept='.xlsx,.docx'
+                        />
                     </form>
                 )}
             </div>

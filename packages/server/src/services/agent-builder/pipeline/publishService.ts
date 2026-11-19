@@ -208,6 +208,30 @@ export class PublishService {
         chatflow.isPublic = isPublic
         await this.chatflowRepo.save(chatflow)
 
+        // Đồng bộ lịch chạy định kỳ độc lập (ScheduleBeat) nếu workflow có khai báo schedule
+        if (!this.customDataSource && spec.workflow?.schedule?.cronExpression) {
+            try {
+                const [{ default: scheduleService }, { ScheduleBeat }, { ScheduleTriggerType }] = await Promise.all([
+                    import('../../../services/schedule'),
+                    import('../../../schedule/ScheduleBeat'),
+                    import('../../../database/entities/ScheduleRecord')
+                ])
+                const record = await scheduleService.createOrUpdateSchedule({
+                    triggerType: ScheduleTriggerType.AGENTFLOW,
+                    targetId: chatflow.id,
+                    cronExpression: spec.workflow.schedule.cronExpression,
+                    timezone: spec.workflow.schedule.timezone || 'Asia/Ho_Chi_Minh',
+                    enabled: true,
+                    scheduleInputMode: 'text',
+                    defaultInput: spec.workflow.schedule.defaultInput,
+                    workspaceId
+                })
+                await ScheduleBeat.getInstance().onScheduleChanged(record.id, 'upsert')
+            } catch {
+                // Không chặn xuất bản nếu ScheduleBeat đang ở chế độ test không khởi chạy cron
+            }
+        }
+
         session.state = 'published'
         await this.sessionRepo.save(session)
 
@@ -290,6 +314,26 @@ export class PublishService {
         chatflow.deployed = false
         chatflow.isPublic = false
         await this.chatflowRepo.save(chatflow)
+
+        if (!this.customDataSource) {
+            try {
+                const [{ default: scheduleService }, { ScheduleBeat }, { ScheduleTriggerType }] = await Promise.all([
+                    import('../../../services/schedule'),
+                    import('../../../schedule/ScheduleBeat'),
+                    import('../../../database/entities/ScheduleRecord')
+                ])
+                const existingSchedule = await scheduleService.deleteScheduleForTarget(
+                    chatflow.id,
+                    ScheduleTriggerType.AGENTFLOW,
+                    workspaceId
+                )
+                if (existingSchedule?.id) {
+                    await ScheduleBeat.getInstance().onScheduleChanged(existingSchedule.id, 'delete')
+                }
+            } catch {
+                // Ignore if no schedule record exists
+            }
+        }
 
         session.state = 'ready'
         await this.sessionRepo.save(session)

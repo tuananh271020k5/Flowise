@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'crypto'
 import path from 'path'
+import { read as readXlsx, utils as xlsxUtils } from 'xlsx'
 import { DataSource } from 'typeorm'
 import { DocumentStore } from '../../../database/entities/DocumentStore'
 import { DocumentStoreFileChunk } from '../../../database/entities/DocumentStoreFileChunk'
@@ -11,8 +12,14 @@ import { DataSourceRef } from '../types'
 import { BuilderSession } from '../../../database/entities/BuilderSession'
 
 export const BUILDER_DOCUMENT_STORE = 'builderLocalDocumentsV1'
-export const DOCUMENT_LIMITS = { fileBytes: 5 * 1024 * 1024, files: 5, characters: 200000, chunks: 200 }
-export const SUPPORTED_DOCUMENTS = ['.txt', '.md', '.csv', '.pdf', '.docx']
+export const DOCUMENT_LIMITS = {
+    fileBytes: 25 * 1024 * 1024,
+    files: 20,
+    maxPerSession: 30,
+    characters: 1_000_000,
+    chunks: 1000
+}
+export const SUPPORTED_DOCUMENTS = ['.txt', '.md', '.csv', '.json', '.pdf', '.docx', '.xlsx']
 
 export function splitDocument(text: string): string[] {
     const value = text
@@ -46,7 +53,7 @@ export class DocumentUploadService {
         if (!['lexical', 'vector'].includes(mode))
             throw new AdapterError('INVALID_RETRIEVAL_MODE', 'Chọn tìm theo từ khóa hoặc embedding.', 400)
         if (!files?.length || files.length > DOCUMENT_LIMITS.files)
-            throw new AdapterError('INVALID_FILES', 'Chọn từ 1 đến 5 tài liệu.', 400)
+            throw new AdapterError('INVALID_FILES', `Chọn từ 1 đến ${DOCUMENT_LIMITS.files} tài liệu trong một lần tải.`, 400)
         const existing = await this.ds.getRepository(DocumentStore).find({ where: { workspaceId } })
         const embedding = mode === 'vector' ? await modelSettingsService.getEmbeddingModel(workspaceId, embeddingModel) : undefined
         const pending: { store: DocumentStore; chunks: DocumentStoreFileChunk[] }[] = []
@@ -65,8 +72,17 @@ export class DocumentUploadService {
                 .replace(/[\u0000-\u001f]/g, '')
                 .slice(0, 180)
             const extension = path.extname(filename).toLowerCase()
-            if (!SUPPORTED_DOCUMENTS.includes(extension) || !file.buffer?.length || file.buffer.length > DOCUMENT_LIMITS.fileBytes)
-                throw new AdapterError('INVALID_FILE', 'Hỗ trợ TXT, MD, CSV, PDF, DOCX; mỗi file tối đa 5 MB và không rỗng.', 400)
+            if (!SUPPORTED_DOCUMENTS.includes(extension))
+                throw new AdapterError(
+                    'INVALID_FILE',
+                    `Tệp "${filename}" chưa được hỗ trợ (hỗ trợ PDF, DOCX, XLSX, TXT, MD, CSV, JSON).`,
+                    400
+                )
+            if (!file.buffer?.length) throw new AdapterError('INVALID_FILE', `Tệp "${filename}" đang rỗng (0 byte).`, 400)
+            if (file.buffer.length > DOCUMENT_LIMITS.fileBytes) {
+                const sizeMb = (file.buffer.length / (1024 * 1024)).toFixed(1)
+                throw new AdapterError('INVALID_FILE', `Tệp "${filename}" (${sizeMb} MB) vượt giới hạn 25 MB mỗi tệp.`, 400)
+            }
             const hash = createHash('sha256')
                 .update(file.buffer)
                 .update(`${mode}:${embedding ? JSON.stringify(embedding.config) : ''}`)
@@ -90,15 +106,28 @@ export class DocumentUploadService {
                     return false
                 }
             }).length
-            if (inSession + pending.length >= 10)
-                throw new AdapterError('DOCUMENT_LIMIT', 'Mỗi phiên tối đa 10 tài liệu. Hãy tạo phiên mới cho bộ tài liệu khác.', 400)
+            if (inSession + pending.length >= DOCUMENT_LIMITS.maxPerSession)
+                throw new AdapterError(
+                    'DOCUMENT_LIMIT',
+                    `Mỗi phiên hỗ trợ tối đa ${DOCUMENT_LIMITS.maxPerSession} tài liệu. Hãy tạo phiên mới hoặc ghép các tài liệu liên quan.`,
+                    400
+                )
             const pages = await this.readPages(file, extension)
             if (pages.reduce((total, page) => total + page.text.length, 0) > DOCUMENT_LIMITS.characters)
-                throw new AdapterError('DOCUMENT_TOO_LARGE', 'Nội dung một tài liệu tối đa 200.000 ký tự. Hãy tách tài liệu nhỏ hơn.', 400)
+                throw new AdapterError(
+                    'DOCUMENT_TOO_LARGE',
+                    `Tài liệu "${filename}" vượt giới hạn 1.000.000 ký tự văn bản. Hãy tách thành nhiều tệp nhỏ hơn.`,
+                    400
+                )
             const chunks = pages.flatMap((page) => splitDocument(page.text).map((text) => ({ text, page: page.page })))
             if (!chunks.length)
                 throw new AdapterError('EMPTY_DOCUMENT', 'Không đọc được văn bản trong tài liệu. PDF ảnh quét cần OCR trước khi tải.', 400)
-            if (chunks.length > DOCUMENT_LIMITS.chunks) throw new AdapterError('TOO_MANY_CHUNKS', 'Tài liệu vượt giới hạn 200 đoạn.', 400)
+            if (chunks.length > DOCUMENT_LIMITS.chunks)
+                throw new AdapterError(
+                    'TOO_MANY_CHUNKS',
+                    `Tài liệu "${filename}" vượt giới hạn ${DOCUMENT_LIMITS.chunks} đoạn trích xuất.`,
+                    400
+                )
             let embeddingConfig: string | null = null
             let vectors: number[][] | undefined
             if (mode === 'vector') {
@@ -180,13 +209,35 @@ export class DocumentUploadService {
     }
 
     private async readPages(file: Express.Multer.File, extension: string): Promise<{ text: string; page?: number }[]> {
-        if (['.txt', '.md', '.csv'].includes(extension)) {
+        if (['.txt', '.md', '.csv', '.json'].includes(extension)) {
             try {
                 const text = new TextDecoder('utf-8', { fatal: true }).decode(file.buffer)
                 if (text.includes('\u0000')) throw new Error('Binary data')
                 return [{ text }]
             } catch {
-                throw new AdapterError('INVALID_TEXT_ENCODING', 'Tài liệu TXT/MD/CSV phải là văn bản UTF-8.', 400)
+                throw new AdapterError('INVALID_TEXT_ENCODING', 'Tài liệu TXT/MD/CSV/JSON phải là văn bản UTF-8.', 400)
+            }
+        }
+        if (extension === '.xlsx') {
+            try {
+                const wb = readXlsx(file.buffer, { type: 'buffer' })
+                const pages: { text: string; page?: number }[] = []
+                wb.SheetNames.forEach((sheetName, idx) => {
+                    const rows = xlsxUtils.sheet_to_json<Array<unknown>>(wb.Sheets[sheetName], { header: 1, defval: '' })
+                    const lines = rows
+                        .map((row) => row.map((cell) => String(cell ?? '').trim()).join(' | '))
+                        .filter((line) => line.replace(/\|/g, '').trim().length > 0)
+                    if (lines.length > 0) {
+                        pages.push({ text: `Sheet: ${sheetName}\n${lines.join('\n')}`, page: idx + 1 })
+                    }
+                })
+                return pages
+            } catch {
+                throw new AdapterError(
+                    'DOCUMENT_READ_FAILED',
+                    'Không đọc được tệp Excel (.xlsx). Kiểm tra tệp không bị mã hóa mật khẩu.',
+                    400
+                )
             }
         }
         if (extension === '.docx') {
@@ -195,8 +246,8 @@ export class DocumentUploadService {
             for (let offset = 0; offset + 46 < file.buffer.length; offset++)
                 if (file.buffer.readUInt32LE(offset) === 0x02014b50) {
                     expanded += file.buffer.readUInt32LE(offset + 24)
-                    if (expanded > 20 * 1024 * 1024)
-                        throw new AdapterError('DOCUMENT_TOO_LARGE', 'DOCX vượt giới hạn nội dung giải nén 20 MB.', 400)
+                    if (expanded > 60 * 1024 * 1024)
+                        throw new AdapterError('DOCUMENT_TOO_LARGE', 'DOCX vượt giới hạn nội dung giải nén 60 MB.', 400)
                 }
         }
         const name = extension === '.pdf' ? 'pdfFile' : 'docxFile'

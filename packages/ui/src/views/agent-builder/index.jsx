@@ -1,8 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Grid, Alert, Button, Snackbar, Typography, Box, Tabs, Tab } from '@mui/material'
-import { IconSettings, IconMessageCode } from '@tabler/icons-react'
-import MainCard from '@/ui-component/cards/MainCard'
+import {
+    Grid,
+    Alert,
+    Button,
+    Snackbar,
+    Typography,
+    Box,
+    Tabs,
+    Tab,
+    Chip,
+    ToggleButton,
+    ToggleButtonGroup,
+    Paper,
+    Stack
+} from '@mui/material'
+import { IconSettings, IconMessageCode, IconPlugConnected, IconTicket, IconGitBranch, IconCpu } from '@tabler/icons-react'
 import { BackdropLoader } from '@/ui-component/loading/BackdropLoader'
 import agentBuilderApi from '@/api/agentBuilder'
 import ChatPane from './ChatPane'
@@ -10,6 +23,8 @@ import SpecCard from './SpecCard'
 import TestChatPane from './TestChatPane'
 import RevisionsDialog from './RevisionsDialog'
 import ModelSettingsDialog from './ModelSettingsDialog'
+import McpServersDialog from './McpServersDialog'
+import HelpdeskTicketsDialog from './HelpdeskTicketsDialog'
 import WorkflowPanel from './WorkflowPanel'
 import client from '@/api/client'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
@@ -41,20 +56,46 @@ const AgentBuilderView = () => {
     // Phase 3 State: Quản lý Build & Chat Thử Nghiệm (PH3-T01, PH3-T02)
     const [modelOpen, setModelOpen] = useState(false)
     const [modelProfile, setModelProfile] = useState(null)
+    const [mcpOpen, setMcpOpen] = useState(false)
+    const [ticketsOpen, setTicketsOpen] = useState(false)
+    const [workspaceMcpServers, setWorkspaceMcpServers] = useState([])
+    const [canvasVersion, setCanvasVersion] = useState(() => {
+        try {
+            return localStorage.getItem('agentBuilderCanvasVersion') || 'v1'
+        } catch {
+            return 'v1'
+        }
+    })
+    const [currentFlowType, setCurrentFlowType] = useState(null)
     useEffect(() => {
         agentBuilderApi
             .getModelProfile()
             .then(({ data }) => setModelProfile(data))
             .catch(() => {})
+        agentBuilderApi
+            .listMcpServers()
+            .then(({ data }) => setWorkspaceMcpServers(Array.isArray(data) ? data : []))
+            .catch(() => {})
     }, [])
+    const handleCanvasVersionChange = (_event, nextVal) => {
+        if (!nextVal) return
+        setCanvasVersion(nextVal)
+        try {
+            localStorage.setItem('agentBuilderCanvasVersion', nextVal)
+        } catch {
+            // Ignore storage errors
+        }
+    }
     const applyBuildResult = (data) => {
         if (data?.success && data.flowId) {
             setCurrentFlowId(data.flowId)
+            setCurrentFlowType(data.flowType || (canvasVersion === 'v1' ? 'MULTIAGENT' : 'AGENTFLOW'))
             setBuildStatus('completed')
             setBuildError(null)
             setActiveTab('test')
         } else if (data?.success === false) {
             setCurrentFlowId(null)
+            setCurrentFlowType(null)
             setBuildStatus('failed')
             setBuildError(data.error || data.message)
         }
@@ -81,7 +122,13 @@ const AgentBuilderView = () => {
         try {
             const res = await agentBuilderApi.getSession(sid)
             const data = res.data
-            setSessionId(data.session?.id || sid)
+            const resolvedSid = data.session?.id || sid
+            setSessionId(resolvedSid)
+            try {
+                localStorage.setItem('agentBuilderLastSessionId', resolvedSid)
+            } catch {
+                // Ignore storage errors
+            }
             setMessages(data.messages || [])
             setRevisionNumber(data.session?.currentRevisionNo || 0)
             if (data.currentSpecRevision) {
@@ -98,6 +145,7 @@ const AgentBuilderView = () => {
                 if (draftRes.data && draftRes.data.length > 0) {
                     const latestDraft = draftRes.data.filter((draft) => draft.specRevisionId === data.currentSpecRevision?.id).at(-1)
                     setCurrentFlowId(latestDraft?.flowId || null)
+                    setCurrentFlowType(latestDraft?.flowType || null)
                     setBuildStatus(latestDraft ? 'completed' : null)
                 }
             } catch {
@@ -106,18 +154,35 @@ const AgentBuilderView = () => {
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Lỗi khi tải phiên Agent Builder:', err)
+            if (err?.response?.status === 404 || err?.response?.status === 403) {
+                try {
+                    localStorage.removeItem('agentBuilderLastSessionId')
+                } catch {
+                    // Ignore storage errors
+                }
+            }
             setError(err?.response?.data?.message || 'Không thể tải phiên làm việc. Vui lòng thử lại.')
         } finally {
             setIsLoading(false)
         }
     }, [])
 
-    // Đồng bộ session khi URL param thay đổi
+    // Đồng bộ session khi URL param thay đổi (tự mở lại phiên gần nhất khi quay lại /agent-builder)
     useEffect(() => {
         if (paramSessionId) {
             setSessionId(paramSessionId)
             loadSession(paramSessionId)
         } else {
+            let lastSessionId = null
+            try {
+                lastSessionId = localStorage.getItem('agentBuilderLastSessionId')
+            } catch {
+                lastSessionId = null
+            }
+            if (lastSessionId) {
+                navigate(`/agent-builder/${lastSessionId}`, { replace: true })
+                return
+            }
             // Reset khi ở trang mới không có ID
             setSessionId(null)
             setMessages([])
@@ -128,7 +193,7 @@ const AgentBuilderView = () => {
             setBuildStatus(null)
             setActiveTab('spec')
         }
-    }, [paramSessionId, loadSession])
+    }, [paramSessionId, loadSession, navigate])
 
     // Lắng nghe sự kiện SSE realtime từ backend (PH3-T02)
     useEffect(() => {
@@ -199,7 +264,7 @@ const AgentBuilderView = () => {
                 let sid = sessionId
                 let expectedRevision = revisionNumber
                 if (!sid) {
-                    const created = await agentBuilderApi.createSession({})
+                    const created = await agentBuilderApi.createSession({ canvasVersion })
                     sid = created.data.session.id
                     expectedRevision = created.data.session.currentRevisionNo || 0
                     setSessionId(sid)
@@ -236,7 +301,8 @@ const AgentBuilderView = () => {
                 // Khởi tạo phiên mới với tin nhắn ban đầu
                 const res = await agentBuilderApi.createSession({
                     initialGoal: content,
-                    initialPrompt: content
+                    initialPrompt: content,
+                    canvasVersion
                 })
                 const data = res.data
                 if (data.currentSpecRevision?.revisionNo !== revisionNumber && !data.buildResult?.success) {
@@ -265,7 +331,8 @@ const AgentBuilderView = () => {
                 const res = await agentBuilderApi.sendMessage(sessionId, {
                     content,
                     clientMessageId,
-                    expectedRevision: revisionNumber
+                    expectedRevision: revisionNumber,
+                    canvasVersion
                 })
                 const data = res.data
                 if (data.currentSpecRevision?.revisionNo !== revisionNumber && !data.buildResult?.success) {
@@ -312,6 +379,11 @@ const AgentBuilderView = () => {
 
     // Xử lý tạo phiên mới
     const handleNewSession = () => {
+        try {
+            localStorage.removeItem('agentBuilderLastSessionId')
+        } catch {
+            // Ignore storage errors
+        }
         setSessionId(null)
         setMessages([])
         setSpec(null)
@@ -374,11 +446,12 @@ const AgentBuilderView = () => {
         setActiveTab('test') // Tự động chuyển qua tab chat thử nghiệm để người dùng thấy tiến trình
 
         try {
-            const res = await agentBuilderApi.executeBuild(sessionId, {})
+            const res = await agentBuilderApi.executeBuild(sessionId, { canvasVersion })
             const data = res.data
 
             if (data.flowId) {
                 setCurrentFlowId(data.flowId)
+                setCurrentFlowType(data.flowType || (canvasVersion === 'v1' ? 'MULTIAGENT' : 'AGENTFLOW'))
             }
             if (data.jobId) {
                 setCurrentBuildJobId(data.jobId)
@@ -387,7 +460,7 @@ const AgentBuilderView = () => {
             setSnackbarMessage(
                 data.isExisting
                     ? 'Bản draft Agentflow đã tồn tại cho phiên bản này. Bạn có thể bắt đầu thử nghiệm!'
-                    : 'Đã tạo bản draft Agentflow V2 thành công!'
+                    : `Đã tạo bản draft Agentflow ${canvasVersion.toUpperCase()} thành công!`
             )
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -410,29 +483,135 @@ const AgentBuilderView = () => {
         }
     }
 
+    const authorizedMcpCount = workspaceMcpServers.filter((srv) => srv.status === 'AUTHORIZED').length
+
     return (
-        <MainCard
-            maxWidth='full'
+        <Box
             sx={{
-                p: 0,
-                m: 0,
-                height: 'calc(100vh - 120px)',
-                display: 'flex',
-                flexDirection: 'column'
-            }}
-            contentSX={{
-                p: 2,
-                flex: 1,
+                pt: 1.5,
+                pb: 1,
+                px: { xs: 0.5, md: 1 },
+                height: 'calc(100vh - 138px)',
+                minHeight: 560,
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%'
+                gap: 1.5
             }}
         >
             <BackdropLoader open={isLoading} />
-            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Button onClick={() => setModelOpen(true)}>Cấu hình model</Button>
-                <Typography variant='body2'>{modelProfile?.ready ? modelProfile.modelName : 'Chưa cấu hình API key'}</Typography>
-            </Box>
+
+            {/* Thanh công cụ Workspace gọn gàng, không bao giờ bị che cắt phía trên */}
+            <Paper
+                variant='outlined'
+                sx={{
+                    px: 2,
+                    py: 1,
+                    borderRadius: 2.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1.5,
+                    flexWrap: 'wrap',
+                    flexShrink: 0,
+                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff')
+                }}
+            >
+                <Stack direction='row' alignItems='center' spacing={1.5} flexWrap='wrap' useFlexGap>
+                    <Typography variant='h4' sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>
+                        Agent Builder
+                    </Typography>
+                    <Button
+                        size='small'
+                        variant='outlined'
+                        color={modelProfile?.ready ? 'inherit' : 'warning'}
+                        startIcon={<IconCpu size={16} />}
+                        onClick={() => setModelOpen(true)}
+                        sx={{
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            px: 1.25,
+                            py: 0.4,
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            borderColor: 'divider'
+                        }}
+                    >
+                        <Box
+                            component='span'
+                            sx={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                bgcolor: modelProfile?.ready ? 'success.main' : 'warning.main',
+                                mr: 0.85,
+                                display: 'inline-block'
+                            }}
+                        />
+                        {modelProfile?.ready ? modelProfile.modelName : 'Cấu hình Model API'}
+                    </Button>
+                </Stack>
+
+                <Stack direction='row' alignItems='center' spacing={1} flexWrap='wrap' useFlexGap>
+                    <Button
+                        variant='outlined'
+                        size='small'
+                        color='inherit'
+                        startIcon={<IconPlugConnected size={16} />}
+                        onClick={() => setMcpOpen(true)}
+                        sx={{ textTransform: 'none', borderRadius: 2, borderColor: 'divider', fontSize: '0.8rem' }}
+                    >
+                        Kết nối MCP
+                        {authorizedMcpCount > 0 && (
+                            <Chip
+                                size='small'
+                                color='success'
+                                label={authorizedMcpCount}
+                                sx={{ ml: 0.75, height: 18, fontSize: '0.68rem', fontWeight: 700 }}
+                            />
+                        )}
+                    </Button>
+                    <Button
+                        variant='outlined'
+                        size='small'
+                        color='inherit'
+                        startIcon={<IconTicket size={16} />}
+                        onClick={() => setTicketsOpen(true)}
+                        sx={{ textTransform: 'none', borderRadius: 2, borderColor: 'divider', fontSize: '0.8rem' }}
+                    >
+                        Phiếu CSKH
+                    </Button>
+                    <ToggleButtonGroup
+                        size='small'
+                        exclusive
+                        value={canvasVersion}
+                        onChange={handleCanvasVersionChange}
+                        aria-label='Chọn phiên bản Flowise Canvas'
+                        sx={{
+                            bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : '#f1f5f9'),
+                            p: 0.25,
+                            borderRadius: 2,
+                            '& .MuiToggleButton-root': {
+                                border: 'none',
+                                borderRadius: '6px !important',
+                                textTransform: 'none',
+                                py: 0.35,
+                                px: 1.25,
+                                fontSize: '0.76rem',
+                                fontWeight: 500,
+                                '&.Mui-selected': {
+                                    bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'primary.dark' : '#ffffff'),
+                                    boxShadow: '0 1px 2px rgba(15,23,42,0.1)',
+                                    fontWeight: 600
+                                }
+                            }
+                        }}
+                    >
+                        <ToggleButton value='v1'>Canvas V1 (Đầy đủ Node)</ToggleButton>
+                        <ToggleButton value='v2'>Canvas V2</ToggleButton>
+                    </ToggleButtonGroup>
+                </Stack>
+            </Paper>
+
             <ModelSettingsDialog
                 open={modelOpen}
                 onClose={() => setModelOpen(false)}
@@ -440,19 +619,22 @@ const AgentBuilderView = () => {
                     setModelProfile(data)
                 }}
             />
+            <McpServersDialog open={mcpOpen} onClose={() => setMcpOpen(false)} onChanged={setWorkspaceMcpServers} />
+            <HelpdeskTicketsDialog open={ticketsOpen} onClose={() => setTicketsOpen(false)} />
 
             {error && (
-                <Alert severity='error' sx={{ mb: 2 }} onClose={() => setError(null)}>
+                <Alert severity='error' sx={{ borderRadius: 2, flexShrink: 0 }} onClose={() => setError(null)}>
                     {error}
                 </Alert>
             )}
 
-            <Grid container spacing={2} sx={{ flex: 1, height: '100%', minHeight: 0 }}>
+            <Grid container spacing={1.5} sx={{ flex: 1, minHeight: 0 }}>
                 {/* Cột trái: Khung Chat trò chuyện đàm thoại thiết kế (7/12 desktop) */}
-                <Grid item xs={12} md={7} lg={7} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Grid item xs={12} md={7} lg={7} sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <ChatPane
                         messages={messages}
                         documents={spec?.dataSources || []}
+                        suggestions={buildStatus === 'completed' ? [] : spec?.workflow?.suggestions || []}
                         isSending={isSending}
                         canConfirmBuild={Boolean(readiness?.buildReady && buildStatus !== 'completed' && messages.length > 0)}
                         onSendMessage={handleSendMessage}
@@ -460,55 +642,93 @@ const AgentBuilderView = () => {
                     />
                 </Grid>
 
-                {/* Cột phải: Tabs chuyển đổi Cấu hình Spec / Chat Thử Nghiệm (5/12 desktop) */}
-                <Grid item xs={12} md={5} lg={5} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5 }}>
-                        <Tabs
-                            value={activeTab}
-                            onChange={(e, val) => setActiveTab(val)}
-                            textColor='primary'
-                            indicatorColor='primary'
-                            variant='fullWidth'
+                {/* Cột phải: Khung hợp nhất Cấu hình / Luồng xử lý / Chạy thử (5/12 desktop) */}
+                <Grid item xs={12} md={5} lg={5} sx={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <Paper
+                        variant='outlined'
+                        sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            borderRadius: 2.5,
+                            overflow: 'hidden',
+                            bgcolor: (theme) => (theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff')
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                borderBottom: 1,
+                                borderColor: 'divider',
+                                px: 1,
+                                bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : '#f8fafc')
+                            }}
                         >
-                            <Tab icon={<IconSettings size={18} />} iconPosition='start' label='Cấu hình Agent' value='spec' />
-                            <Tab label='Luồng thực hiện' value='workflow' />
-                            <Tab icon={<IconMessageCode size={18} />} iconPosition='start' label='Chat Thử Nghiệm' value='test' />
-                        </Tabs>
-                    </Box>
-
-                    {/* Nội dung Tab Cấu hình Spec */}
-                    {activeTab === 'spec' && (
-                        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                            <SpecCard
-                                spec={spec}
-                                readiness={readiness}
-                                revisionNumber={revisionNumber}
-                                onOpenRevisions={handleOpenRevisions}
-                                onGenerateAgentflow={handleGenerateAgentflow}
-                            />
+                            <Tabs
+                                value={activeTab}
+                                onChange={(e, val) => setActiveTab(val)}
+                                textColor='primary'
+                                indicatorColor='primary'
+                                variant='fullWidth'
+                                sx={{
+                                    minHeight: 46,
+                                    '& .MuiTab-root': {
+                                        minHeight: 46,
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        fontSize: '0.82rem',
+                                        whiteSpace: 'nowrap',
+                                        px: 1
+                                    }
+                                }}
+                            >
+                                <Tab icon={<IconSettings size={16} />} iconPosition='start' label='Cấu hình' value='spec' />
+                                <Tab icon={<IconGitBranch size={16} />} iconPosition='start' label='Luồng xử lý' value='workflow' />
+                                <Tab icon={<IconMessageCode size={16} />} iconPosition='start' label='Chạy thử' value='test' />
+                            </Tabs>
                         </Box>
-                    )}
 
-                    {/* Nội dung Tab Chat Thử Nghiệm (PH3-T01, PH3-T02) */}
-                    {activeTab === 'workflow' && (
-                        <WorkflowPanel workflow={spec?.workflow} readiness={readiness} buildStatus={buildStatus} />
-                    )}
-                    {activeTab === 'test' && (
-                        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                            <TestChatPane
-                                key={currentFlowId || 'pending'}
-                                sessionId={sessionId}
-                                flowId={currentFlowId}
-                                flowName={spec?.name || 'Trợ lý Agentflow'}
-                                revisionNo={revisionNumber}
-                                evaluationExamples={spec?.evaluationExamples || []}
-                                buildStatus={buildStatus}
-                                buildError={buildError}
-                                onCancelBuild={handleCancelBuild}
-                                onRetryBuild={handleGenerateAgentflow}
-                            />
-                        </Box>
-                    )}
+                        {activeTab === 'spec' && (
+                            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                                <SpecCard
+                                    spec={spec}
+                                    readiness={readiness}
+                                    revisionNumber={revisionNumber}
+                                    onOpenRevisions={handleOpenRevisions}
+                                    onGenerateAgentflow={handleGenerateAgentflow}
+                                />
+                            </Box>
+                        )}
+
+                        {activeTab === 'workflow' && (
+                            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', p: 1.5 }}>
+                                <WorkflowPanel
+                                    workflow={spec?.workflow}
+                                    readiness={readiness}
+                                    buildStatus={buildStatus}
+                                    mcpServers={spec?.mcpServers?.length ? spec.mcpServers : workspaceMcpServers}
+                                />
+                            </Box>
+                        )}
+
+                        {activeTab === 'test' && (
+                            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                                <TestChatPane
+                                    key={currentFlowId || 'pending'}
+                                    sessionId={sessionId}
+                                    flowId={currentFlowId}
+                                    flowType={currentFlowType || (canvasVersion === 'v1' ? 'MULTIAGENT' : 'AGENTFLOW')}
+                                    flowName={spec?.name || 'Trợ lý Agentflow'}
+                                    revisionNo={revisionNumber}
+                                    evaluationExamples={spec?.evaluationExamples || []}
+                                    buildStatus={buildStatus}
+                                    buildError={buildError}
+                                    onCancelBuild={handleCancelBuild}
+                                    onRetryBuild={handleGenerateAgentflow}
+                                />
+                            </Box>
+                        )}
+                    </Paper>
                 </Grid>
             </Grid>
 
@@ -529,7 +749,7 @@ const AgentBuilderView = () => {
                 onClose={() => setSnackbarMessage('')}
                 message={<Typography variant='body2'>{snackbarMessage}</Typography>}
             />
-        </MainCard>
+        </Box>
     )
 }
 

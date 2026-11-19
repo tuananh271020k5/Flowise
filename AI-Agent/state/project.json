@@ -1,35 +1,32 @@
 {
   "schemaVersion": 1,
-  "revision": 78,
-  "updatedAt": "2026-11-18T07:36:08.508Z",
+  "revision": 98,
+  "updatedAt": "2026-11-19T09:12:03.156Z",
   "authorization": "User explicitly authorized B-028 product fixes, runtime integration, audit remediation and UI run/test guide on 2026-11-17",
   "baselineGitHead": "c31ae010ad0da23b823abbc31c16a9e732025dad",
-  "currentTask": "B-030",
-  "status": "in_progress",
-  "productStage": "b030_docker_tsc_fixed",
-  "summary": "Sửa triệt để lỗi GitHub Actions Docker build (flowise#build exited 2): bổ sung kiểu Express/Multer tại routes/agent-builder/index.ts và bỏ import tĩnh xuyên package sang packages/components trong 2 file test (agentBehaviorPolicy.test.ts, documentUploadService.test.ts). Cả tsc --noEmit trên packages/server và packages/components đều exit 0; Jest 2 suites/13 tests pass.",
+  "currentTask": "B-035",
+  "status": "completed",
+  "productStage": "b035_t08_retriever_uuid_typo_reconciliation_completed",
+  "summary": "B-035-T08: Sua dut diem loi 'Buoc truy xuat tham chieu tai lieu chua duoc cap.' khi LLM (Gemini 2.5 Flash) go nham 1-4 ky tu hex trong UUID 36 ky tu cua dataSource (vi du 30d19c38-e383-48d8-a37e-8b73383bbb8c thay vi ...5bbb8c) hoac dien ten file thay vi ID: (1) them resolveOwnedSourceId va reconcileWorkflowDataSourceIds trong collectorService.ts tu dong chuan hoa/sua nham UUID theo khoang cach Hamming <= 4 hoac ten file hop le cua phien, loai bo ID rac va tu dong gan nguon cho buoc retriever; (2) goi doi soat trong extractWithModel, bindDataSourcesToExistingWorkflow va sessionService.ts (ke ca khi nguoi dung nhan 'xong' tren phien dang bi loi UUID cu).",
   "decisions": [
-    "Dùng kiểu tường minh trên route /sessions/:id/documents và ép kiểu middleware Multer sang express.RequestHandler để tương thích @types/express@4.17.",
-    "Tránh import ES tĩnh vượt ra ngoài packages/server/src sang packages/components trong file test để tsc của server không kéo source của components vào sai tsconfig.",
-    "Theo yêu cầu người dùng, đặt pushDefault sang remote standalone (Flowise-Agent-Builder.git) và chỉ push lên repo này."
+    "Chi tu dong sua typo UUID trong pham vi danh sach dataSources da thuoc quyen so huu cua phien hien tai (Hamming <= 4, khop duy nhat), giu nguyen rang buoc chan ID la/ngoai workspace khi khong co nguon hop le."
   ],
   "changedFiles": [
-    "packages/server/src/routes/agent-builder/index.ts",
-    "packages/server/src/services/agent-builder/agentBehaviorPolicy.test.ts",
-    "packages/server/src/services/agent-builder/knowledge/documentUploadService.test.ts"
+    "packages/server/src/services/agent-builder/collectorService.ts",
+    "packages/server/src/services/agent-builder/sessionService.ts",
+    "packages/server/src/services/agent-builder/collectorModel.test.ts"
   ],
   "checks": [
-    "tsc -p packages/server/tsconfig.json --noEmit: exit 0 (0 errors).",
-    "tsc -p packages/components/tsconfig.json --noEmit: exit 0 (0 errors).",
-    "Jest (--runInBand, heap 4096): agentBehaviorPolicy.test.ts + documentUploadService.test.ts (2 suites / 13 tests PASS).",
-    "node AI-Agent/scripts/prepare-builder.mjs: Prepared 61 backend overlay files PASS."
+    "ESLint tren collectorService.ts, sessionService.ts, collectorModel.test.ts: 0 errors",
+    "tsc -p packages/server/tsconfig.json --noEmit: exit 0",
+    "Backend Jest (--runInBand, heap 4096): collectorModel.test.ts va sessionService.test.ts pass (gom test tai hien dung loi typo 1 ky tu UUID)",
+    "prepare-builder.mjs: 76 backend overlay files pass"
   ],
   "blockers": [],
   "nextActions": [
-    "Commit và push lên https://github.com/tuananh271020k5/Flowise-Agent-Builder.git, kiểm tra GitHub Actions xanh.",
-    "Sẵn sàng nhận yêu cầu tính năng tiếp theo."
+    "Nguoi dung khoi dong lai server (Ctrl+C -> node AI-Agent/scripts/run-builder.mjs) de nap ban sua dist/ moi nhat, sau do chi can nhan 'xong' ngay tai phien hien tai (d312d368-...) hoac mo lai phien Rev #2 da build (76fada24-...) de chay thu tron bo L1/L2/L3."
   ],
-  "nextTask": "B-030",
+  "nextTask": "B-035",
   "references": [
     "PLAN_TONG_HOP.md",
     "AI-Agent/plans/FINAL_ACCEPTANCE_REPORT.md",
@@ -43,8 +40,8 @@
     "verifiedSavings": false
   },
   "snapshot": {
-    "head": "5e9593d3819879b09ea8f2297d54be93a1c92ef2",
+    "head": "0972c86d4963bcf6b9909a12dcd22c7f5387c8c0",
     "branch": "main",
-    "sourceFingerprint": "56a54fdd2f972ad4e4697dfbb8aa89d72ae82c60bb2219e3dc8e5726035ed2be"
+    "sourceFingerprint": "ec3756119529fb4eb727ec956f3ff339c3352a32359fe757508e0df43586f75f"
   }
 }

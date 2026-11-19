@@ -3,7 +3,10 @@ import client from './client'
 
 jest.mock('./client', () => ({
     get: jest.fn(),
-    post: jest.fn()
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn()
 }))
 
 describe('agentBuilder API client', () => {
@@ -23,6 +26,34 @@ describe('agentBuilder API client', () => {
         expect(body.get('expectedRevision')).toBe('0')
         expect(body.get('files').name).toBe('guide.md')
         expect(body.get('apiKey')).toBeNull()
+    })
+    it('uploads Excel and Word office files via multipart FormData to /agent-builder/office-files', async () => {
+        client.post.mockResolvedValueOnce({
+            data: { files: [{ fileId: 'f-1', fileName: 'Chi_Phi.xlsx', ext: 'xlsx' }] }
+        })
+        const excelFile = new File(['PK\x03\x04'], 'Chi_Phi.xlsx', {
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        const res = await agentBuilderApi.uploadOfficeFiles([excelFile])
+        const [url, body] = client.post.mock.calls[0]
+        expect(url).toBe('/agent-builder/office-files')
+        expect(body).toBeInstanceOf(FormData)
+        expect(body.get('files').name).toBe('Chi_Phi.xlsx')
+        expect(res.data.files[0].fileId).toBe('f-1')
+    })
+    it('lists and updates Helpdesk L3 tickets for Admin workspace management', async () => {
+        client.get.mockResolvedValueOnce({ data: { tickets: [{ ticketId: 'TCK-1001', status: 'Mới tiếp nhận' }] } })
+        const listRes = await agentBuilderApi.listHelpdeskTickets()
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/helpdesk/tickets')
+        expect(listRes.data.tickets[0].ticketId).toBe('TCK-1001')
+
+        client.patch.mockResolvedValueOnce({ data: { ticket: { ticketId: 'TCK-1001', status: 'Đang xử lý' } } })
+        const patchRes = await agentBuilderApi.updateHelpdeskTicket('TCK-1001', { status: 'Đang xử lý', note: 'Đang kiểm tra' })
+        expect(client.patch).toHaveBeenCalledWith('/agent-builder/helpdesk/tickets/TCK-1001', {
+            status: 'Đang xử lý',
+            note: 'Đang kiểm tra'
+        })
+        expect(patchRes.data.ticket.status).toBe('Đang xử lý')
     })
     it('loads the catalog with GET and sends no key or provider override from the browser', async () => {
         client.get.mockResolvedValueOnce({ data: { models: ['custom/model'] } })
@@ -482,5 +513,27 @@ describe('agentBuilder API client', () => {
 
         expect(client.post).toHaveBeenCalledWith('/agent-builder/mcp/call', payload)
         expect(res.data.content).toBeDefined()
+    })
+
+    it('listMcpServers, createMcpServer, refreshMcpServer, deleteMcpServer gọi đúng endpoint /agent-builder/mcp-servers', async () => {
+        client.get.mockResolvedValueOnce({ data: [{ id: 'mcp-1', name: 'Google Drive MCP', toolCount: 3 }] })
+        const listed = await agentBuilderApi.listMcpServers()
+        expect(client.get).toHaveBeenCalledWith('/agent-builder/mcp-servers')
+        expect(listed.data).toHaveLength(1)
+
+        const payload = { name: 'Google Drive MCP', serverUrl: 'https://mcp.example.com/sse' }
+        client.post.mockResolvedValueOnce({ data: { id: 'mcp-1', ...payload } })
+        const created = await agentBuilderApi.createMcpServer(payload)
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/mcp-servers', payload)
+        expect(created.data.id).toBe('mcp-1')
+
+        client.post.mockResolvedValueOnce({ data: { id: 'mcp-1', status: 'AUTHORIZED' } })
+        await agentBuilderApi.refreshMcpServer('mcp-1')
+        expect(client.post).toHaveBeenCalledWith('/agent-builder/mcp-servers/mcp-1/refresh')
+
+        client.delete.mockResolvedValueOnce({ data: { deleted: true } })
+        const deleted = await agentBuilderApi.deleteMcpServer('mcp-1')
+        expect(client.delete).toHaveBeenCalledWith('/agent-builder/mcp-servers/mcp-1')
+        expect(deleted.data.deleted).toBe(true)
     })
 })

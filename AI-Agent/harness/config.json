@@ -5,7 +5,7 @@
   "maxSourceBytes": 131072,
   "maxLogBytes": 2097152,
   "maxLogLines": 80,
-  "defaultTask": "AI-Agent/tasks/B-030.md",
+  "defaultTask": "AI-Agent/tasks/B-035.md",
   "baseFiles": [
     "AI-Agent/state/project.json",
     "AI-Agent/context/PROJECT_MAP.md"
@@ -57,6 +57,11 @@
     "AI-Agent/tasks/B-028.md",
     "AI-Agent/tasks/B-029.md",
     "AI-Agent/tasks/B-030.md",
+    "AI-Agent/tasks/B-031.md",
+    "AI-Agent/tasks/B-032.md",
+    "AI-Agent/tasks/B-033.md",
+    "AI-Agent/tasks/B-034.md",
+    "AI-Agent/tasks/B-035.md",
     "AI-Agent/GUI_TEST_GUIDE.md"
   ]
 }

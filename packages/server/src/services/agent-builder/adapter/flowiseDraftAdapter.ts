@@ -77,15 +77,16 @@ export class FlowiseDraftAdapter {
         // 2. Serialize flowData 1 lần duy nhất
         const serializedFlowData = this.serializeFlowData(graph)
 
-        // 3. Tạo ChatFlow record theo chuẩn Flowise Agentflow V2
+        // 3. Tạo ChatFlow record theo chuẩn Flowise Agentflow V2 hoặc V1 (MULTIAGENT)
+        const flowType = graph.flowConfig?.chatflowType === 'MULTIAGENT' ? EnumChatflowType.MULTIAGENT : EnumChatflowType.AGENTFLOW
         const chatflow = this.chatflowRepo.create({
             name: graph.flowConfig?.name || 'Trợ lý Agentflow mới',
             flowData: serializedFlowData,
-            type: EnumChatflowType.AGENTFLOW,
+            type: flowType,
             deployed: metadata?.deployed ?? false, // Mặc định an toàn cho draft
             isPublic: metadata?.isPublic ?? false, // Mặc định an toàn cho draft
             workspaceId,
-            category: graph.flowConfig?.category || 'Agent Flows'
+            category: graph.flowConfig?.category || (flowType === EnumChatflowType.MULTIAGENT ? 'Sequential Agents' : 'Agent Flows')
         })
 
         return this.chatflowRepo.save(chatflow)

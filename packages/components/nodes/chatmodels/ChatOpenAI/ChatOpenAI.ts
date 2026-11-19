@@ -88,6 +88,10 @@ class ChatOpenAI_ChatModels implements INode {
                 type: 'options',
                 options: [
                     {
+                        label: 'None',
+                        name: 'none'
+                    },
+                    {
                         label: 'Low',
                         name: 'low'
                     },
@@ -273,7 +277,9 @@ class ChatOpenAI_ChatModels implements INode {
             if (reasoningSummary) {
                 reasoning.summary = reasoningSummary
             }
-            obj.reasoning = reasoning
+            if (Object.keys(reasoning).length > 0) {
+                obj.reasoning = reasoning
+            }
         }
 
         let parsedBaseOptions: any | undefined = undefined

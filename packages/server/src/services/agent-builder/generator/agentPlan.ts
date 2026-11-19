@@ -47,6 +47,9 @@ export const calculatePlanHash = (spec: AgentSpec, specRevisionId: string): stri
         modelProfileRef: spec.modelProfileRef,
         instructions: spec.instructions,
         tools: spec.tools,
+        mcpServers: spec.mcpServers,
+        apiConnectors: spec.apiConnectors,
+        sqlConfig: spec.sqlConfig,
         dataSources: spec.dataSources,
         workflow: spec.workflow,
         specRevisionId
@@ -158,15 +161,27 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
         connectionRefs.sql = 'customTool'
     }
 
-    // 3. Ánh xạ Tools Capabilities (chỉ từ registry allowlist)
+    // 3. Ánh xạ Tools Capabilities (hỗ trợ toàn bộ Native Flowise Tools trong allowlist hoặc dynamic NodesPool)
     if (spec.tools && spec.tools.length > 0) {
         spec.tools.forEach((tool, idx) => {
             const toolType = tool.type || 'calculator'
             let toolNodeName = 'calculator'
-            if (toolType === 'webSearch') {
+            if (ALLOWED_AGENTFLOW_NODES[toolType] && ALLOWED_AGENTFLOW_NODES[toolType].baseClasses.includes('Tool')) {
+                toolNodeName = toolType
+            } else if (toolType === 'webSearch') {
                 toolNodeName = 'webSearch'
             } else if (toolType === 'customTool') {
                 toolNodeName = 'customTool'
+            } else if (/^[a-zA-Z0-9_]{2,80}$/.test(toolType) && tool.config?.dynamicFlowiseTool === true) {
+                const { dynamicFlowiseTool: _ignored, ...restCfg } = tool.config
+                capabilityBindings.push({
+                    capabilityId: `cap_tool_${toolType}_${idx}`,
+                    nodeName: toolType,
+                    nodeVersion: 1.0,
+                    type: 'tool',
+                    config: restCfg
+                })
+                return
             }
             const toolMeta = ALLOWED_AGENTFLOW_NODES[toolNodeName]
 
@@ -180,6 +195,24 @@ export const createAgentPlan = (spec: AgentSpec, specRevisionId: string = 'rev_i
                 })
             }
         })
+    }
+
+    // 3b. Ánh xạ Workspace MCP Server Capabilities (customMcpServerTool) (B-031)
+    if (spec.mcpServers && spec.mcpServers.length > 0) {
+        for (const mcpServer of spec.mcpServers) {
+            if (!mcpServer?.id || !Array.isArray(mcpServer.actions) || mcpServer.actions.length === 0) continue
+            capabilityBindings.push({
+                capabilityId: `cap_mcp_${mcpServer.id}`,
+                nodeName: 'customMcpServerTool',
+                nodeVersion: ALLOWED_AGENTFLOW_NODES.customMcpServerTool.recommendedVersion,
+                type: 'tool',
+                config: {
+                    mcpServerId: mcpServer.id,
+                    mcpActions: mcpServer.actions
+                }
+            })
+        }
+        connectionRefs.mcp = 'customMcpServerTool'
     }
 
     let templateId = ASSISTANT_TEMPLATE_ID

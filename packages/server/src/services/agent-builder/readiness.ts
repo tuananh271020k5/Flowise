@@ -61,7 +61,9 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         'modelProfileRef',
         'dataSources',
         'tools',
+        'mcpServers',
         'apiConnectors',
+        'canvasVersion',
         'sqlConfig',
         'policy',
         'evaluationExamples',
@@ -152,15 +154,48 @@ export function computeReadiness(spec: unknown): ReadinessResult {
         const workflow = raw.workflow as AgentSpec['workflow']
         if (Array.isArray(workflow?.steps)) {
             const sources = Array.isArray(raw.dataSources) ? (raw.dataSources as AgentSpec['dataSources']) : []
+            const specTools = Array.isArray(raw.tools) ? (raw.tools as AgentSpec['tools']) : []
+            const mcpServers = Array.isArray(raw.mcpServers) ? (raw.mcpServers as NonNullable<AgentSpec['mcpServers']>) : []
+            const apiConnectors = Array.isArray(raw.apiConnectors) ? (raw.apiConnectors as NonNullable<AgentSpec['apiConnectors']>) : []
+            const allowWrite = Boolean((raw.policy as any)?.allowWrite)
             if (workflow.steps.some((step) => step.type === 'retriever') && !sources.length) {
                 missingFields.push('dataSources')
                 issues.push('Hãy đính kèm tài liệu hoặc chọn Document Store để truy xuất.')
             }
-            if (sources.length && !workflow.steps.some((step) => step.type === 'retriever'))
+            if (sources.length && !workflow.steps.some((step) => step.type === 'retriever' || step.type === 'agent'))
                 issues.push('Đã gắn tài liệu nhưng kế hoạch chưa có bước truy xuất để dùng tài liệu.')
-            for (const step of workflow.steps)
+            for (const step of workflow.steps) {
                 if (step.type === 'retriever' && step.sourceIds?.some((id) => !sources.some((source) => source.id === id)))
                     issues.push('Bước truy xuất tham chiếu tài liệu chưa được cấp.')
+                if (step.mcpServerIds?.length && step.mcpServerIds.some((id) => !mcpServers.some((server) => server.id === id))) {
+                    missingFields.push('mcpServers')
+                    issues.push(`Bước ${step.label} tham chiếu MCP Server chưa được kết nối/ủy quyền trong Workspace.`)
+                }
+                if (step.nativeTools?.length) {
+                    for (const toolNodeName of step.nativeTools) {
+                        const matchedTool = specTools.find((t) => t.type === toolNodeName)
+                        if (!matchedTool) {
+                            issues.push(`Bước ${step.label} tham chiếu node công cụ "${toolNodeName}" chưa được khai báo trong spec.tools.`)
+                        } else if (typeof matchedTool.config?.missingCredential === 'string' && matchedTool.config.missingCredential) {
+                            issues.push(
+                                `Bước "${step.label}" dùng node ${matchedTool.name} cần kết nối tài khoản "${matchedTool.config.missingCredential}" trong mục Credentials ở thanh menu trái trước khi build (hoặc nhắn tôi chuyển sang dùng node nội bộ Excel/Word không cần đăng nhập).`
+                            )
+                        }
+                    }
+                }
+                if (step.type === 'http') {
+                    const connId = step.http?.connectorId
+                    const matched = connId ? apiConnectors.find((c) => c.connectorId === connId) : apiConnectors[0]
+                    if (!matched) {
+                        missingFields.push('apiConnectors')
+                        issues.push(`Bước ${step.label} cần kết nối API đã đăng ký trong Workspace trước khi gọi HTTP.`)
+                    }
+                    if (step.http?.method && step.http.method !== 'GET' && !allowWrite)
+                        issues.push(
+                            `Bước ${step.label} dùng phương thức ${step.http.method} nhưng chính sách hiện tại chưa bật allowWrite.`
+                        )
+                }
+            }
         }
         if (issues.length) {
             missingFields.push('workflow')

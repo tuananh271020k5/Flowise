@@ -109,4 +109,55 @@ describe('Authenticated runtime preview boundary', () => {
             'Chưa có hướng dẫn được xác nhận trong tài liệu DeskFlow cho yêu cầu này. Vui lòng hỏi người phụ trách.'
         )
     })
+    it('retries tool-bearing drafts without web_search when a custom gateway rejects Responses/web_search and appends export links', async () => {
+        findOneBy.mockResolvedValueOnce({
+            id: 'flow-office',
+            workspaceId: 'ws',
+            name: 'Thư ký Dự án',
+            flowData: JSON.stringify({
+                nodes: [
+                    {
+                        data: {
+                            name: 'agentAgentflow',
+                            inputs: {
+                                agentModel: 'chatOpenAI',
+                                agentMessages: [{ role: 'system', content: 'Tạo Excel và Word' }],
+                                agentTools: [{ agentSelectedTool: 'excelOfficeTool', agentSelectedToolConfig: {} }]
+                            }
+                        }
+                    }
+                ],
+                edges: []
+            })
+        })
+        ;(settings.getProfile as jest.Mock).mockResolvedValue({
+            ready: true,
+            webSearchEnabled: true,
+            modelName: 'gpt-5.6-luna',
+            baseUrl: 'https://gateway.example/v1',
+            credentialId: 'cred-1'
+        })
+        ;(utilBuildChatflow as jest.Mock)
+            .mockRejectedValueOnce(new Error('404 /v1/responses not found for web_search'))
+            .mockResolvedValueOnce({
+                text: 'Đã hoàn tất tạo tệp dự án.',
+                agentFlowExecutedData: [
+                    {
+                        data: {
+                            output: {
+                                content:
+                                    '[Tải xuống bang-cong-viec.xlsx](/api/v1/agent-builder/exports/11111111-2222-3333-4444-555555555555/bang-cong-viec.xlsx)'
+                            }
+                        }
+                    }
+                ]
+            })
+
+        const result = await predictDraft('flow-office', 'ws', { question: 'Lập bảng Excel công việc tuần này' })
+        expect(utilBuildChatflow).toHaveBeenCalledTimes(2)
+        const retryGraph = JSON.parse((utilBuildChatflow as jest.Mock).mock.calls[1][3])
+        expect(retryGraph.nodes[0].data.inputs.agentToolsBuiltInOpenAI).toEqual([])
+        expect(retryGraph.nodes[0].data.inputs.agentModelConfig.reasoningEffort).toBe('none')
+        expect(result.text).toContain('/api/v1/agent-builder/exports/11111111-2222-3333-4444-555555555555/bang-cong-viec.xlsx')
+    })
 })

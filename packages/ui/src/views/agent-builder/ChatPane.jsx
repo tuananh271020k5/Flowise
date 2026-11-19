@@ -4,8 +4,6 @@ import {
     Box,
     Card,
     CardContent,
-    CardHeader,
-    Divider,
     IconButton,
     InputAdornment,
     OutlinedInput,
@@ -45,18 +43,45 @@ const STARTER_SCENARIOS = [
     }
 ]
 
-const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirmBuild = false, onSendMessage, onNewSession }) => {
+const ChatPane = ({
+    messages = [],
+    documents = [],
+    suggestions = [],
+    isSending = false,
+    canConfirmBuild = false,
+    onSendMessage,
+    onNewSession
+}) => {
     const theme = useTheme()
     const [inputValue, setInputValue] = useState('')
     const messagesEndRef = useRef(null)
+    const inputRef = useRef(null)
     const [files, setFiles] = useState([])
     const [fileError, setFileError] = useState('')
     const [retrievalMode, setRetrievalMode] = useState('lexical')
     const [embeddingModel, setEmbeddingModel] = useState('text-embedding-3-small')
+    const [showSuggestions, setShowSuggestions] = useState(false)
     const chooseFiles = (picked) => {
-        const next = [...files, ...Array.from(picked || [])]
-        if (next.length > 5 || next.some((file) => file.size > 5 * 1024 * 1024 || !/\.(pdf|docx|txt|md|csv)$/i.test(file.name))) {
-            setFileError('Chọn tối đa 5 file PDF/DOCX/TXT/MD/CSV, mỗi file tối đa 5 MB.')
+        const incoming = Array.from(picked || [])
+        if (!incoming.length) return
+        const next = [...files, ...incoming]
+        if (next.length > 20) {
+            setFileError(`Bạn vừa chọn ${next.length} tệp — mỗi lần tải tối đa 20 tệp (mỗi phiên hỗ trợ đến 30 tệp).`)
+            return
+        }
+        const unsupported = next.find((file) => !/\.(pdf|docx|xlsx|txt|md|csv|json)$/i.test(file.name))
+        if (unsupported) {
+            setFileError(`Tệp "${unsupported.name}" chưa được hỗ trợ (hỗ trợ PDF, DOCX, XLSX, TXT, MD, CSV, JSON).`)
+            return
+        }
+        const oversized = next.find((file) => file.size > 25 * 1024 * 1024)
+        if (oversized) {
+            setFileError(`Tệp "${oversized.name}" (${(oversized.size / (1024 * 1024)).toFixed(1)} MB) vượt giới hạn 25 MB mỗi tệp.`)
+            return
+        }
+        const emptyFile = next.find((file) => file.size === 0)
+        if (emptyFile) {
+            setFileError(`Tệp "${emptyFile.name}" đang trống (0 byte).`)
             return
         }
         setFileError('')
@@ -99,6 +124,7 @@ const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirm
 
     return (
         <Card
+            variant='outlined'
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
                 event.preventDefault()
@@ -106,43 +132,52 @@ const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirm
             }}
             sx={{
                 height: '100%',
+                minHeight: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                borderRadius: 2,
-                border: `1px solid ${theme.palette.divider}`,
-                boxShadow: theme.palette.mode === 'dark' ? '0 2px 14px 0 rgba(0,0,0,0.4)' : '0 2px 14px 0 rgba(32,40,45,0.08)',
+                borderRadius: 2.5,
+                overflow: 'hidden',
+                borderColor: theme.palette.divider,
                 background: theme.palette.mode === 'dark' ? theme.palette.background.paper : '#ffffff'
             }}
         >
-            {/* Header */}
-            <CardHeader
-                title={
-                    <Stack direction='row' alignItems='center' spacing={1}>
-                        <IconMessages size={22} color={theme.palette.primary.main} />
-                        <Typography variant='h4' sx={{ fontWeight: 600 }}>
-                            Hội thoại Thiết kế Trợ lý
-                        </Typography>
-                    </Stack>
-                }
-                action={
-                    <Tooltip title='Tạo phiên làm việc mới'>
-                        <IconButton
-                            disabled={isSending}
-                            size='small'
-                            color='primary'
-                            onClick={() => {
-                                setFiles([])
-                                setInputValue('')
-                                onNewSession()
-                            }}
-                        >
-                            <IconPlus size={20} />
-                        </IconButton>
-                    </Tooltip>
-                }
-                sx={{ pb: 1 }}
-            />
-            <Divider />
+            {/* Header gọn, cùng chiều cao 46px khớp thẳng hàng với Tabs cột phải */}
+            <Box
+                sx={{
+                    minHeight: 46,
+                    px: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : '#f8fafc'
+                }}
+            >
+                <Stack direction='row' alignItems='center' spacing={1}>
+                    <IconMessages size={18} color={theme.palette.primary.main} />
+                    <Typography variant='subtitle1' sx={{ fontWeight: 600 }}>
+                        Hội thoại Thiết kế Trợ lý
+                    </Typography>
+                </Stack>
+                <Tooltip title='Tạo phiên làm việc mới'>
+                    <Button
+                        disabled={isSending}
+                        size='small'
+                        variant='text'
+                        color='primary'
+                        startIcon={<IconPlus size={16} />}
+                        onClick={() => {
+                            setFiles([])
+                            setInputValue('')
+                            setFileError('')
+                            onNewSession()
+                        }}
+                        sx={{ textTransform: 'none', fontSize: '0.78rem', fontWeight: 600 }}
+                    >
+                        Phiên mới
+                    </Button>
+                </Tooltip>
+            </Box>
 
             {/* Nội dung tin nhắn (Scrollable) */}
             <CardContent
@@ -351,90 +386,163 @@ const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirm
                 <div ref={messagesEndRef} />
             </CardContent>
 
-            <Divider />
-
-            {/* Ô nhập tin nhắn */}
-            <Box sx={{ p: 2, background: theme.palette.mode === 'dark' ? theme.palette.background.default : '#fafafa' }}>
+            {/* Khu vực nhập liệu hiện đại, tối ưu chiều cao cho khung hội thoại */}
+            <Box
+                sx={{
+                    px: 2,
+                    py: 1.5,
+                    borderTop: `1px solid ${theme.palette.divider}`,
+                    background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : '#f8fafc'
+                }}
+            >
                 {!!documents.length && (
-                    <Stack spacing={0.5} sx={{ mb: 1 }}>
-                        <Typography variant='caption'>Tài liệu đã gắn với Agent</Typography>
+                    <Stack direction='row' spacing={0.5} alignItems='center' flexWrap='wrap' useFlexGap sx={{ mb: 1 }}>
+                        <Typography variant='caption' color='textSecondary' sx={{ fontWeight: 600, mr: 0.5 }}>
+                            Nguồn đã nạp ({documents.length}):
+                        </Typography>
                         {documents.map((doc) => (
                             <Chip
                                 key={doc.id}
                                 size='small'
                                 variant='outlined'
-                                label={`${doc.name} · ${doc.config?.chunkCount || '?'} đoạn · ${
-                                    doc.config?.retrievalMode === 'vector'
-                                        ? 'embedding'
-                                        : doc.config?.uploaded
-                                        ? 'từ khóa'
-                                        : 'Document Store'
-                                }`}
+                                label={`${doc.name} · ${doc.config?.chunkCount || '?'} đoạn`}
+                                sx={{ height: 22, fontSize: '0.72rem' }}
                             />
                         ))}
                     </Stack>
                 )}
-                <Button size='small' component='label' startIcon={<IconPaperclip size={18} />} disabled={isSending} sx={{ mb: 1 }}>
-                    Đính kèm tài liệu
-                    <input
-                        disabled={isSending}
-                        name='documents'
-                        aria-label='Đính kèm tài liệu'
-                        type='file'
-                        hidden
-                        multiple
-                        accept='.pdf,.docx,.txt,.md,.csv'
-                        onChange={(event) => {
-                            chooseFiles(event.target.files)
-                            event.target.value = ''
-                        }}
-                    />
-                </Button>
+
                 {fileError && (
-                    <Alert severity='error' sx={{ mb: 1 }}>
+                    <Alert severity='error' onClose={() => setFileError('')} sx={{ mb: 1, py: 0.25, borderRadius: 1.5 }}>
                         {fileError}
                     </Alert>
                 )}
+
                 {!!files.length && (
-                    <Stack spacing={1} sx={{ mb: 1 }}>
-                        {files.map((file, index) => (
-                            <Chip
-                                key={`${file.name}-${index}`}
-                                label={`${file.name} · ${Math.ceil(file.size / 1024)} KB`}
-                                disabled={isSending}
-                                onDelete={() => setFiles(files.filter((_, i) => i !== index))}
-                            />
-                        ))}
-                        <FormControl size='small'>
-                            <InputLabel id='retrieval-mode-label'>Cách tìm trong tài liệu</InputLabel>
-                            <Select
-                                labelId='retrieval-mode-label'
-                                label='Cách tìm trong tài liệu'
-                                value={retrievalMode}
-                                disabled={isSending}
-                                onChange={(event) => setRetrievalMode(event.target.value)}
-                            >
-                                <MenuItem value='lexical'>Theo từ khóa — không gọi embedding</MenuItem>
-                                <MenuItem value='vector'>Theo ngữ nghĩa — embedding của provider</MenuItem>
-                            </Select>
-                        </FormControl>
-                        {retrievalMode === 'vector' && (
-                            <>
+                    <Stack spacing={1} sx={{ mb: 1.25 }}>
+                        <Stack direction='row' spacing={0.75} flexWrap='wrap' useFlexGap>
+                            {files.map((file, index) => (
+                                <Chip
+                                    key={`${file.name}-${index}`}
+                                    size='small'
+                                    color='primary'
+                                    variant='outlined'
+                                    label={`${file.name} · ${
+                                        file.size >= 1024 * 1024
+                                            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                                            : `${Math.max(1, Math.ceil(file.size / 1024))} KB`
+                                    }`}
+                                    disabled={isSending}
+                                    onDelete={() => setFiles(files.filter((_, i) => i !== index))}
+                                />
+                            ))}
+                        </Stack>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                            <FormControl size='small' sx={{ minWidth: 230 }}>
+                                <InputLabel id='retrieval-mode-label'>Cách tìm trong tài liệu</InputLabel>
+                                <Select
+                                    labelId='retrieval-mode-label'
+                                    label='Cách tìm trong tài liệu'
+                                    value={retrievalMode}
+                                    disabled={isSending}
+                                    onChange={(event) => setRetrievalMode(event.target.value)}
+                                >
+                                    <MenuItem value='lexical'>Theo từ khóa (nhanh, không tốn phí embedding)</MenuItem>
+                                    <MenuItem value='vector'>Theo ngữ nghĩa (dùng model embedding)</MenuItem>
+                                </Select>
+                            </FormControl>
+                            {retrievalMode === 'vector' && (
                                 <TextField
                                     size='small'
+                                    fullWidth
                                     label='Model embedding'
                                     value={embeddingModel}
                                     disabled={isSending}
                                     onChange={(event) => setEmbeddingModel(event.target.value)}
                                 />
-                                <Alert severity='info'>
-                                    Dùng key/Base URL đã lưu để tạo và truy vấn embedding. Provider phải hỗ trợ model này và có thể tính
-                                    phí.
-                                </Alert>
-                            </>
-                        )}
+                            )}
+                        </Stack>
                     </Stack>
                 )}
+
+                {Array.isArray(suggestions) && suggestions.length > 0 && !isSending && (
+                    <Box sx={{ mb: 1 }}>
+                        <Stack direction='row' alignItems='center' justifyContent='space-between' sx={{ mb: showSuggestions ? 0.75 : 0 }}>
+                            <Button
+                                size='small'
+                                variant='text'
+                                color='inherit'
+                                startIcon={<IconBulb size={14} color={theme.palette.warning.main} />}
+                                onClick={() => setShowSuggestions((prev) => !prev)}
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    color: 'text.secondary',
+                                    px: 0.5,
+                                    py: 0.2,
+                                    minWidth: 0
+                                }}
+                            >
+                                {showSuggestions
+                                    ? 'Thu gọn gợi ý tinh chỉnh'
+                                    : `Xem ${Math.min(3, suggestions.length)} gợi ý tinh chỉnh nhanh`}
+                            </Button>
+                            {!showSuggestions && (
+                                <Stack direction='row' spacing={0.5} sx={{ overflow: 'hidden', maxWidth: '62%' }}>
+                                    {suggestions.slice(0, 2).map((item, idx) => (
+                                        <Tooltip key={idx} title={item}>
+                                            <Chip
+                                                size='small'
+                                                variant='outlined'
+                                                clickable
+                                                label={item}
+                                                onClick={() => {
+                                                    setInputValue(item)
+                                                    setTimeout(() => inputRef.current?.focus(), 0)
+                                                }}
+                                                sx={{
+                                                    height: 24,
+                                                    maxWidth: 190,
+                                                    fontSize: '0.72rem',
+                                                    borderColor: 'divider',
+                                                    bgcolor: theme.palette.background.paper
+                                                }}
+                                            />
+                                        </Tooltip>
+                                    ))}
+                                </Stack>
+                            )}
+                        </Stack>
+                        {showSuggestions && (
+                            <Stack spacing={0.5}>
+                                {suggestions.slice(0, 3).map((item, idx) => (
+                                    <ButtonBase
+                                        key={idx}
+                                        onClick={() => {
+                                            setInputValue(item)
+                                            setTimeout(() => inputRef.current?.focus(), 0)
+                                        }}
+                                        sx={{
+                                            px: 1.25,
+                                            py: 0.65,
+                                            borderRadius: 1.5,
+                                            border: `1px solid ${theme.palette.divider}`,
+                                            bgcolor: theme.palette.background.paper,
+                                            textAlign: 'left',
+                                            justifyContent: 'flex-start',
+                                            fontSize: '0.78rem',
+                                            color: 'text.primary',
+                                            '&:hover': { borderColor: theme.palette.primary.main }
+                                        }}
+                                    >
+                                        {item}
+                                    </ButtonBase>
+                                ))}
+                            </Stack>
+                        )}
+                    </Box>
+                )}
+
                 {canConfirmBuild && !isSending && (
                     <Stack
                         direction={{ xs: 'column', sm: 'row' }}
@@ -442,37 +550,70 @@ const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirm
                         justifyContent='space-between'
                         spacing={1}
                         sx={{
-                            mb: 1.25,
+                            mb: 1,
                             px: 1.5,
-                            py: 1,
+                            py: 0.75,
                             borderRadius: 1.5,
                             border: `1px solid ${theme.palette.success.main}`,
                             bgcolor: theme.palette.mode === 'dark' ? 'rgba(76,175,80,0.12)' : 'rgba(76,175,80,0.08)'
                         }}
                     >
-                        <Typography variant='body2'>Đã đủ thông tin thiết kế. Bạn có thể nhắn thêm yêu cầu hoặc chốt tạo Agent:</Typography>
+                        <Typography variant='caption' sx={{ fontWeight: 500 }}>
+                            Đã đủ thông tin thiết kế. Tiếp tục bổ sung hoặc chốt tạo Agent ngay:
+                        </Typography>
                         <Button
                             size='small'
                             variant='contained'
                             color='success'
-                            startIcon={<IconCheck size={16} />}
+                            startIcon={<IconCheck size={15} />}
                             onClick={() => onSendMessage('xong', [], { retrievalMode, embeddingModel })}
-                            sx={{ fontWeight: 600, flexShrink: 0 }}
+                            sx={{ fontWeight: 600, flexShrink: 0, textTransform: 'none', py: 0.35 }}
                         >
                             Xong — Tạo Agent
                         </Button>
                     </Stack>
                 )}
+
                 <OutlinedInput
+                    inputRef={inputRef}
                     fullWidth
                     multiline
                     minRows={1}
                     maxRows={4}
-                    placeholder='Mô tả trợ lý bạn muốn xây dựng... (Nhấn Enter để gửi, Shift+Enter xuống dòng)'
+                    placeholder='Mô tả trợ lý hoặc thả tệp tài liệu vào đây... (Enter để gửi, Shift+Enter xuống dòng)'
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={isSending}
+                    startAdornment={
+                        <InputAdornment position='start'>
+                            <Tooltip title='Đính kèm tài liệu nguồn (PDF, DOCX, XLSX, TXT, MD, CSV, JSON — tối đa 20 tệp, 25 MB/tệp)'>
+                                <span>
+                                    <IconButton
+                                        component='label'
+                                        size='small'
+                                        color={files.length ? 'primary' : 'default'}
+                                        disabled={isSending}
+                                    >
+                                        <IconPaperclip size={19} />
+                                        <input
+                                            disabled={isSending}
+                                            name='documents'
+                                            aria-label='Đính kèm tài liệu'
+                                            type='file'
+                                            hidden
+                                            multiple
+                                            accept='.pdf,.docx,.xlsx,.txt,.md,.csv,.json'
+                                            onChange={(event) => {
+                                                chooseFiles(event.target.files)
+                                                event.target.value = ''
+                                            }}
+                                        />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
+                        </InputAdornment>
+                    }
                     endAdornment={
                         <InputAdornment position='end'>
                             <Tooltip title='Gửi tin nhắn (Enter)'>
@@ -503,6 +644,7 @@ const ChatPane = ({ messages = [], documents = [], isSending = false, canConfirm
 ChatPane.propTypes = {
     messages: PropTypes.array,
     documents: PropTypes.array,
+    suggestions: PropTypes.array,
     isSending: PropTypes.bool,
     canConfirmBuild: PropTypes.bool,
     onSendMessage: PropTypes.func.isRequired,

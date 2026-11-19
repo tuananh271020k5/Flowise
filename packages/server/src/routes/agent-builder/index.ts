@@ -34,11 +34,24 @@ router.post(
     },
     multer({
         storage: multer.memoryStorage(),
-        limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 6, fieldSize: 18000 }
-    }).array('files', 5) as unknown as express.RequestHandler,
+        limits: { fileSize: 25 * 1024 * 1024, files: 20, fields: 8, fieldSize: 32000 }
+    }).array('files', 20) as unknown as express.RequestHandler,
     agentBuilderController.uploadDocuments
 )
 router.get('/documents/:storeId/chunks/:chunkId', agentBuilderController.readDocumentChunk)
+router.get('/exports/:fileId/:fileName', agentBuilderController.downloadExportedFile)
+router.get('/helpdesk/tickets', agentBuilderController.listHelpdeskTickets)
+router.patch('/helpdesk/tickets/:ticketId', agentBuilderController.updateHelpdeskTicket)
+router.get('/office-files', agentBuilderController.listOfficeFiles)
+router.post(
+    '/office-files',
+    multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 10 * 1024 * 1024, files: 5 }
+    }).array('files', 5) as unknown as express.RequestHandler,
+    agentBuilderController.uploadOfficeFiles
+)
+router.get('/native-tools', agentBuilderController.listWorkspaceNativeTools)
 
 // LIST REVISIONS
 router.get('/sessions/:id/revisions', agentBuilderController.getRevisions)
@@ -123,8 +136,24 @@ router.get('/webhooks', agentBuilderController.listWebhooks)
 router.post('/webhooks', agentBuilderController.registerWebhook)
 router.post('/webhooks/:id/receive', agentBuilderController.receiveWebhook)
 
-// MODEL CONTEXT PROTOCOL TOOLS (PH6-T12)
+// MODEL CONTEXT PROTOCOL TOOLS (PH6-T12 & B-031)
 router.get('/mcp/tools', agentBuilderController.listMcpTools)
 router.post('/mcp/call', agentBuilderController.callMcpTool)
+router.get('/mcp-servers', agentBuilderController.listWorkspaceMcpServers)
+router.post(
+    '/mcp-servers',
+    checkAnyPermission('tools:create,tools:update,credentials:create,credentials:update'),
+    agentBuilderController.registerWorkspaceMcpServer
+)
+router.post(
+    '/mcp-servers/:id/refresh',
+    checkAnyPermission('tools:create,tools:update,credentials:create,credentials:update'),
+    agentBuilderController.refreshWorkspaceMcpServer
+)
+router.delete(
+    '/mcp-servers/:id',
+    checkAnyPermission('tools:delete,tools:update,credentials:update'),
+    agentBuilderController.deleteWorkspaceMcpServer
+)
 
 export default router

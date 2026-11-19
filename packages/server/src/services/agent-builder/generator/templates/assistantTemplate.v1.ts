@@ -23,9 +23,12 @@ export interface AgentflowNodeData {
 
 export interface AgentflowNode {
     id: string
-    type: 'agentFlow'
+    type: 'agentFlow' | 'iteration'
     position: { x: number; y: number }
     data: AgentflowNodeData
+    parentNode?: string
+    extent?: 'parent'
+    style?: { width: number; height: number }
     width?: number
     height?: number
 }

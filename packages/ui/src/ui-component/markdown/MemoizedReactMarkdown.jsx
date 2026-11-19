@@ -6,6 +6,7 @@ import { CodeBlock } from '../markdown/CodeBlock'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeMathjax from 'rehype-mathjax'
+import client from '@/api/client'
 
 /**
  * Checks if text likely contains LaTeX math notation
@@ -116,7 +117,43 @@ export const MemoizedReactMarkdown = memo(
                                 </code>
                             )
                         },
+                        table({ children, ...tableProps }) {
+                            return (
+                                <div className='markdown-table-wrap'>
+                                    <table {...tableProps}>{children}</table>
+                                </div>
+                            )
+                        },
                         a({ href, children, ...linkProps }) {
+                            const isBuilderExport =
+                                typeof href === 'string' && /^\/api\/v1\/agent-builder\/exports\/[^/]+\/[^/]+$/i.test(href)
+                            if (isBuilderExport) {
+                                const handleExportDownload = async (event) => {
+                                    event.preventDefault()
+                                    try {
+                                        const apiPath = href.replace(/^\/api\/v1/, '')
+                                        const response = await client.get(apiPath, { responseType: 'blob' })
+                                        const blobUrl = window.URL.createObjectURL(new Blob([response.data]))
+                                        const rawName = href.split('/').pop() || 'export'
+                                        const fileName = decodeURIComponent(rawName)
+                                        const anchor = document.createElement('a')
+                                        anchor.href = blobUrl
+                                        anchor.setAttribute('download', fileName)
+                                        document.body.appendChild(anchor)
+                                        anchor.click()
+                                        anchor.remove()
+                                        window.URL.revokeObjectURL(blobUrl)
+                                    } catch (err) {
+                                        // eslint-disable-next-line no-console
+                                        console.error('Lỗi tải tệp xuất bản:', err)
+                                    }
+                                }
+                                return (
+                                    <a href={href} onClick={handleExportDownload} {...linkProps}>
+                                        {children}
+                                    </a>
+                                )
+                            }
                             return (
                                 <a href={href} target='_blank' rel='noopener noreferrer' {...linkProps}>
                                     {children}

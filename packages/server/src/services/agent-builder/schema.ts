@@ -95,6 +95,26 @@ export const ApiConnectorRefSchema = z
     .strict()
 
 /**
+ * Authorized Workspace MCP Server reference schema (B-031).
+ */
+export const McpServerRefSchema = z
+    .object({
+        id: safeString(1, 100, 'MCP Server ID'),
+        name: safeString(1, 120, 'MCP Server Name'),
+        actions: z
+            .array(
+                z
+                    .string()
+                    .trim()
+                    .regex(/^[a-zA-Z0-9_-]{1,128}$/, 'Tên MCP action không hợp lệ')
+            )
+            .min(1, 'MCP Server cần ít nhất 1 action được cấp phép')
+            .max(64, 'Tối đa 64 MCP actions cho mỗi server'),
+        description: safeString(1, 500, 'Mô tả MCP Server').optional()
+    })
+    .strict()
+
+/**
  * SQL agent configuration schema (PH6-T06).
  */
 export const SqlAgentConfigSchema = z
@@ -123,6 +143,29 @@ export const PolicySchema = z
     .strict()
 
 /**
+ * Normalizes descriptive language strings from LLM output (e.g. "Tiếng Việt chuyên nghiệp", "Vietnamese", "English")
+ * into compact ISO-style language codes accepted by AgentSpecSchema (2..10 chars).
+ */
+export const normalizeLanguageCode = (raw: unknown): unknown => {
+    if (raw === undefined || raw === null) return undefined
+    if (typeof raw !== 'string') return raw
+    const trimmed = raw.trim()
+    if (!trimmed) return 'vi'
+    const lower = trimmed.toLowerCase()
+    if (/song\s*ngữ|bilingual/.test(lower)) return 'vi-en'
+    if (/tiếng\s*việt|tieng\s*viet|vietnamese|^vi(?:[-_][a-z]{2})?$/.test(lower)) return 'vi'
+    if (/tiếng\s*anh|tieng\s*anh|english|^en(?:[-_][a-z]{2})?$/.test(lower)) return 'en'
+    if (/tiếng\s*nhật|tieng\s*nhat|japanese|^ja(?:[-_][a-z]{2})?$/.test(lower)) return 'ja'
+    if (/tiếng\s*hàn|tieng\s*han|korean|^ko(?:[-_][a-z]{2})?$/.test(lower)) return 'ko'
+    if (/tiếng\s*trung|tieng\s*trung|chinese|^zh(?:[-_][a-z]{2,4})?$/.test(lower)) return 'zh'
+    if (/tiếng\s*pháp|tieng\s*phap|french|^fr(?:[-_][a-z]{2})?$/.test(lower)) return 'fr'
+    if (/tiếng\s*đức|tieng\s*duc|german|^de(?:[-_][a-z]{2})?$/.test(lower)) return 'de'
+    if (/tiếng\s*tây\s*ban\s*nha|spanish|^es(?:[-_][a-z]{2})?$/.test(lower)) return 'es'
+    if (trimmed.length >= 2 && trimmed.length <= 10) return trimmed
+    return 'vi'
+}
+
+/**
  * Complete AgentSpec v1 schema.
  * Rejects unknown fields via .strict() to prevent tenantId / credential bypass.
  */
@@ -132,7 +175,12 @@ export const AgentSpecSchema = z
         kind: z.enum(['assistant', 'knowledge', 'api-readonly', 'data-readonly', 'sql-readonly']).default('assistant'),
         name: safeString(1, 100, 'Tên trợ lý (name)'),
         goal: safeString(5, 1000, 'Mục tiêu trợ lý (goal)'),
-        language: z.string().trim().min(2, 'Mã ngôn ngữ tối thiểu 2 ký tự').max(10, 'Mã ngôn ngữ tối đa 10 ký tự').default('vi'),
+        language: z
+            .preprocess(
+                normalizeLanguageCode,
+                z.string().trim().min(2, 'Mã ngôn ngữ tối thiểu 2 ký tự').max(10, 'Mã ngôn ngữ tối đa 10 ký tự')
+            )
+            .default('vi'),
         instructions: safeString(5, 4000, 'Hướng dẫn chỉ dẫn (instructions)'),
         outputExpectations: z
             .array(safeString(1, 500, 'Kỳ vọng đầu ra (outputExpectation)'))
@@ -147,10 +195,12 @@ export const AgentSpecSchema = z
                 message: 'modelProfileRef chỉ là tên định danh logic, không được chứa khóa API hoặc secret'
             })
             .default('default-builder-model'),
-        dataSources: z.array(DataSourceRefSchema).max(10, 'Tối đa 10 data sources').default([]),
+        dataSources: z.array(DataSourceRefSchema).max(30, 'Tối đa 30 data sources').default([]),
         tools: z.array(ToolRefSchema).max(20, 'Tối đa 20 tools').default([]),
+        mcpServers: z.array(McpServerRefSchema).max(10, 'Tối đa 10 MCP servers').optional(),
         apiConnectors: z.array(ApiConnectorRefSchema).max(10, 'Tối đa 10 API connectors').optional(),
         sqlConfig: SqlAgentConfigSchema.optional(),
+        canvasVersion: z.enum(['v1', 'v2']).optional(),
         workflow: WorkflowSchema.refine(
             (value) => !containsSecret(JSON.stringify(value)) && !containsScriptTag(JSON.stringify(value)),
             'Workflow không được chứa secret/script'
